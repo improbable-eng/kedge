@@ -14,7 +14,7 @@ function proto_build_dir {
   DIR_FULL=${1}
   DIR_REL=${1##${PROTOBUF_DIR}}
   DIR_REL=${DIR_REL#/}
-  echo -n "proto_build: $DIR_REL "
+  echo "proto_build: $DIR_REL"
   mkdir -p ${GENERATION_DIR}/${DIR_REL} 2> /dev/null
   PATH=${GOPATH}/bin:$PATH protoc \
     -I${PROTOBUF_DIR} \
@@ -29,7 +29,7 @@ function fix_imports {
   for file in $(ls ${DIR_FULL}/*.go 2>/dev/null); do
     # This is a massive hack (prefix of "kfe")
     # See https://github.com/golang/protobuf/issues/63
-    sed -i '' -E "s~^import(.*) \"kfe(.*)\"$~import \1 \"${IMPORT_PREFIX}/kfe\2\"~" ${file};
+    sed --in-place='' -r "s~^import(.*) \"kfe(.*)\"$~import \1 \"${IMPORT_PREFIX}/kfe\2\"~" ${file};
     echo $file;
   done
 }

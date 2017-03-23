@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kfe.config.grpc.routes;
 
-/// Backend is a gRPC ClientConn pool maintained to a single serivce.
+/// Route is a mapping between invoked gRPC requests and backends that should serve it.
 message Route {
     /// backend_name is the string identifying the backend to send data to.
     string backend_name = 1;

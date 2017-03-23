@@ -9,39 +9,38 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/mwitkow/bazel-distcache/common/sharedflags"
 	"github.com/mwitkow/go-nicejsonpb"
-	pb_be "github.com/mwitkow/grpc-proxy/backendpool/proto"
-	pb_director "github.com/mwitkow/grpc-proxy/director/proto"
+	pb_config "github.com/mwitkow/kfe/_protogen/kfe/config"
 
-	"github.com/mwitkow/grpc-proxy/backendpool"
-	"github.com/mwitkow/grpc-proxy/director/router"
+	"github.com/mwitkow/kfe/grpc/backendpool"
+	"github.com/mwitkow/kfe/grpc/director/router"
 )
 
 var (
 	flagConfigDirectorPath = sharedflags.Set.String(
 		"grpcproxy_config_director_path",
-		"misc/director.json",
+		"../misc/director.json",
 		"Path to the jsonPB file configuring the director.")
 	flagConfigBackendPoolPath = sharedflags.Set.String(
 		"grpcproxy_config_backendpool_path",
-		"misc/backendpool.json",
+		"../misc/backendpool.json",
 		"Path to the jsonPB file configuring the backend pool.")
 )
 
-func buildRouterOrFail() router.Router {
-	cnf := &pb_director.Config{}
+func buildGrpcRouterOrFail() router.Router {
+	cnf := &pb_config.DirectorConfig{}
 	if err := readAsJson(*flagConfigDirectorPath, cnf); err != nil {
 		log.Fatalf("failed reading proxy director config: %v", err)
 	}
-	r := router.NewStatic(cnf)
+	r := router.NewStatic(cnf.Grpc.Routes)
 	return r
 }
 
-func buildBackendPoolOrFail() backendpool.Pool {
-	cnf := &pb_be.Config{}
+func buildGrpcBackendPoolOrFail() backendpool.Pool {
+	cnf := &pb_config.BackendPoolConfig{}
 	if err := readAsJson(*flagConfigBackendPoolPath, cnf); err != nil {
 		log.Fatalf("failed reading backend pool config: %v", err)
 	}
-	bePool, err := backendpool.NewStatic(cnf)
+	bePool, err := backendpool.NewStatic(cnf.GetGrpc().Backends)
 	if err != nil {
 		log.Fatalf("failed creating backend pool: %v", err)
 	}

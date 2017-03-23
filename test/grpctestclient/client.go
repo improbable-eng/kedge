@@ -9,7 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	pb_base "github.com/mwitkow/grpc-proxy/server/testclient/proto"
+	pb_base "github.com/mwitkow/kfe/_protogen/base"
 
 	"io"
 	"os"
@@ -24,7 +24,7 @@ var (
 )
 
 func addClientCerts(tlsConfig *tls.Config) {
-	cert, err := tls.LoadX509KeyPair("../misc/client.crt", "../misc/client.key")
+	cert, err := tls.LoadX509KeyPair("../../misc/client.crt", "../../misc/client.key")
 	if err != nil {
 		logrus.Fatal("failed loading client cert: %v", err)
 	}

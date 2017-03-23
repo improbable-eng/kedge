@@ -3,7 +3,7 @@ package backendpool
 import (
 	"fmt"
 
-	pb "github.com/mwitkow/grpc-proxy/backendpool/proto"
+	pb "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/backends"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
@@ -23,9 +23,9 @@ type static struct {
 }
 
 // NewStatic creates a backend pool that has static configuration.
-func NewStatic(config *pb.Config) (Pool, error) {
+func NewStatic(backends []*pb.Backend) (Pool, error) {
 	s := &static{backends: make(map[string]*backend)}
-	for _, beCnf := range config.Backends {
+	for _, beCnf := range backends {
 		be, err := newBackend(beCnf)
 		if err != nil {
 			return nil, fmt.Errorf("failed creating backend '%v': %v", beCnf.Name, err)

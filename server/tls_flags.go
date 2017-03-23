@@ -8,17 +8,17 @@ import (
 	"io/ioutil"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/grpc-proxy/server/sharedflags"
+	"github.com/mwitkow/kfe/server/sharedflags"
 )
 
 var (
 	flagTlsServerCert = sharedflags.Set.String(
 		"server_tls_cert_file",
-		"misc/localhost.crt",
+		"../misc/localhost.crt",
 		"Path to the PEM certificate for server use.")
 	flagTlsServerKey = sharedflags.Set.String(
 		"server_tls_key_file",
-		"misc/localhost.key",
+		"../misc/localhost.key",
 		"Path to the PEM key for the certificate for the server use.")
 	flagTlsServerClientCAFiles = sharedflags.Set.StringSlice(
 		"server_tls_client_ca_files",

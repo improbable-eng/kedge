@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package kfe.config.common.resolvers;
+
+/// SrvBackend describes a gRPC backend that is resolved and load balanced using SRV.
+message SrvResolver {
+    /// dns_name specifies the address to look up using DNS SRV. Needs to be a FQDN.
+    /// E.g. "_grpc._tcp.someservice.somenamespace.svc.cluster.local"
+    string dns_name = 2;
+}
+
+/// KubeResolver uses the Kubernetes Endpoints API to identify the service.
+/// It requires the job to run inside a K8S pod and uses the pod's credentails to fetch the service information.
+message KubeResolver {
+    /// namespace is the k8s namespace to use.
+    /// If unset, it deafults to 'deafult'.
+    string namespace = 1;
+    /// service_name is the k8s service name to use.
+    string service_name = 2;
+    /// port_name is the name of the port to bind in the service.
+    string port_name = 3;
+}

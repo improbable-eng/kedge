@@ -12,8 +12,8 @@ import (
 	"github.com/mwitkow/go-grpc-middleware"
 	"github.com/mwitkow/go-srvlb/grpc"
 	"github.com/mwitkow/go-srvlb/srv"
-	pb "github.com/mwitkow/grpc-proxy/backendpool/proto"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	pb "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/backends"
 	"github.com/sercand/kuberesolver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -63,7 +63,7 @@ func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
 	dialFunc := ParentDialFunc
 	if !cnf.DisableConntracking {
 		dialFunc = conntrack.NewDialContextFunc(
-			conntrack.DialWithName("backend_" + cnf.Name),
+			conntrack.DialWithName("backend_"+cnf.Name),
 			conntrack.DialWithDialContextFunc(dialFunc),
 			conntrack.DialWithTracing(),
 		)

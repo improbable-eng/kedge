@@ -2,10 +2,11 @@ package main
 
 import (
 	"net"
-	"google.golang.org/grpc/credentials"
+
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 )
 
 // optionalTlsCreds acts as gRPC `credentials.TransportAuthenticator` but checks if the connection came from an TLS-configured listener.

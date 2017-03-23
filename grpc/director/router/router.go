@@ -1,7 +1,7 @@
 package router
 
 import (
-	pb "github.com/mwitkow/grpc-proxy/director/proto"
+	pb "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/routes"
 
 	"strings"
 
@@ -22,11 +22,11 @@ type Router interface {
 }
 
 type router struct {
-	config *pb.Config
+	routes []*pb.Route
 }
 
-func NewStatic(cnf *pb.Config) *router {
-	return &router{config: cnf}
+func NewStatic(routes []*pb.Route) *router {
+	return &router{routes: routes}
 }
 
 func (r *router) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
@@ -34,7 +34,7 @@ func (r *router) Route(ctx context.Context, fullMethodName string) (backendName 
 	if !ok {
 		md = emptyMd
 	}
-	for _, route := range r.config.Routes {
+	for _, route := range r.routes {
 		if !r.serviceNameMatches(fullMethodName, route.ServiceNameMatcher) {
 			continue
 		}

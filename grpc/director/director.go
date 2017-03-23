@@ -1,12 +1,12 @@
 package director
 
 import (
-	"github.com/mwitkow/grpc-proxy/backendpool"
-	"github.com/mwitkow/grpc-proxy/director/router"
+	"github.com/mwitkow/go-grpc-middleware/logging"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	"github.com/mwitkow/kfe/grpc/backendpool"
+	"github.com/mwitkow/kfe/grpc/director/router"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"github.com/mwitkow/go-grpc-middleware/logging"
 )
 
 // New builds a StreamDirector based off a backend pool and a router.

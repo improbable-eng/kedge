@@ -3,7 +3,7 @@ package router
 import "testing"
 import (
 	"github.com/golang/protobuf/jsonpb"
-	pb "github.com/mwitkow/grpc-proxy/director/proto"
+	pb "github.com/mwitkow/kfe/_protogen/kfe/config"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
@@ -41,9 +41,9 @@ func TestRouteMatches(t *testing.T) {
 		"serviceNameMatcher": "com.*"
 	}
 ]}`
-	config := &pb.Config{}
+	config := &pb.DirectorConfig_Grpc{}
 	require.NoError(t, jsonpb.UnmarshalString(configJson, config))
-	r := &router{config: config}
+	r := &router{routes: config.Routes}
 
 	for _, tcase := range []struct {
 		name            string
@@ -104,7 +104,7 @@ func TestRouteMatches(t *testing.T) {
 	} {
 		t.Run(tcase.name, func(t *testing.T) {
 			ctx := metadata.NewContext(context.TODO(), tcase.md)
-			be, _ := r.Route(tcase.fullServiceName, ctx)
+			be, _ := r.Route(ctx, tcase.fullServiceName)
 			assert.Equal(t, be, tcase.expectedBackend, "must match expected backend")
 		})
 

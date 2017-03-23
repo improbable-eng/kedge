@@ -19,9 +19,9 @@ import (
 	"github.com/mwitkow/go-flagz"
 	"github.com/mwitkow/go-grpc-middleware"
 	"github.com/mwitkow/go-grpc-middleware/logging/logrus"
-	"github.com/mwitkow/grpc-proxy/director"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	"github.com/mwitkow/grpc-proxy/server/sharedflags"
+	"github.com/mwitkow/kfe/grpc/director"
+	"github.com/mwitkow/kfe/server/sharedflags"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
@@ -52,7 +52,7 @@ func main() {
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
 
-	proxyDirector := director.New(buildBackendPoolOrFail(), buildRouterOrFail())
+	proxyDirector := director.New(buildGrpcBackendPoolOrFail(), buildGrpcRouterOrFail())
 	grpcTlsCreds := newOptionalTlsCreds() // allows the server to listen both over tLS and nonTLS at the same time.
 	grpcServer := grpc.NewServer(
 		grpc.CustomCodec(proxy.Codec()), // needed for proxy to function.

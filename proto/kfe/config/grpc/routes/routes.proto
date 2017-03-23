@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package mwitkow.grpcproxy.director;
+package kfe.config.grpc.routes;
 
 /// Backend is a gRPC ClientConn pool maintained to a single serivce.
 message Route {

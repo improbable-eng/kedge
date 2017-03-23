@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package kfe.config;
+
+import "kfe/config/grpc/routes/routes.proto";
+
+/// DirectorConfig is the top level configuration message the director.
+message DirectorConfig {
+    message Grpc {
+        repeated kfe.config.grpc.routes.Route routes = 1;
+    }
+
+    Grpc grpc = 1;
+}
+

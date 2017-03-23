@@ -8,6 +8,16 @@
 Kubernetes Frontend (KFE) for gRPC, HTTP (1.1/2) microservices with the aim to make cross-cluster
 microservice communication simple (no service discovery) and secure (TLS client certs).
 
+
+## Reason
+
+Kubernetes is great, if you have one cluster. If you have two, you face the problem of making service in cluster A 
+communicate with a service in cluster B. [K8S Federation](https://kubernetes.io/docs/concepts/cluster-administration/federation/) and others
+networking solutions rely on low-level networking that is hard to set up (tunnels, DNS federation).
+
+This project allows for a really simple solution to the problem: a FE that allows services to talk to others services
+via client-side certificates.
+
 ## Project Status
 
 **In development**

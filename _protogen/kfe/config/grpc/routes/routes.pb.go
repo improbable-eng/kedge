@@ -28,7 +28,7 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
-// / Backend is a gRPC ClientConn pool maintained to a single serivce.
+// / Route is a mapping between invoked gRPC requests and backends that should serve it.
 type Route struct {
 	// / backend_name is the string identifying the backend to send data to.
 	BackendName string `protobuf:"bytes,1,opt,name=backend_name,json=backendName" json:"backend_name,omitempty"`

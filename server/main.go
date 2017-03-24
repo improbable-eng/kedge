@@ -55,7 +55,7 @@ func main() {
 	proxyDirector := director.New(buildGrpcBackendPoolOrFail(), buildGrpcRouterOrFail())
 	grpcTlsCreds := newOptionalTlsCreds() // allows the server to listen both over tLS and nonTLS at the same time.
 	grpcServer := grpc.NewServer(
-		grpc.CustomCodec(proxy.Codec()), // needed for proxy to function.
+		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
 		grpc.UnknownServiceHandler(proxy.TransparentHandler(proxyDirector)),
 		grpc_middleware.WithUnaryServerChain(
 			grpc_logrus.UnaryServerInterceptor(logEntry),

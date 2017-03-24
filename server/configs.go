@@ -13,6 +13,8 @@ import (
 
 	grpc_bp "github.com/mwitkow/kfe/grpc/backendpool"
 	grpc_router "github.com/mwitkow/kfe/grpc/director/router"
+	http_bp "github.com/mwitkow/kfe/http/backendpool"
+	http_router "github.com/mwitkow/kfe/http/director/router"
 )
 
 var (
@@ -26,46 +28,30 @@ var (
 		"Path to the jsonPB file configuring the backend pool.")
 )
 
-func buildGrpcRouterOrFail() grpc_router.Router {
+func buildRouterOrFail() (grpc_router.Router, http_router.Router) {
 	cnf := &pb_config.DirectorConfig{}
 	if err := readAsJson(*flagConfigDirectorPath, cnf); err != nil {
 		log.Fatalf("failed reading director director config: %v", err)
 	}
-	r := grpc_router.NewStatic(cnf.Grpc.Routes)
-	return r
+	grpcRouter := grpc_router.NewStatic(cnf.Grpc.Routes)
+	httpRouter := http_router.NewStatic(cnf.Http.Routes)
+	return grpcRouter, httpRouter
 }
 
-func buildGrpcBackendPoolOrFail() grpc_bp.Pool {
+func buildBackendPoolOrFail() (grpc_bp.Pool, http_bp.Pool) {
 	cnf := &pb_config.BackendPoolConfig{}
 	if err := readAsJson(*flagConfigBackendPoolPath, cnf); err != nil {
 		log.Fatalf("failed reading backend pool config: %v", err)
 	}
-	bePool, err := grpc_bp.NewStatic(cnf.GetGrpc().Backends)
+	grpcBePool, err := grpc_bp.NewStatic(cnf.GetGrpc().GetBackends())
 	if err != nil {
-		log.Fatalf("failed creating backend pool: %v", err)
+		log.Fatalf("failed creating grpc backend pool: %v", err)
 	}
-	return bePool
-}
-
-func buildHttpRouterOrFail() grpc_router.Router {
-	cnf := &pb_config.DirectorConfig{}
-	if err := readAsJson(*flagConfigDirectorPath, cnf); err != nil {
-		log.Fatalf("failed reading director director config: %v", err)
-	}
-	r := grpc_router.NewStatic(cnf.Grpc.Routes)
-	return r
-}
-
-func buildHttpBackendPoolOrFail() grpc_bp.Pool {
-	cnf := &pb_config.BackendPoolConfig{}
-	if err := readAsJson(*flagConfigBackendPoolPath, cnf); err != nil {
-		log.Fatalf("failed reading backend pool config: %v", err)
-	}
-	bePool, err := grpc_bp.NewStatic(cnf.GetGrpc().Backends)
+	httpBePool, err := http_bp.NewStatic(cnf.GetHttp().GetBackends())
 	if err != nil {
-		log.Fatalf("failed creating backend pool: %v", err)
+		log.Fatalf("failed creating http backend pool: %v", err)
 	}
-	return bePool
+	return grpcBePool, httpBePool
 }
 
 func readAsJson(filePath string, destination proto.Message) error {

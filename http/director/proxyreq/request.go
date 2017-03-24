@@ -1,4 +1,4 @@
-package director
+package proxyreq
 
 import (
 	"context"
@@ -16,8 +16,8 @@ var (
 	typeMarker = "proxy_mode_marker"
 )
 
-// normalizeInboundRequest makes sure that the request received by the proxy has the destination inside URL.Host.
-func normalizeInboundRequest(r *http.Request) *http.Request {
+// NormalizeInboundRequest makes sure that the request received by the proxy has the destination inside URL.Host.
+func NormalizeInboundRequest(r *http.Request) *http.Request {
 	t := unnormalizedRequestMode(r)
 	reqCopy := r.WithContext(context.WithValue(r.Context(), typeMarker, t))
 	if t == MODE_REVERSE_PROXY {

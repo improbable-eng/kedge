@@ -5,13 +5,13 @@ import (
 
 	"strings"
 
-	"golang.org/x/net/context"
+	"net/http"
+	"net/url"
+
+	"github.com/mwitkow/kfe/http/director/proxyreq"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"net/http"
-	"net/url"
-	"github.com/mwitkow/kfe/http/director"
 )
 
 var (
@@ -44,7 +44,7 @@ func (r *router) Route(req *http.Request) (backendName string, err error) {
 		if !r.headersMatch(req.Header, route.HeaderMatcher) {
 			continue
 		}
-		if !r.requestTypeMatch(director.GetProxyMode(req), route.ProxyMode) {
+		if !r.requestTypeMatch(proxyreq.GetProxyMode(req), route.ProxyMode) {
 			continue
 		}
 		return route.BackendName, nil
@@ -95,14 +95,14 @@ func (r *router) headersMatch(header http.Header, expectedKv map[string]string) 
 	return true
 }
 
-func (r *router) requestTypeMatch(requestMode director.ProxyMode, routeMode pb.ProxyMode) bool {
+func (r *router) requestTypeMatch(requestMode proxyreq.ProxyMode, routeMode pb.ProxyMode) bool {
 	if routeMode == pb.ProxyMode_ANY {
 		return true
 	}
-	if requestMode == director.MODE_FORWARD_PROXY && routeMode == pb.ProxyMode_FORWARD_PROXY {
+	if requestMode == proxyreq.MODE_FORWARD_PROXY && routeMode == pb.ProxyMode_FORWARD_PROXY {
 		return true
 	}
-	if requestMode == director.MODE_REVERSE_PROXY && routeMode == pb.ProxyMode_REVERSE_PROXY {
+	if requestMode == proxyreq.MODE_REVERSE_PROXY && routeMode == pb.ProxyMode_REVERSE_PROXY {
 		return true
 	}
 	return false

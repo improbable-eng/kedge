@@ -89,9 +89,10 @@ func (s *tripper) Close() error {
 }
 
 func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	if r.URL.Host != s.targetName {
-		return nil, fmt.Errorf("lb: request Host '%v' doesn't match Target destination '%v'", r.Host, s.targetName)
-	}
+	// TODO(mwitkow): Fixup this target name matching. Can we even do it??
+	//if r.URL.Host != s.targetName {
+	//	return nil, fmt.Errorf("lb: request Host '%v' doesn't match Target destination '%v'", r.Host, s.targetName)
+	//}
 	s.mu.RLock()
 	targetRef := s.currentTargets
 	lastResolvErr := s.lastResolveError

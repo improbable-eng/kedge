@@ -1,9 +1,19 @@
 {
-  "routes": [
-    {
-      "backend_name": "controller",
-      "service_name_matcher": "*",
-      "authority_matcher": "controller.eu1-prod.improbable.local"
-    }
-  ]
+  "grpc": {
+    "routes": [
+      {
+        "backend_name": "controller",
+        "service_name_matcher": "*",
+        "authority_matcher": "controller.eu1-prod.improbable.local"
+      }
+    ]
+  },
+  "http": {
+    "routes": [
+      {
+        "backend_name": "controller",
+        "host_matcher": "controller.eu1-prod.improbable.local"
+      }
+    ]
+  }
 }

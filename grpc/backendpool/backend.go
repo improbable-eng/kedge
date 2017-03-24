@@ -10,15 +10,12 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-grpc-middleware"
-	"github.com/mwitkow/go-srvlb/grpc"
-	"github.com/mwitkow/go-srvlb/srv"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/backends"
-	"github.com/sercand/kuberesolver"
+	"github.com/mwitkow/kfe/lib/resolvers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/naming"
-	"github.com/mwitkow/kfe/lib/resolvers"
 )
 
 var (

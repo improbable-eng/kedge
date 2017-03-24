@@ -20,7 +20,8 @@ import (
 	"github.com/mwitkow/go-grpc-middleware"
 	"github.com/mwitkow/go-grpc-middleware/logging/logrus"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	"github.com/mwitkow/kfe/grpc/director"
+	grpc_director "github.com/mwitkow/kfe/grpc/director"
+	http_director "github.com/mwitkow/kfe/http/director"
 	"github.com/mwitkow/kfe/server/sharedflags"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/trace"
@@ -52,11 +53,17 @@ func main() {
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
 
-	proxyDirector := director.New(buildGrpcBackendPoolOrFail(), buildGrpcRouterOrFail())
+
+	grpcBe, httpBe := buildBackendPoolOrFail()
+	grpcRouter, httpRouter := buildRouterOrFail()
+	grpcProxy := grpc_director.New(grpcBe, grpcRouter)
+	httpProxy := http_director.New(httpBe, httpRouter)
+
+
 	grpcTlsCreds := newOptionalTlsCreds() // allows the server to listen both over tLS and nonTLS at the same time.
 	grpcServer := grpc.NewServer(
 		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
-		grpc.UnknownServiceHandler(proxy.TransparentHandler(proxyDirector)),
+		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcProxy)),
 		grpc_middleware.WithUnaryServerChain(
 			grpc_logrus.UnaryServerInterceptor(logEntry),
 			grpc_prometheus.UnaryServerInterceptor,
@@ -70,6 +77,8 @@ func main() {
 	//grpc_prometheus.Register(grpcServer)
 
 	tlsConfig := buildServerTlsOrFail()
+
+	http.Handle("/", httpProxy)
 
 	httpServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,

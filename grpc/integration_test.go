@@ -130,15 +130,10 @@ func TestBackendPoolIntegrationTestSuite(t *testing.T) {
 
 // implements srv resolver.
 func (s *BackendPoolIntegrationTestSuite) Lookup(domainName string) ([]*srv.Target, error) {
-
 	local, ok := s.localBackends[domainName]
 	if !ok {
-		s.T().Logf("lookup error: %v", domainName)
-
 		return nil, fmt.Errorf("Unknown local backend '%v' in testing", domainName)
 	}
-	s.T().Logf("lookup returned: %v %v", domainName, local.targets())
-
 	return local.targets(), nil
 }
 

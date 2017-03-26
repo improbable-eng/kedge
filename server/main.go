@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/pprof"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -20,10 +20,11 @@ import (
 	"github.com/mwitkow/go-grpc-middleware"
 	"github.com/mwitkow/go-grpc-middleware/logging/logrus"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	"github.com/mwitkow/kfe/grpc/director"
+	grpc_director "github.com/mwitkow/kfe/grpc/director"
+	http_director "github.com/mwitkow/kfe/http/director"
 	"github.com/mwitkow/kfe/server/sharedflags"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/trace"
+	_ "golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -52,11 +53,16 @@ func main() {
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
 
-	proxyDirector := director.New(buildGrpcBackendPoolOrFail(), buildGrpcRouterOrFail())
+	grpcBe, httpBe := buildBackendPoolOrFail()
+	grpcRouter, httpRouter := buildRouterOrFail()
+	grpcProxy := grpc_director.New(grpcBe, grpcRouter)
+	httpProxy := http_director.New(httpBe, httpRouter)
+
+
 	grpcTlsCreds := newOptionalTlsCreds() // allows the server to listen both over tLS and nonTLS at the same time.
 	grpcServer := grpc.NewServer(
-		grpc.CustomCodec(proxy.Codec()), // needed for proxy to function.
-		grpc.UnknownServiceHandler(proxy.TransparentHandler(proxyDirector)),
+		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
+		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcProxy)),
 		grpc_middleware.WithUnaryServerChain(
 			grpc_logrus.UnaryServerInterceptor(logEntry),
 			grpc_prometheus.UnaryServerInterceptor,
@@ -71,12 +77,13 @@ func main() {
 
 	tlsConfig := buildServerTlsOrFail()
 
+	registerDebugHandlers()
+
 	httpServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     nil, // TODO(mwitkow): Add this to log to logrus.
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			log.Printf("got request: %v", req)
 			if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
 				if *flagGrpcWebEnabled {
 					log.Printf("Serving grpc-web")
@@ -88,7 +95,10 @@ func main() {
 					return
 				}
 			}
-			http.DefaultServeMux.ServeHTTP(w, req)
+			if strings.HasPrefix(req.URL.Path, "/debug") {
+				http.DefaultServeMux.ServeHTTP(w, req)
+			}
+			httpProxy.ServeHTTP(w, req)
 		}),
 	}
 
@@ -149,6 +159,7 @@ func main() {
 			}
 		}()
 	}
+
 	err := <-errChan // this waits for some server breaking
 	log.Fatalf("Error: %v", err)
 }
@@ -157,19 +168,19 @@ func registerDebugHandlers() {
 	// TODO(mwitkow): Add middleware for making these only visible to private IPs.
 	http.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
 	http.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-	http.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	http.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	http.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	http.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	http.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		trace.Render(w, req /*sensitive*/, true)
-	}))
-	http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		trace.RenderEvents(w, req /*sensitive*/, true)
-	}))
+	//http.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	//http.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	//http.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	//http.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	//http.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+	//http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	//	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	//	trace.Render(w, req /*sensitive*/, true)
+	//}))
+	//http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	//	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	//	trace.RenderEvents(w, req /*sensitive*/, true)
+	//}))
 }
 
 func buildListenerOrFail(name string, port int) net.Listener {

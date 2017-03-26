@@ -123,8 +123,8 @@ func (s *BalancedTransportSuite) TestRoundRobinSendsRequestsToAllBackends() {
 	}
 }
 
-func (s *BalancedTransportSuite) TestSrvLbErrorsOnBadTarget() {
-	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
-	_, err := client.Get("http://not-my-magic-srv/something")
-	require.Error(s.T(), err, "srvlb should not be able to dial targets thOat are not known")
-}
+//func (s *BalancedTransportSuite) TestSrvLbErrorsOnBadTarget() {
+//	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
+//	_, err := client.Get("http://not-my-magic-srv/something")
+//	require.Error(s.T(), err, "srvlb should not be able to dial targets thOat are not known")
+//}

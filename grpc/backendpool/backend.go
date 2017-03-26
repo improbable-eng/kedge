@@ -7,14 +7,14 @@ import (
 	"net"
 	"time"
 
+	"sync"
+
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-grpc-middleware"
-	"github.com/mwitkow/go-srvlb/grpc"
-	"github.com/mwitkow/go-srvlb/srv"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/backends"
-	"github.com/sercand/kuberesolver"
+	"github.com/mwitkow/kfe/lib/resolvers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/naming"
@@ -25,16 +25,34 @@ var (
 		Timeout:   1 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}).DialContext
-	ParentSrvResolver = srv.NewGoResolver(5 * time.Second)
 )
 
 type backend struct {
+	mu     sync.RWMutex
 	conn   *grpc.ClientConn
 	config *pb.Backend
 }
 
-func (b *backend) Conn() *grpc.ClientConn {
-	return b.conn
+func (b *backend) Conn() (*grpc.ClientConn, error) {
+	// This needs to be lazy. Otherwise backends with zero resolutions will fail to be created and
+	// recreated.
+	b.mu.RLock()
+	cc := b.conn
+	b.mu.RUnlock()
+	if cc != nil {
+		return cc, nil
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.conn != nil {
+		return b.conn, nil
+	}
+	cc, err := buildClientConn(b.config)
+	if err != nil {
+		return nil, err
+	}
+	b.conn = cc
+	return cc, nil
 }
 
 func (b *backend) Close() error {
@@ -42,6 +60,17 @@ func (b *backend) Close() error {
 }
 
 func newBackend(cnf *pb.Backend) (*backend, error) {
+
+	cc, err := buildClientConn(cnf)
+	if err != nil && err.Error() == "grpc: there is no address available to dial" {
+		return &backend{conn: nil, config: cnf}, nil // make this lazy
+	} else if err != nil {
+		return nil, fmt.Errorf("backend '%v' dial error: %v", cnf.Name, err)
+	}
+	return &backend{conn: cc, config: cnf}, nil
+}
+
+func buildClientConn(cnf *pb.Backend) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{}
 	target, resolver, err := chooseNamingResolver(cnf)
 	if err != nil {
@@ -49,14 +78,11 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	}
 	opts = append(opts, chooseDialFuncOpt(cnf))
 	opts = append(opts, chooseSecurityOpt(cnf))
-	opts = append(opts, grpc.WithCodec(proxy.Codec())) // needed for the proxy to function at all.
+	opts = append(opts, grpc.WithCodec(proxy.Codec())) // needed for the director to function at all.
 	opts = append(opts, chooseInterceptors(cnf)...)
 	opts = append(opts, grpc.WithBalancer(chooseBalancerPolicy(cnf, resolver)))
-	cc, err := grpc.Dial(target, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("backend '%v' dial error: %v", cnf.Name, err)
-	}
-	return &backend{conn: cc, config: cnf}, nil
+	return grpc.Dial(target, opts...)
+
 }
 
 func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
@@ -104,16 +130,9 @@ func chooseInterceptors(cnf *pb.Backend) []grpc.DialOption {
 
 func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	if s := cnf.GetSrv(); s != nil {
-		return s.GetDnsName(), grpcsrvlb.New(ParentSrvResolver), nil
+		return resolvers.NewSrvFromConfig(s)
 	} else if k := cnf.GetK8S(); k != nil {
-		// see https://github.com/sercand/kuberesolver/blob/master/README.md
-		target := fmt.Sprintf("kubernetes://%v:%v", k.ServiceName, k.PortName)
-		namespace := "default"
-		if k.Namespace != "" {
-			namespace = k.Namespace
-		}
-		b := kuberesolver.NewWithNamespace(namespace)
-		return target, b.Resolver(), nil
+		return resolvers.NewK8sFromConfig(k)
 	}
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)
 }

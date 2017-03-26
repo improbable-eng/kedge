@@ -3,9 +3,10 @@ package backendpool
 import (
 	"fmt"
 
-	pb "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/backends"
+	pb "github.com/mwitkow/kfe/_protogen/kfe/config/http/backends"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"net/http"
 )
 
 var (
@@ -13,23 +14,13 @@ var (
 )
 
 type Pool interface {
-	// Conn returns a dialled grpc.ClientConn for a given backend name.
-	Conn(backendName string) (*grpc.ClientConn, error)
-
-	// Close closes all the connections of the pool.
-	Close() error
+	// Tripper returns an already established http.RoundTripper just for this backend.
+	Tripper(backendName string) (http.RoundTripper, error)
 }
 
 // static is a Pool with a static configuration.
 type static struct {
 	backends map[string]*backend
-}
-
-func (s *static) Close() error {
-	for _, be := range s.backends {
-		be.Close()
-	}
-	return nil
 }
 
 // NewStatic creates a backend pool that has static configuration.
@@ -45,10 +36,10 @@ func NewStatic(backends []*pb.Backend) (Pool, error) {
 	return s, nil
 }
 
-func (s *static) Conn(backendName string) (*grpc.ClientConn, error) {
+func (s *static) Tripper(backendName string) (http.RoundTripper, error) {
 	be, ok := s.backends[backendName]
 	if !ok {
 		return nil, ErrUnknownBackend
 	}
-	return be.Conn()
+	return be.Tripper(), nil
 }

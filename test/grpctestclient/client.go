@@ -62,7 +62,7 @@ func main() {
 }
 
 // spoofedGrpcDialer pretends to dial over a remote DNS name, but resolves to localhost.
-// This is to send the requests to the proxy
+// This is to send the requests to the director
 func spoofedGrpcDialer(addr string, t time.Duration) (net.Conn, error) {
 	host, _, _ := net.SplitHostPort(addr)
 	switch host {

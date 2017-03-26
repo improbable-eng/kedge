@@ -1,15 +1,29 @@
 {
-  "backends": [
-    {
-      "name": "controller",
-      "balancer": "ROUND_ROBIN",
-      "interceptors": [
-        { "prometheus": true }
-
-      ],
-      "srv": {
-        "dns_name": "controller.eu1-prod.internal.improbable.io"
+  "grpc": {
+    "backends": [
+      {
+        "name": "controller",
+        "balancer": "ROUND_ROBIN",
+        "interceptors": [
+          {
+            "prometheus": true
+          }
+        ],
+        "srv": {
+          "dns_name": "controller.eu1-prod.internal.improbable.io"
+        }
       }
-    }
-  ]
+    ]
+  },
+  "http": {
+    "backends": [
+      {
+        "name": "controller",
+        "balancer": "ROUND_ROBIN",
+        "srv": {
+          "dns_name": "controller.metrics.eu1-prod.internal.improbable.io"
+        }
+      }
+    ]
+  }
 }

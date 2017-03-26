@@ -34,6 +34,9 @@ func (r *router) Route(ctx context.Context, fullMethodName string) (backendName 
 	if !ok {
 		md = emptyMd
 	}
+	if strings.HasPrefix(fullMethodName, "/") {
+		fullMethodName = fullMethodName[1:]
+	}
 	for _, route := range r.routes {
 		if !r.serviceNameMatches(fullMethodName, route.ServiceNameMatcher) {
 			continue

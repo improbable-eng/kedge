@@ -15,11 +15,21 @@ var (
 type Pool interface {
 	// Conn returns a dialled grpc.ClientConn for a given backend name.
 	Conn(backendName string) (*grpc.ClientConn, error)
+
+	// Close closes all the connections of the pool.
+	Close() error
 }
 
 // static is a Pool with a static configuration.
 type static struct {
 	backends map[string]*backend
+}
+
+func (s *static) Close() error {
+	for _, be := range s.backends {
+		be.Close()
+	}
+	return nil
 }
 
 // NewStatic creates a backend pool that has static configuration.

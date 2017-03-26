@@ -40,5 +40,5 @@ func (s *static) Conn(backendName string) (*grpc.ClientConn, error) {
 	if !ok {
 		return nil, ErrUnknownBackend
 	}
-	return be.Conn(), nil
+	return be.Conn()
 }

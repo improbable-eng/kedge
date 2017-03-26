@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/pprof"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -24,7 +24,7 @@ import (
 	http_director "github.com/mwitkow/kfe/http/director"
 	"github.com/mwitkow/kfe/server/sharedflags"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/trace"
+	_ "golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -53,7 +53,6 @@ func main() {
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
 
-
 	grpcBe, httpBe := buildBackendPoolOrFail()
 	grpcRouter, httpRouter := buildRouterOrFail()
 	grpcProxy := grpc_director.New(grpcBe, grpcRouter)
@@ -78,14 +77,13 @@ func main() {
 
 	tlsConfig := buildServerTlsOrFail()
 
-	http.Handle("/", httpProxy)
+	registerDebugHandlers()
 
 	httpServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     nil, // TODO(mwitkow): Add this to log to logrus.
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			log.Printf("got request: %v", req)
 			if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
 				if *flagGrpcWebEnabled {
 					log.Printf("Serving grpc-web")
@@ -97,7 +95,10 @@ func main() {
 					return
 				}
 			}
-			http.DefaultServeMux.ServeHTTP(w, req)
+			if strings.HasPrefix(req.URL.Path, "/debug") {
+				http.DefaultServeMux.ServeHTTP(w, req)
+			}
+			httpProxy.ServeHTTP(w, req)
 		}),
 	}
 
@@ -158,6 +159,7 @@ func main() {
 			}
 		}()
 	}
+
 	err := <-errChan // this waits for some server breaking
 	log.Fatalf("Error: %v", err)
 }
@@ -166,19 +168,19 @@ func registerDebugHandlers() {
 	// TODO(mwitkow): Add middleware for making these only visible to private IPs.
 	http.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
 	http.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-	http.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	http.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	http.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	http.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	http.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		trace.Render(w, req /*sensitive*/, true)
-	}))
-	http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		trace.RenderEvents(w, req /*sensitive*/, true)
-	}))
+	//http.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	//http.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	//http.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	//http.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	//http.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+	//http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	//	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	//	trace.Render(w, req /*sensitive*/, true)
+	//}))
+	//http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	//	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	//	trace.RenderEvents(w, req /*sensitive*/, true)
+	//}))
 }
 
 func buildListenerOrFail(name string, port int) net.Listener {

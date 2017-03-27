@@ -30,11 +30,13 @@ import (
 	"github.com/mwitkow/kfe/grpc/director"
 	"github.com/mwitkow/kfe/grpc/director/router"
 	"github.com/mwitkow/kfe/lib/resolvers"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/transport"
 )
 
 var backendResolutionDuration = 10 * time.Millisecond
@@ -50,15 +52,40 @@ var backendConfigs = []*pb_be.Backend{
 	},
 }
 
+var defaultBackendCount = 5
+
 var routeConfigs = []*pb_route.Route{
 	&pb_route.Route{
 		BackendName:        "non_secure",
 		ServiceNameMatcher: "mwitkow.*", // testservice is mwitkow.testproto
 	},
 	&pb_route.Route{
-		BackendName:        "unspecified_backend",
-		ServiceNameMatcher: "something.*", // testservice is mwitkow.testproto
+		BackendName:        "non_secure",
+		ServiceNameMatcher: "hand_rolled.non_secure.*", // these will be used in unknownPingBackHandler-based tests
 	},
+	&pb_route.Route{
+		BackendName:        "unspecified_backend",
+		ServiceNameMatcher: "bad.backend.*", // bad.backend will match a bad tests
+	},
+}
+
+type unknownResponse struct {
+	Addr   string `protobuf:"bytes,1,opt,name=addr,json=value"`
+	Method string `protobuf:"bytes,2,opt,name=method"`
+}
+
+func (m *unknownResponse) Reset()         { *m = unknownResponse{} }
+func (m *unknownResponse) String() string { return fmt.Sprintf("%v", m) }
+func (*unknownResponse) ProtoMessage()    {}
+
+func unknownPingbackHandler(serverAddr string) grpc.StreamHandler {
+	return func(srv interface{}, stream grpc.ServerStream) error {
+		tr, ok := transport.StreamFromContext(stream.Context())
+		if !ok {
+			return fmt.Errorf("handler should have access to transport info")
+		}
+		return stream.SendMsg(&unknownResponse{Method: tr.Method(), Addr: serverAddr})
+	}
 }
 
 type localBackends struct {
@@ -72,6 +99,7 @@ func (l *localBackends) addServer(t *testing.T, serverOpt ...grpc.ServerOption) 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
 	// This is the point where we hook up the interceptor
+	serverOpt = append(serverOpt, grpc.UnknownServiceHandler(unknownPingbackHandler(listener.Addr().String())))
 	server := grpc.NewServer(serverOpt...)
 	pb_testproto.RegisterTestServiceServer(server, &grpc_testing.TestPingService{T: t})
 	l.mu.Lock()
@@ -172,7 +200,7 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 func (s *BackendPoolIntegrationTestSuite) buildBackends() {
 	s.localBackends = make(map[string]*localBackends)
 	nonSecure := &localBackends{}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < defaultBackendCount; i++ {
 		nonSecure.addServer(s.T())
 	}
 	nonSecure.setResolvableCount(100)
@@ -188,6 +216,34 @@ func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackend() {
 	client := pb_testproto.NewTestServiceClient(s.proxyConn)
 	_, err := client.Ping(s.SimpleCtx(), &pb_testproto.PingRequest{})
 	require.NoError(s.T(), err, "no error on simple call")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackendLoadBalancesRoundRobin() {
+	backendResponse := make(map[string]int)
+	for i := 0; i < defaultBackendCount*10; i++ {
+		resp := &unknownResponse{}
+		err := grpc.Invoke(s.SimpleCtx(), "/hand_rolled.non_secure.SomeService/Method", &pb_testproto.Empty{}, resp, s.proxyConn)
+		require.NoError(s.T(), err, "unknownPingHandler should not return errors")
+		if _, ok := backendResponse[resp.Addr]; ok {
+			backendResponse[resp.Addr] += 1
+		} else {
+			backendResponse[resp.Addr] = 1
+		}
+	}
+	assert.Len(s.T(), backendResponse, defaultBackendCount, "requests should hit all backends")
+	for addr, value := range backendResponse {
+		assert.Equal(s.T(), 10, value, "backend %v should have received the same amount of requests", addr)
+	}
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownRouteCausesError() {
+	err := grpc.Invoke(s.SimpleCtx(), "/bad.route.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
+	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown route to service", "no error on simple call")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownBackend() {
+	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
+	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown backend", "no error on simple call")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TearDownSuite() {

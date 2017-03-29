@@ -5,15 +5,14 @@ import (
 	"net/http/httputil"
 
 	"github.com/mwitkow/kfe/http/backendpool"
-	"github.com/mwitkow/kfe/http/director/router"
 	"github.com/mwitkow/kfe/http/director/proxyreq"
-	"fmt"
+	"github.com/mwitkow/kfe/http/director/router"
 )
 
 func New(pool backendpool.Pool, router router.Router) *Proxy {
 	p := &Proxy{
 		reverseProxy: &httputil.ReverseProxy{
-			Director: func(r *http.Request) {},
+			Director:  func(r *http.Request) {},
 			Transport: &backendPoolTripper{pool: pool},
 		},
 		router: router,
@@ -30,12 +29,12 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	// note resp needs to implement Flusher, otherwise flush intervals won't work.
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	backend, err := p.router.Route(req)
-	fmt.Printf("Got request: %v err %v", backend, err)
 	if err != nil {
+		resp.Header().Set("x-kfe-error", err.Error())
 		resp.WriteHeader(http.StatusBadGateway)
 		return
 	}
-
+	resp.Header().Set("x-kfe-backend-name", backend)
 	normReq.URL.Host = backend
 	p.reverseProxy.ServeHTTP(resp, req)
 }

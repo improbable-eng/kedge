@@ -3,6 +3,7 @@ package proxyreq
 import (
 	"context"
 	"net/http"
+	"strings"
 )
 
 type ProxyMode int
@@ -27,13 +28,12 @@ func NormalizeInboundRequest(r *http.Request) *http.Request {
 }
 
 func unnormalizedRequestMode(r *http.Request) ProxyMode {
-	if r.URL.Host != "" {
+	if r.Method != "CONNECT" && strings.HasPrefix(r.RequestURI, "http") {
 		// Forward Proxy requests embed the host information of the destination inside the RequestURI.
 		return MODE_FORWARD_PROXY
 	} else {
 		return MODE_REVERSE_PROXY
 	}
-
 }
 
 func GetProxyMode(r *http.Request) ProxyMode {

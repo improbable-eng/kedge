@@ -17,6 +17,7 @@ Kubernetes is great, if you have one cluster. If you want to have twoThis projec
  - cross-cluster networking - usually a complex process of setting up and maintaining IPSec bridges
  - configuration of routing rules - each cluster needs to know about each other cluster's 3 (!) network ranges: host, pod and internal-service networks
  - providing federated service discovery - either through the alpha-grade [K8S Federation](https://kubernetes.io/docs/concepts/cluster-administration/federation/) or [CoreDNS](https://github.com/coredns/coredns) stub zones
+
 All these are subject to subtle interplays between routes, `iptables` rules, DNS packets and MTU limits of IPSec tunnels, which would make even a seasoned network engineer go gray.
 
 At the same time, none of the existing service meshes or networking overlays provide an easy fix for this.

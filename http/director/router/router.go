@@ -1,14 +1,14 @@
 package router
 
 import (
-	pb "github.com/mwitkow/kfe/_protogen/kfe/config/http/routes"
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 
 	"strings"
 
 	"net/http"
 	"net/url"
 
-	"github.com/mwitkow/kfe/http/director/proxyreq"
+	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

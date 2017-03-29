@@ -10,9 +10,9 @@ import (
 	"net/http"
 
 	"github.com/mwitkow/go-conntrack"
-	pb "github.com/mwitkow/kfe/_protogen/kfe/config/http/backends"
-	"github.com/mwitkow/kfe/http/lbtransport"
-	"github.com/mwitkow/kfe/lib/resolvers"
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	"github.com/mwitkow/kedge/http/lbtransport"
+	"github.com/mwitkow/kedge/lib/resolvers"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
 )

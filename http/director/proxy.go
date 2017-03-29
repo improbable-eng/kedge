@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 
-	"github.com/mwitkow/kfe/http/backendpool"
-	"github.com/mwitkow/kfe/http/director/router"
-	"github.com/mwitkow/kfe/http/director/proxyreq"
+	"github.com/mwitkow/kedge/http/backendpool"
+	"github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"fmt"
 )
 

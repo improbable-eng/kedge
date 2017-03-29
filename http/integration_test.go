@@ -19,16 +19,16 @@ import (
 	"github.com/mwitkow/go-srvlb/srv"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
-	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
-	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/routes"
+	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 
 	"fmt"
 
 	"strings"
 
-	"github.com/mwitkow/kedge/grpc/backendpool"
-	"github.com/mwitkow/kedge/grpc/director"
-	"github.com/mwitkow/kedge/grpc/director/router"
+	"github.com/mwitkow/kedge/http/backendpool"
+	"github.com/mwitkow/kedge/http/director"
+	"github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -1,7 +1,7 @@
 package resolvers
 
 import (
-	pb "github.com/mwitkow/kfe/_protogen/kfe/config/common/resolvers"
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	"google.golang.org/grpc/naming"
 	"github.com/mwitkow/go-srvlb/grpc"
 	"github.com/mwitkow/go-srvlb/srv"

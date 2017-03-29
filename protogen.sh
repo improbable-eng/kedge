@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROTOBUF_DIR=${PROTOBUF_DIR-${SCRIPT_DIR}/proto}
 PROTOGEN_DIR=_protogen
 GENERATION_DIR=${GENERATION_DIR-${SCRIPT_DIR}/${PROTOGEN_DIR}}
-IMPORT_PREFIX="github.com/mwitkow/kfe/${PROTOGEN_DIR}"
+IMPORT_PREFIX="github.com/mwitkow/kedge/${PROTOGEN_DIR}"
 
 # Builds all .proto files in a given package dirctory.
 # NOTE: All .proto files in a given package must be processed *together*, otherwise the self-referencing
@@ -27,9 +27,9 @@ function proto_build_dir {
 function fix_imports {
   DIR_FULL=${1}
   for file in $(ls ${DIR_FULL}/*.go 2>/dev/null); do
-    # This is a massive hack (prefix of "kfe")
+    # This is a massive hack (prefix of "kedge")
     # See https://github.com/golang/protobuf/issues/63
-    sed --in-place='' -r "s~^import(.*) \"kfe(.*)\"$~import \1 \"${IMPORT_PREFIX}/kfe\2\"~" ${file};
+    sed --in-place='' -r "s~^import(.*) \"kedge(.*)\"$~import \1 \"${IMPORT_PREFIX}/kedge\2\"~" ${file};
   done
 }
 

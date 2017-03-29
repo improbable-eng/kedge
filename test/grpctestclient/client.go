@@ -9,7 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	pb_base "github.com/mwitkow/kfe/_protogen/base"
+	pb_base "github.com/mwitkow/kedge/_protogen/base"
 
 	"io"
 	"os"

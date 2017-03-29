@@ -16,7 +16,7 @@ import (
 
 var (
 	emptyMd       = metadata.Pairs()
-	routeNotFound = errors.New("unknown route to service")
+	ErrRouteNotFound = errors.New("unknown route to service")
 )
 
 type Router interface {

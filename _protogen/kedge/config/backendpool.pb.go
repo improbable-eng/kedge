@@ -19,8 +19,8 @@ package kedge_config
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import kedge_config_grpc_backends  "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
-import kedge_config_http_backends  "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+import  kedge_config_grpc_backends "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
+import  kedge_config_http_backends "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -121,7 +121,7 @@ func init() {
 	proto.RegisterType((*TlsServerConfig)(nil), "kedge.config.TlsServerConfig")
 }
 
-func init() { proto.RegisterFile( "github.com/mwitkow/kedge/_protogen/kedge/config/backendpool.proto", fileDescriptor0) }
+func init() { proto.RegisterFile("kedge/config/backendpool.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
 	// 256 bytes of a gzipped FileDescriptorProto

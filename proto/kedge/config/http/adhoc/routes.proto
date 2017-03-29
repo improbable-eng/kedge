@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kedge.config.http.routes;
 
-/// Route describes a mapping between a stable proxying endpoint and a pre-defined backend.
+/// Backend is a gRPC ClientConn pool maintained to a single serivce.
 message Route {
     /// backend_name is the string identifying the HTTP backend pool to send data to.
     string backend_name = 1;

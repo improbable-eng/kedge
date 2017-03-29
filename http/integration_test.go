@@ -107,7 +107,7 @@ type localBackends struct {
 	servers    []*http.Server
 }
 
-func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
+func buildAndStartServer(t *testing.T, config *tls.Config) (net.Listener, *http.Server) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
 	if config != nil {
@@ -116,13 +116,19 @@ func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
 	server := &http.Server{
 		Handler: unknownPingbackHandler(listener.Addr().String()),
 	}
+	go func() {
+		server.Serve(listener)
+	}()
+	return listener, server
+}
+
+func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
+	listener, server := buildAndStartServer(t, config)
 	l.mu.Lock()
 	l.servers = append(l.servers, server)
 	l.listeners = append(l.listeners, listener)
 	l.mu.Unlock()
-	go func() {
-		server.Serve(listener)
-	}()
+
 }
 
 func (l *localBackends) setResolvableCount(count int) {

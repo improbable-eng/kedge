@@ -1,22 +1,22 @@
 package router
 
 import (
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
+	pb "github.com/mwitkow/kfe/_protogen/kfe/config/http/routes"
 
 	"strings"
 
 	"net/http"
 	"net/url"
 
-	"github.com/mwitkow/kedge/http/director/proxyreq"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
+	"errors"
+
+	"github.com/mwitkow/kfe/http/director/proxyreq"
 	"google.golang.org/grpc/metadata"
 )
 
 var (
 	emptyMd       = metadata.Pairs()
-	routeNotFound = grpc.Errorf(codes.Unimplemented, "unknown route to service")
+	routeNotFound = errors.New("unknown route to service")
 )
 
 type Router interface {

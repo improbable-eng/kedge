@@ -37,5 +37,8 @@ enum ProxyMode {
     /// Forward Proxy is when the FE serves as an HTTP_PROXY for a browser or an application. The resolution of the
     /// backend is done by the FE itself, so non-public names can be addressed.
     /// This may be from the 90s, but it still is very useful.
+    ///
+    /// IMPORTANT: If you have a PAC file configured in Firefox, the HTTPS rule behaves differently than in Chrome. The
+    /// proxied requests are not FORWARD_PROXY requests but REVERSE_PROXY_REQUESTS.
     FORWARD_PROXY = 2;
 }

@@ -1,4 +1,4 @@
-package grpc_integration
+package http_integration
 
 import (
 	"net"
@@ -14,29 +14,26 @@ import (
 	"io/ioutil"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/go-grpc-middleware/testing"
-	pb_testproto "github.com/mwitkow/go-grpc-middleware/testing/testproto"
 	"github.com/mwitkow/go-srvlb/srv"
-	"github.com/mwitkow/grpc-proxy/proxy"
-	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
-	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
-	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
+	pb_res "github.com/mwitkow/kfe/_protogen/kfe/config/common/resolvers"
+	pb_be "github.com/mwitkow/kfe/_protogen/kfe/config/http/backends"
+	pb_route "github.com/mwitkow/kfe/_protogen/kfe/config/http/routes"
 
 	"fmt"
 
-	"strings"
+	"context"
+	"net/http"
+	"net/url"
 
-	"github.com/mwitkow/kedge/http/backendpool"
-	"github.com/mwitkow/kedge/http/director"
-	"github.com/mwitkow/kedge/http/director/router"
-	"github.com/mwitkow/kedge/lib/resolvers"
+	"errors"
+
+	"github.com/mwitkow/kfe/http/backendpool"
+	"github.com/mwitkow/kfe/http/director"
+	"github.com/mwitkow/kfe/http/director/router"
+	"github.com/mwitkow/kfe/lib/resolvers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/transport"
 )
 
 var backendResolutionDuration = 10 * time.Millisecond
@@ -46,62 +43,79 @@ var backendConfigs = []*pb_be.Backend{
 		Name: "non_secure",
 		Resolver: &pb_be.Backend_Srv{
 			Srv: &pb_res.SrvResolver{
-				DnsName: "_grpc._tcp.nonsecure.backends.test.local",
+				DnsName: "_http._tcp.nonsecure.backends.test.local",
 			},
 		},
+		Balancer: pb_be.Balancer_ROUND_ROBIN,
+	},
+	&pb_be.Backend{
+		Name: "secure",
+		Resolver: &pb_be.Backend_Srv{
+			Srv: &pb_res.SrvResolver{
+				DnsName: "_https._tcp.secure.backends.test.local",
+			},
+		},
+		Security: &pb_be.Security{
+			InsecureSkipVerify: true, // TODO(mwitkow): Add config TLS once we do parsing of TLS configs.
+		},
+		Balancer: pb_be.Balancer_ROUND_ROBIN,
 	},
 }
 
-var defaultBackendCount = 5
+var nonSecureBackendCount = 5
+var secureBackendCount = 10
 
 var routeConfigs = []*pb_route.Route{
 	&pb_route.Route{
-		BackendName:        "non_secure",
-		ServiceNameMatcher: "mwitkow.*", // testservice is mwitkow.testproto
+		BackendName: "non_secure",
+		PathRules:   []string{"/some/strict/path"},
+		HostMatcher: "nonsecure.ext.example.com",
+		ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
 	},
 	&pb_route.Route{
-		BackendName:        "non_secure",
-		ServiceNameMatcher: "hand_rolled.non_secure.*", // these will be used in unknownPingBackHandler-based tests
+		BackendName: "non_secure",
+		HostMatcher: "nonsecure.backends.test.local",
+		ProxyMode:   pb_route.ProxyMode_FORWARD_PROXY,
 	},
 	&pb_route.Route{
-		BackendName:        "unspecified_backend",
-		ServiceNameMatcher: "bad.backend.*", // bad.backend will match a bad tests
+		BackendName: "secure",
+		PathRules:   []string{"/some/strict/path"},
+		HostMatcher: "secure.ext.example.com",
+		ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+	},
+	&pb_route.Route{
+		BackendName: "secure",
+		HostMatcher: "secure.backends.test.local",
+		ProxyMode:   pb_route.ProxyMode_FORWARD_PROXY,
 	},
 }
 
-type unknownResponse struct {
-	Addr   string `protobuf:"bytes,1,opt,name=addr,json=value"`
-	Method string `protobuf:"bytes,2,opt,name=method"`
-}
-
-func (m *unknownResponse) Reset()         { *m = unknownResponse{} }
-func (m *unknownResponse) String() string { return fmt.Sprintf("%v", m) }
-func (*unknownResponse) ProtoMessage()    {}
-
-func unknownPingbackHandler(serverAddr string) grpc.StreamHandler {
-	return func(srv interface{}, stream grpc.ServerStream) error {
-		tr, ok := transport.StreamFromContext(stream.Context())
-		if !ok {
-			return fmt.Errorf("handler should have access to transport info")
-		}
-		return stream.SendMsg(&unknownResponse{Method: tr.Method(), Addr: serverAddr})
-	}
+func unknownPingbackHandler(serverAddr string) http.Handler {
+	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		resp.Header().Set("x-test-req-proto", fmt.Sprintf("%d.%d", req.ProtoMajor, req.ProtoMinor))
+		resp.Header().Set("x-test-req-url", req.URL.String())
+		resp.Header().Set("x-test-req-host", req.Host)
+		resp.Header().Set("x-test-backend-addr", serverAddr)
+		resp.WriteHeader(http.StatusAccepted) // accepted to make sure stuff is slightly different.
+	})
 }
 
 type localBackends struct {
 	mu         sync.RWMutex
 	resolvable int
 	listeners  []net.Listener
-	servers    []*grpc.Server
+	servers    []*http.Server
 }
 
-func (l *localBackends) addServer(t *testing.T, serverOpt ...grpc.ServerOption) {
+func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
-	// This is the point where we hook up the interceptor
-	serverOpt = append(serverOpt, grpc.UnknownServiceHandler(unknownPingbackHandler(listener.Addr().String())))
-	server := grpc.NewServer(serverOpt...)
-	pb_testproto.RegisterTestServiceServer(server, &grpc_testing.TestPingService{T: t})
+	if config != nil {
+		listener = tls.NewListener(listener, config)
+	}
+	server := &http.Server{
+		Handler: unknownPingbackHandler(listener.Addr().String()),
+	}
 	l.mu.Lock()
 	l.servers = append(l.servers, server)
 	l.listeners = append(l.listeners, listener)
@@ -130,9 +144,6 @@ func (l *localBackends) targets() (targets []*srv.Target) {
 }
 
 func (l *localBackends) Close() error {
-	for _, s := range l.servers {
-		s.GracefulStop()
-	}
 	for _, l := range l.listeners {
 		l.Close()
 	}
@@ -142,12 +153,10 @@ func (l *localBackends) Close() error {
 type BackendPoolIntegrationTestSuite struct {
 	suite.Suite
 
-	proxy         *grpc.Server
-	proxyListener net.Listener
-	pool          backendpool.Pool
+	proxy              *http.Server
+	proxyListenerPlain net.Listener
+	proxyListenerTls   net.Listener
 
-	proxyConn           *grpc.ClientConn
-	originalDialFunc    func(ctx context.Context, network, address string) (net.Conn, error)
 	originalSrvResolver srv.Resolver
 	localBackends       map[string]*localBackends
 }
@@ -167,44 +176,76 @@ func (s *BackendPoolIntegrationTestSuite) Lookup(domainName string) ([]*srv.Targ
 
 func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	var err error
-	s.proxyListener, err = net.Listen("tcp", "localhost:0")
+	s.proxyListenerPlain, err = net.Listen("tcp", "localhost:0")
+	require.NoError(s.T(), err, "must be able to allocate a port for proxyListenerPlain")
+	s.proxyListenerTls, err = net.Listen("tcp", "localhost:0")
 	require.NoError(s.T(), err, "must be able to allocate a port for proxyListener")
+	s.proxyListenerTls = tls.NewListener(s.proxyListenerTls, s.tlsConfigForTest())
+
 	// Make ourselves the resolver for SRV for our backends. See Lookup function.
 	s.originalSrvResolver = resolvers.ParentSrvResolver
 	resolvers.ParentSrvResolver = s
 	s.buildBackends()
 
-	s.pool, err = backendpool.NewStatic(backendConfigs)
+	pool, err := backendpool.NewStatic(backendConfigs)
 	require.NoError(s.T(), err, "backend pool creation must not fail")
-	router := router.NewStatic(routeConfigs)
-	dir := director.New(s.pool, router)
-
-	s.proxy = grpc.NewServer(
-		grpc.CustomCodec(proxy.Codec()),
-		grpc.UnknownServiceHandler(proxy.TransparentHandler(dir)),
-		grpc.Creds(credentials.NewTLS(s.tlsConfigForTest())),
-	)
+	staticRouter := router.NewStatic(routeConfigs)
+	s.proxy = &http.Server{
+		Handler: director.New(pool, staticRouter),
+	}
 
 	go func() {
-		s.T().Logf("starting proxy with TLS at: %v", s.proxyListener.Addr().String())
-		s.proxy.Serve(s.proxyListener)
+		s.proxy.Serve(s.proxyListenerPlain)
 	}()
-	proxyPort := s.proxyListener.Addr().String()[strings.LastIndex(s.proxyListener.Addr().String(), ":"):]
-	s.proxyConn, err = grpc.Dial(fmt.Sprintf("localhost%s", proxyPort),
-		grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfigForTest())),
-		grpc.WithBlock(),
-	)
-	require.NoError(s.T(), err, "dialing the proxy on a conn *must not* fail")
+	go func() {
+		s.proxy.Serve(s.proxyListenerTls)
+	}()
+}
+
+func (s *BackendPoolIntegrationTestSuite) reverseProxyClient(listener net.Listener) *http.Client {
+	proxyTlsClientConfig := s.tlsConfigForTest()
+	proxyTlsClientConfig.InsecureSkipVerify = true // the proxy can be dialed over many different hostnames
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.Dial("tcp", listener.Addr().String())
+			},
+			TLSClientConfig: proxyTlsClientConfig,
+		},
+	}
+}
+
+func (s *BackendPoolIntegrationTestSuite) forwardProxyClient(listener net.Listener) *http.Client {
+	client := s.reverseProxyClient(listener)
+	// This will make all dials over the Proxy mechanism. For "http" schemes it will used FORWARD_PROXY semantics.
+	// For "https" scheme it will use CONNECT proxy.
+	(client.Transport).(*http.Transport).Proxy = func(req *http.Request) (*url.URL, error) {
+		if listener == s.proxyListenerPlain {
+			return urlMustParse("http://address_overwritten_in_dialer_anyway"), nil
+		}
+		return nil, errors.New("Golang proxy logic cannot use HTTPS connecitons to proxy. Saad.")
+	}
+	return client
 }
 
 func (s *BackendPoolIntegrationTestSuite) buildBackends() {
 	s.localBackends = make(map[string]*localBackends)
 	nonSecure := &localBackends{}
-	for i := 0; i < defaultBackendCount; i++ {
-		nonSecure.addServer(s.T())
+	for i := 0; i < nonSecureBackendCount; i++ {
+		nonSecure.addServer(s.T(), nil /* notls */)
 	}
 	nonSecure.setResolvableCount(100)
-	s.localBackends["_grpc._tcp.nonsecure.backends.test.local"] = nonSecure
+	s.localBackends["_http._tcp.nonsecure.backends.test.local"] = nonSecure
+	secure := &localBackends{}
+	http2ServerTlsConfig, err := connhelpers.TlsConfigWithHttp2Enabled(s.tlsConfigForTest())
+	if err != nil {
+		s.FailNow("cannot configure the tls config for http2")
+	}
+	for i := 0; i < secureBackendCount; i++ {
+		secure.addServer(s.T(), http2ServerTlsConfig)
+	}
+	secure.setResolvableCount(100)
+	s.localBackends["_https._tcp.secure.backends.test.local"] = secure
 }
 
 func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
@@ -212,51 +253,152 @@ func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
 	return ctx
 }
 
-func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackend() {
-	client := pb_testproto.NewTestServiceClient(s.proxyConn)
-	_, err := client.Ping(s.SimpleCtx(), &pb_testproto.PingRequest{})
-	require.NoError(s.T(), err, "no error on simple call")
+//func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackend() {
+//	client := pb_testproto.NewTestServiceClient(s.proxyConn)
+//	_, err := client.Ping(s.SimpleCtx(), &pb_testproto.PingRequest{})
+//	require.NoError(s.T(), err, "no error on simple call")
+//}
+
+func (s *BackendPoolIntegrationTestSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, err error) {
+	require.NoError(s.T(), err, "no error on a call to a nonsecure reverse proxy addr")
+	assert.Equal(s.T(), resp.StatusCode, http.StatusAccepted)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-url"), req.URL.Path, "path seen on backend must match requested path")
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-host"), req.URL.Host, "host seen on backend must match requested host")
 }
 
-func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackendLoadBalancesRoundRobin() {
+func (s *BackendPoolIntegrationTestSuite) TestSuccessOverReverseProxy_ToNonSecure_OverPlain() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://nonsecure.ext.example.com/some/strict/path")}
+	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+	s.assertSuccessfulPingback(req, resp, err)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestSuccessOverReverseProxy_ToSecure_OverPlain() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://secure.ext.example.com/some/strict/path")}
+	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+	s.assertSuccessfulPingback(req, resp, err)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestSuccessOverReverseProxy_ToNonSecure_OverTls() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("https://nonsecure.ext.example.com/some/strict/path")}
+	resp, err := s.reverseProxyClient(s.proxyListenerTls).Do(req)
+	s.assertSuccessfulPingback(req, resp, err)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestSuccessOverReverseProxy_ToSecure_OverTls() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("https://secure.ext.example.com/some/strict/path")}
+	resp, err := s.reverseProxyClient(s.proxyListenerTls).Do(req)
+	s.assertSuccessfulPingback(req, resp, err)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestSuccessOverForwardProxy_ToNonSecure_OverPlain() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://nonsecure.backends.test.local/some/strict/path")}
+	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+	s.assertSuccessfulPingback(req, resp, err)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestSuccessOverForwardProxy_ToSecure_OverPlain() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://secure.backends.test.local/some/strict/path")}
+	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+	s.assertSuccessfulPingback(req, resp, err)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestFailOverReverseProxy_ToForwardSecure_OverPlain() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://secure.backends.test.local/some/strict/path")}
+	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+	require.NoError(s.T(), err, "dialing should not fail")
+	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
+	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kfe-error"), "routing error should be in the header")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestFailOverForwardProxy_ToReverseNonSecure_OverPlain() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://nonsecure.ext.example.com/some/strict/path")}
+	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+	require.NoError(s.T(), err, "dialing should not fail")
+	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
+	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kfe-error"), "routing error should be in the header")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestFailOverReverseProxy_NonSecureWithBadPath() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://nonsecure.ext.example.com/other_path")}
+	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+	require.NoError(s.T(), err, "dialing should not fail")
+	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
+	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kfe-error"), "routing error should be in the header")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestLoadbalacingToSecureBackend() {
 	backendResponse := make(map[string]int)
-	for i := 0; i < defaultBackendCount*10; i++ {
-		resp := &unknownResponse{}
-		err := grpc.Invoke(s.SimpleCtx(), "/hand_rolled.non_secure.SomeService/Method", &pb_testproto.Empty{}, resp, s.proxyConn)
-		require.NoError(s.T(), err, "unknownPingHandler should not return errors")
-		if _, ok := backendResponse[resp.Addr]; ok {
-			backendResponse[resp.Addr] += 1
+	for i := 0; i < secureBackendCount*10; i++ {
+		req := &http.Request{Method: "GET", URL: urlMustParse("http://secure.backends.test.local/some/strict/path")}
+		resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+		s.assertSuccessfulPingback(req, resp, err)
+		addr := resp.Header.Get("x-test-backend-addr")
+		if _, ok := backendResponse[addr]; ok {
+			backendResponse[addr] += 1
 		} else {
-			backendResponse[resp.Addr] = 1
+			backendResponse[addr] = 1
 		}
 	}
-	assert.Len(s.T(), backendResponse, defaultBackendCount, "requests should hit all backends")
+	assert.Len(s.T(), backendResponse, secureBackendCount, "requests should hit all backends")
 	for addr, value := range backendResponse {
 		assert.Equal(s.T(), 10, value, "backend %v should have received the same amount of requests", addr)
 	}
 }
 
-func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownRouteCausesError() {
-	err := grpc.Invoke(s.SimpleCtx(), "/bad.route.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
-	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown route to service", "no error on simple call")
+func (s *BackendPoolIntegrationTestSuite) TestLoadbalacingToNonSecureBackend() {
+	backendResponse := make(map[string]int)
+	for i := 0; i < nonSecureBackendCount*10; i++ {
+		req := &http.Request{Method: "GET", URL: urlMustParse("http://nonsecure.ext.example.com/some/strict/path")}
+		resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+		s.assertSuccessfulPingback(req, resp, err)
+		addr := resp.Header.Get("x-test-backend-addr")
+		if _, ok := backendResponse[addr]; ok {
+			backendResponse[addr] += 1
+		} else {
+			backendResponse[addr] = 1
+		}
+	}
+	assert.Len(s.T(), backendResponse, nonSecureBackendCount, "requests should hit all backends")
+	for addr, value := range backendResponse {
+		assert.Equal(s.T(), 10, value, "backend %v should have received the same amount of requests", addr)
+	}
 }
 
-func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownBackend() {
-	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
-	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown backend", "no error on simple call")
-}
+//
+//func (s *BackendPoolIntegrationTestSuite) TestCallOverForwardProxy_Tls() {
+//	req := &http.Request{Method: "GET", URL: urlMustParse("http://nonsecure.ext.example.com/some/strict/path")}
+//	resp, err := s.forwardProxyClient(s.proxyListenerTls).Do(req)
+//	s.assertSuccessfulPingback(resp, err)
+//}
+
+//
+
+//
+//func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownRouteCausesError() {
+//	err := grpc.Invoke(s.SimpleCtx(), "/bad.route.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
+//	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown route to service", "no error on simple call")
+//}
+//
+//func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownBackend() {
+//	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
+//	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown backend", "no error on simple call")
+//}
 
 func (s *BackendPoolIntegrationTestSuite) TearDownSuite() {
-	s.proxyConn.Close()
-	s.pool.Close()
 	// Restore old resolver.
 	if s.originalSrvResolver != nil {
 		resolvers.ParentSrvResolver = s.originalSrvResolver
 	}
 	time.Sleep(10 * time.Millisecond)
 	if s.proxy != nil {
-		s.proxy.GracefulStop()
-		s.proxyListener.Close()
+		s.proxyListenerTls.Close()
+		s.proxyListenerPlain.Close()
 	}
 	for _, be := range s.localBackends {
 		be.Close()
@@ -290,4 +432,12 @@ func (s *BackendPoolIntegrationTestSuite) tlsConfigForTest() *tls.Config {
 func getTestingCertsPath() string {
 	_, callerPath, _, _ := runtime.Caller(0)
 	return path.Join(path.Dir(callerPath), "..", "misc")
+}
+
+func urlMustParse(uStr string) *url.URL {
+	u, err := url.Parse(uStr)
+	if err != nil {
+		panic(err)
+	}
+	return u
 }

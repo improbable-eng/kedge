@@ -9,12 +9,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/mwitkow/bazel-distcache/common/sharedflags"
 	"github.com/mwitkow/go-nicejsonpb"
-	pb_config "github.com/mwitkow/kfe/_protogen/kfe/config"
+	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 
-	grpc_bp "github.com/mwitkow/kfe/grpc/backendpool"
-	grpc_router "github.com/mwitkow/kfe/grpc/director/router"
-	http_bp "github.com/mwitkow/kfe/http/backendpool"
-	http_router "github.com/mwitkow/kfe/http/director/router"
+	grpc_bp "github.com/mwitkow/kedge/grpc/backendpool"
+	grpc_router "github.com/mwitkow/kedge/grpc/director/router"
+	http_bp "github.com/mwitkow/kedge/http/backendpool"
+	http_router "github.com/mwitkow/kedge/http/director/router"
 )
 
 var (

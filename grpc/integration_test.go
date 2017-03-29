@@ -18,18 +18,18 @@ import (
 	pb_testproto "github.com/mwitkow/go-grpc-middleware/testing/testproto"
 	"github.com/mwitkow/go-srvlb/srv"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	pb_res "github.com/mwitkow/kfe/_protogen/kfe/config/common/resolvers"
-	pb_be "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/backends"
-	pb_route "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/routes"
+	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
+	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
+	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/routes"
 
 	"fmt"
 
 	"strings"
 
-	"github.com/mwitkow/kfe/grpc/backendpool"
-	"github.com/mwitkow/kfe/grpc/director"
-	"github.com/mwitkow/kfe/grpc/director/router"
-	"github.com/mwitkow/kfe/lib/resolvers"
+	"github.com/mwitkow/kedge/grpc/backendpool"
+	"github.com/mwitkow/kedge/grpc/director"
+	"github.com/mwitkow/kedge/grpc/director/router"
+	"github.com/mwitkow/kedge/lib/resolvers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -238,12 +238,12 @@ func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackendLoadBalances
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownRouteCausesError() {
 	err := grpc.Invoke(s.SimpleCtx(), "/bad.route.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
-	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown route to service", "no error on simple call")
+	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown route to service", "no error on simple call")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownBackend() {
 	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
-	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown backend", "no error on simple call")
+	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown backend", "no error on simple call")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TearDownSuite() {

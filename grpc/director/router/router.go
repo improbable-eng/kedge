@@ -1,7 +1,7 @@
 package router
 
 import (
-	pb "github.com/mwitkow/kfe/_protogen/kfe/config/grpc/routes"
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/routes"
 
 	"strings"
 

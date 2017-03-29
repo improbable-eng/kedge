@@ -3,8 +3,8 @@ package director
 import (
 	"github.com/mwitkow/go-grpc-middleware/logging"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	"github.com/mwitkow/kfe/grpc/backendpool"
-	"github.com/mwitkow/kfe/grpc/director/router"
+	"github.com/mwitkow/kedge/grpc/backendpool"
+	"github.com/mwitkow/kedge/grpc/director/router"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )

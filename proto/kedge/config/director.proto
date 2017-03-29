@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package kedge.config;
+
+import "kedge/config/grpc/routes/routes.proto";
+import "kedge/config/http/routes/routes.proto";
+
+
+/// DirectorConfig is the top level configuration message the director.
+message DirectorConfig {
+    message Grpc {
+        repeated kedge.config.grpc.routes.Route routes = 1;
+    }
+    message Http {
+        repeated kedge.config.http.routes.Route routes = 1;
+    }
+
+    Grpc grpc = 1;
+    Http http = 2;
+}
+

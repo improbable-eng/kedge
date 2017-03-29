@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 
-	"github.com/mwitkow/kfe/http/backendpool"
-	"github.com/mwitkow/kfe/http/director/proxyreq"
-	"github.com/mwitkow/kfe/http/director/router"
+	"github.com/mwitkow/kedge/http/backendpool"
+	"github.com/mwitkow/kedge/http/director/proxyreq"
+	"github.com/mwitkow/kedge/http/director/router"
 )
 
 func New(pool backendpool.Pool, router router.Router) *Proxy {
@@ -30,11 +30,11 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	backend, err := p.router.Route(req)
 	if err != nil {
-		resp.Header().Set("x-kfe-error", err.Error())
+		resp.Header().Set("x-kedge-error", err.Error())
 		resp.WriteHeader(http.StatusBadGateway)
 		return
 	}
-	resp.Header().Set("x-kfe-backend-name", backend)
+	resp.Header().Set("x-kedge-backend-name", backend)
 	normReq.URL.Host = backend
 	p.reverseProxy.ServeHTTP(resp, req)
 }

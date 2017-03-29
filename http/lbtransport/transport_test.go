@@ -10,7 +10,7 @@ import (
 
 	"github.com/mwitkow/go-srvlb/grpc"
 	"github.com/mwitkow/go-srvlb/srv"
-	"github.com/mwitkow/kfe/http/lbtransport"
+	"github.com/mwitkow/kedge/http/lbtransport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

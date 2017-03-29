@@ -3,7 +3,7 @@ package backendpool
 import (
 	"fmt"
 
-	pb "github.com/mwitkow/kfe/_protogen/kfe/config/http/backends"
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"net/http"

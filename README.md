@@ -8,8 +8,8 @@
 
  > [kedge](https://www.merriam-webster.com/dictionary/kedge) (verb) to move (a ship) by means of a line attached to a small anchor dropped at the distance and in the direction desired
 
-Kubernetes Frontend (KFE) for gRPC, HTTP (1.1/2) microservices with the aim to make cross-cluster
-microservice communication simple to set up, and secure. All you need for it to work is: TLS client certificates in your service pods and a single L4 load balanced IP address in each cluster.
+Proxy for gRPC, HTTP (1.1/2) microservices with the aim to make cross-cluster
+microservice communication simple to set up, and secure. All you need for it to work is: TLS client certificates in your service pods, a single L4 load balanced IP address in each cluster, and a `kedge` server behind it.
 
 ## The pain of cross-cluster Kubernetes
 

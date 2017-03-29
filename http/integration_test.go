@@ -15,9 +15,9 @@ import (
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-srvlb/srv"
-	pb_res "github.com/mwitkow/kfe/_protogen/kfe/config/common/resolvers"
-	pb_be "github.com/mwitkow/kfe/_protogen/kfe/config/http/backends"
-	pb_route "github.com/mwitkow/kfe/_protogen/kfe/config/http/routes"
+	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
+	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 
 	"fmt"
 
@@ -27,10 +27,10 @@ import (
 
 	"errors"
 
-	"github.com/mwitkow/kfe/http/backendpool"
-	"github.com/mwitkow/kfe/http/director"
-	"github.com/mwitkow/kfe/http/director/router"
-	"github.com/mwitkow/kfe/lib/resolvers"
+	"github.com/mwitkow/kedge/http/backendpool"
+	"github.com/mwitkow/kedge/http/director"
+	"github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/lib/resolvers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -313,7 +313,7 @@ func (s *BackendPoolIntegrationTestSuite) TestFailOverReverseProxy_ToForwardSecu
 	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kfe-error"), "routing error should be in the header")
+	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestFailOverForwardProxy_ToReverseNonSecure_OverPlain() {
@@ -321,7 +321,7 @@ func (s *BackendPoolIntegrationTestSuite) TestFailOverForwardProxy_ToReverseNonS
 	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kfe-error"), "routing error should be in the header")
+	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestFailOverReverseProxy_NonSecureWithBadPath() {
@@ -329,7 +329,7 @@ func (s *BackendPoolIntegrationTestSuite) TestFailOverReverseProxy_NonSecureWith
 	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kfe-error"), "routing error should be in the header")
+	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestLoadbalacingToSecureBackend() {

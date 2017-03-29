@@ -238,12 +238,12 @@ func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackendLoadBalances
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownRouteCausesError() {
 	err := grpc.Invoke(s.SimpleCtx(), "/bad.route.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
-	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown route to service", "no error on simple call")
+	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown route to service", "no error on simple call")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownBackend() {
 	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
-	require.EqualError(s.T(), err, "rpc error: code = 12 desc = unknown backend", "no error on simple call")
+	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown backend", "no error on simple call")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TearDownSuite() {

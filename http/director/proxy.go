@@ -4,13 +4,12 @@ import (
 	"net/http"
 	"net/http/httputil"
 
+	"fmt"
+
+	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/http/director/router"
-	"strings"
-	"github.com/mwitkow/go-conntrack"
-	"go.uber.org/zap/buffer"
-	"fmt"
 )
 
 var (

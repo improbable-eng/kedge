@@ -1,17 +1,16 @@
 package router
 
 import (
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 
 	"strings"
-
 	"net/http"
 	"net/url"
-
 	"errors"
 
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"google.golang.org/grpc/metadata"
+
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 )
 
 var (
@@ -49,7 +48,7 @@ func (r *router) Route(req *http.Request) (backendName string, err error) {
 		}
 		return route.BackendName, nil
 	}
-	return "", routeNotFound
+	return "", ErrRouteNotFound
 }
 
 func (r *router) urlMatches(u *url.URL, matchers []string) bool {

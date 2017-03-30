@@ -10,7 +10,7 @@ message Adhoc {
     /// - *.pod.cluster.local
     /// - *.my_namespace.svc.cluster.local
     /// - *.local
-    /// Please use with caution.
+    /// The first rule that matches a DNS name will be used, and its ports will be checked.
     string dns_name_matcher = 1;
 
     /// Port controls the :port behaviour of the URI requested.

@@ -54,9 +54,9 @@ func main() {
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
 
 	grpcBe, httpBe := buildBackendPoolOrFail()
-	grpcRouter, httpRouter := buildRouterOrFail()
+	grpcRouter, httpRouter, httpAddresser := buildRouterOrFail()
 	grpcProxy := grpc_director.New(grpcBe, grpcRouter)
-	httpProxy := http_director.New(httpBe, httpRouter)
+	httpProxy := http_director.New(httpBe, httpRouter, httpAddresser)
 
 
 	grpcTlsCreds := newOptionalTlsCreds() // allows the server to listen both over tLS and nonTLS at the same time.

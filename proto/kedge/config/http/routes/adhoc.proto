@@ -30,7 +30,7 @@ message Adhoc {
         /// allowed_ranges is a list of whitelisted port ranges that this Adhoc rule will allow.
         repeated Range allowed_ranges = 4;
         message Range {
-            /// from is an inclusive lower bound for the port
+            /// from is an inclusive lower bound for the port range
             uint32 from = 1;
             /// to is an inclusive upper bound for the port range
             uint32 to = 2;

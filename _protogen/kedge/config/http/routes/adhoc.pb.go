@@ -37,7 +37,7 @@ type Adhoc struct {
 	// / - *.pod.cluster.local
 	// / - *.my_namespace.svc.cluster.local
 	// / - *.local
-	// / Please use with caution.
+	// / The first rule that matches a DNS name will be used, and its ports will be checked.
 	DnsNameMatcher string `protobuf:"bytes,1,opt,name=dns_name_matcher,json=dnsNameMatcher" json:"dns_name_matcher,omitempty"`
 	// / Port controls the :port behaviour of the URI requested.
 	Port *Adhoc_Port `protobuf:"bytes,2,opt,name=port" json:"port,omitempty"`
@@ -100,7 +100,7 @@ func (m *Adhoc_Port) GetAllowedRanges() []*Adhoc_Port_Range {
 }
 
 type Adhoc_Port_Range struct {
-	// / from is an inclusive lower bound for the port
+	// / from is an inclusive lower bound for the port range
 	From uint32 `protobuf:"varint,1,opt,name=from" json:"from,omitempty"`
 	// / to is an inclusive upper bound for the port range
 	To uint32 `protobuf:"varint,2,opt,name=to" json:"to,omitempty"`

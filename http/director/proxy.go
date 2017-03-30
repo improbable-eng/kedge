@@ -16,6 +16,12 @@ var (
 	AdhocTransport = &(*(http.DefaultTransport.(*http.Transport))) // shallow copy
 )
 
+// New creates a forward/reverse proxy that is either Route+Backend and Adhoc Rules forwarding.
+//
+// The Router decides which "well-known" routes a given request matches, and which backend from the Pool it should be
+// sent to. The backends in the Pool have pre-dialed connections and are load balanced.
+//
+// If  Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
 func New(pool backendpool.Pool, router router.Router, adhoc router.AdhocAddresser) *Proxy {
 	adhocTripper := &(*AdhocTransport) // shallow copy
 	adhocTripper.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
@@ -34,6 +40,7 @@ func New(pool backendpool.Pool, router router.Router, adhoc router.AdhocAddresse
 	return p
 }
 
+// Proxy is a forward/reverse proxy that implements Route+Backend and Adhoc Rules forwarding.
 type Proxy struct {
 	router    router.Router
 	addresser router.AdhocAddresser

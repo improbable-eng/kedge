@@ -85,7 +85,6 @@ func TestAdhocMatches(t *testing.T) {
 		{
 			name:         "fails port check outside the boundary",
 			hostPort:     "1-2-3-4.namespace.pods.cluster.local:11201",
-			expectedAddr: "",
 			expectedErr:  "port 11201 is not allowed",
 		},
 		{
@@ -96,13 +95,11 @@ func TestAdhocMatches(t *testing.T) {
 		{
 			name:         "fails unmatched, even though addresses resolve",
 			hostPort:     "weird.cluster.local:8081",
-			expectedAddr: "",
 			expectedErr:  "unknown route to service",
 		},
 		{
 			name:         "fails dial errors",
 			hostPort:     "otherbackend.somenamespace.svc.cluster.local:8081",
-			expectedAddr: "",
 			expectedErr:  "cannot resolve host",
 		},
 	} {

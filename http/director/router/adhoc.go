@@ -16,6 +16,9 @@ var (
 	DefaultALookup = net.LookupAddr
 )
 
+// AdhocAddresser implements logic that decides what "ad-hoc" ip:port to dial for a backend, if any.
+//
+// Adhoc rules are a way of forwarding requests to services that fall outside of pre-defined Routes and Backends.
 type AdhocAddresser interface {
 	// Address decides the ip:port to send the request to, if any. Errors may be returned if permission is denied.
 	// The returned string must contain contain both ip and port separated by colon.

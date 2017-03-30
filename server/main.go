@@ -27,6 +27,7 @@ import (
 	_ "golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"github.com/mwitkow/kedge/http/middleware/logging/logrus"
 )
 
 var (
@@ -38,9 +39,6 @@ var (
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
-
-	flagGrpcWebEnabled = sharedflags.Set.Bool("server_grpc_web_enabled", true, "Whether to enable gRPC-Web serving over HTTP ports.")
-
 	flagGrpcWithTracing = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 )
 
@@ -82,18 +80,10 @@ func main() {
 	httpServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     nil, // TODO(mwitkow): Add this to log to logrus.
+		ErrorLog:     http_logrus.AsHttpLogger(logEntry),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
-				if *flagGrpcWebEnabled {
-					log.Printf("Serving grpc-web")
-					grpcweb.WrapServer(grpcServer)(w, req)
-					return
-				} else {
-					log.Printf("Serving grpc")
-					grpcServer.ServeHTTP(w, req)
-					return
-				}
+				grpcServer.ServeHTTP(w, req)
 			}
 			if strings.HasPrefix(req.URL.Path, "/debug") {
 				http.DefaultServeMux.ServeHTTP(w, req)

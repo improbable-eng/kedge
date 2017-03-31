@@ -13,7 +13,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-flagz"
@@ -38,9 +37,6 @@ var (
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
-
-	flagGrpcWebEnabled = sharedflags.Set.Bool("server_grpc_web_enabled", true, "Whether to enable gRPC-Web serving over HTTP ports.")
-
 	flagGrpcWithTracing = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 )
 
@@ -57,7 +53,6 @@ func main() {
 	grpcRouter, httpRouter, httpAddresser := buildRouterOrFail()
 	grpcProxy := grpc_director.New(grpcBe, grpcRouter)
 	httpProxy := http_director.New(httpBe, httpRouter, httpAddresser)
-
 
 	grpcTlsCreds := newOptionalTlsCreds() // allows the server to listen both over tLS and nonTLS at the same time.
 	grpcServer := grpc.NewServer(
@@ -85,15 +80,7 @@ func main() {
 		ErrorLog:     nil, // TODO(mwitkow): Add this to log to logrus.
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
-				if *flagGrpcWebEnabled {
-					log.Printf("Serving grpc-web")
-					grpcweb.WrapServer(grpcServer)(w, req)
-					return
-				} else {
-					log.Printf("Serving grpc")
-					grpcServer.ServeHTTP(w, req)
-					return
-				}
+				grpcServer.ServeHTTP(w, req)
 			}
 			if strings.HasPrefix(req.URL.Path, "/debug") {
 				http.DefaultServeMux.ServeHTTP(w, req)

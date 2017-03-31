@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/mwitkow/bazel-distcache/common/sharedflags"
+	"github.com/mwitkow/kedge/server/sharedflags"
 	"github.com/mwitkow/go-nicejsonpb"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 

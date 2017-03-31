@@ -27,6 +27,8 @@ import (
 
 	"errors"
 
+	"strings"
+
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/http/director/router"
@@ -90,6 +92,21 @@ var routeConfigs = []*pb_route.Route{
 	},
 }
 
+var adhocConfig = []*pb_route.Adhoc{
+	{
+		DnsNameMatcher: "*.pods.test.local",
+		Port: &pb_route.Adhoc_Port{
+			AllowedRanges: []*pb_route.Adhoc_Port_Range{
+				{
+					// This will be started on local host. God knows what port it will be.
+					From: 1024,
+					To:   65535,
+				},
+			},
+		},
+	},
+}
+
 func unknownPingbackHandler(serverAddr string) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		resp.Header().Set("x-test-req-proto", fmt.Sprintf("%d.%d", req.ProtoMajor, req.ProtoMinor))
@@ -107,7 +124,7 @@ type localBackends struct {
 	servers    []*http.Server
 }
 
-func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
+func buildAndStartServer(t *testing.T, config *tls.Config) (net.Listener, *http.Server) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
 	if config != nil {
@@ -116,13 +133,19 @@ func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
 	server := &http.Server{
 		Handler: unknownPingbackHandler(listener.Addr().String()),
 	}
+	go func() {
+		server.Serve(listener)
+	}()
+	return listener, server
+}
+
+func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
+	listener, server := buildAndStartServer(t, config)
 	l.mu.Lock()
 	l.servers = append(l.servers, server)
 	l.listeners = append(l.listeners, listener)
 	l.mu.Unlock()
-	go func() {
-		server.Serve(listener)
-	}()
+
 }
 
 func (l *localBackends) setResolvableCount(count int) {
@@ -158,7 +181,9 @@ type BackendPoolIntegrationTestSuite struct {
 	proxyListenerTls   net.Listener
 
 	originalSrvResolver srv.Resolver
-	localBackends       map[string]*localBackends
+	originalAResolver   func(addr string) (names []string, err error)
+
+	localBackends map[string]*localBackends
 }
 
 func TestBackendPoolIntegrationTestSuite(t *testing.T) {
@@ -174,6 +199,11 @@ func (s *BackendPoolIntegrationTestSuite) Lookup(domainName string) ([]*srv.Targ
 	return local.targets(), nil
 }
 
+// implements A resolver that always resolves local host.
+func (s *BackendPoolIntegrationTestSuite) LookupAddr(addr string) (names []string, err error) {
+	return []string{"127.0.0.1"}, nil
+}
+
 func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	var err error
 	s.proxyListenerPlain, err = net.Listen("tcp", "localhost:0")
@@ -185,13 +215,18 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	// Make ourselves the resolver for SRV for our backends. See Lookup function.
 	s.originalSrvResolver = resolvers.ParentSrvResolver
 	resolvers.ParentSrvResolver = s
+	// Make ourselves the A resolver for backends for the Addresser.
+	s.originalAResolver = router.DefaultALookup
+	router.DefaultALookup = s.LookupAddr
+
 	s.buildBackends()
 
 	pool, err := backendpool.NewStatic(backendConfigs)
 	require.NoError(s.T(), err, "backend pool creation must not fail")
 	staticRouter := router.NewStatic(routeConfigs)
+	addresser := router.NewAddresser(adhocConfig)
 	s.proxy = &http.Server{
-		Handler: director.New(pool, staticRouter),
+		Handler: director.New(pool, staticRouter, addresser),
 	}
 
 	go func() {
@@ -253,17 +288,22 @@ func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
 	return ctx
 }
 
-//func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackend() {
-//	client := pb_testproto.NewTestServiceClient(s.proxyConn)
-//	_, err := client.Ping(s.SimpleCtx(), &pb_testproto.PingRequest{})
-//	require.NoError(s.T(), err, "no error on simple call")
-//}
-
 func (s *BackendPoolIntegrationTestSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, err error) {
 	require.NoError(s.T(), err, "no error on a call to a nonsecure reverse proxy addr")
-	assert.Equal(s.T(), resp.StatusCode, http.StatusAccepted)
+	assert.Empty(s.T(), resp.Header.Get("x-kedge-error"))
+	require.Equal(s.T(), http.StatusAccepted, resp.StatusCode)
 	assert.Equal(s.T(), resp.Header.Get("x-test-req-url"), req.URL.Path, "path seen on backend must match requested path")
 	assert.Equal(s.T(), resp.Header.Get("x-test-req-host"), req.URL.Host, "host seen on backend must match requested host")
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestSuccessOverForwardProxy_DialUsingAddresser() {
+	// Pick a port of any non secure backend.
+	addr := s.localBackends["_http._tcp.nonsecure.backends.test.local"].targets()[0].DialAddr
+	port := addr[strings.LastIndex(addr, ":")+1:]
+	req := &http.Request{Method: "GET", URL: urlMustParse(fmt.Sprintf("http://127-0-0-1.pods.test.local:%s/some/strict/path", port))}
+	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+	s.assertSuccessfulPingback(req, resp, err)
+	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestSuccessOverReverseProxy_ToNonSecure_OverPlain() {
@@ -394,6 +434,9 @@ func (s *BackendPoolIntegrationTestSuite) TearDownSuite() {
 	// Restore old resolver.
 	if s.originalSrvResolver != nil {
 		resolvers.ParentSrvResolver = s.originalSrvResolver
+	}
+	if s.originalAResolver != nil {
+		router.DefaultALookup = s.originalAResolver
 	}
 	time.Sleep(10 * time.Millisecond)
 	if s.proxy != nil {

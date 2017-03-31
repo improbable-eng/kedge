@@ -3,6 +3,7 @@ syntax = "proto3";
 package kedge.config;
 
 import "kedge/config/grpc/routes/routes.proto";
+import "kedge/config/http/routes/adhoc.proto";
 import "kedge/config/http/routes/routes.proto";
 
 
@@ -13,6 +14,8 @@ message DirectorConfig {
     }
     message Http {
         repeated kedge.config.http.routes.Route routes = 1;
+        repeated kedge.config.http.routes.Adhoc adhoc_rules = 2;
+
     }
 
     Grpc grpc = 1;

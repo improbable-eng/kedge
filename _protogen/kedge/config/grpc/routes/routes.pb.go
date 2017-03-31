@@ -45,7 +45,7 @@ type Route struct {
 	// / If none are present, the route skips ':authority' checks.
 	AuthorityMatcher string `protobuf:"bytes,3,opt,name=authority_matcher,json=authorityMatcher" json:"authority_matcher,omitempty"`
 	// / metadata_matcher matches any gRPC inbound request metadata.
-	// / Eeach key provided must find a match for the route to match.
+	// / Each key provided must find a match for the route to match.
 	// / The matching is done through lower-case key match and explicit string-equality of values.
 	// / If a given metadata entry has more than one string value, at least one of them needs to match.
 	// / If none are present, the route skips metadata checks.

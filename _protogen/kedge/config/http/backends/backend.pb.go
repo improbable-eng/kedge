@@ -18,7 +18,7 @@ package kedge_config_http_backends
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import kedge_config_common_resolvers  "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
+import  kedge_config_common_resolvers "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

@@ -272,7 +272,7 @@ func (s *BackendPoolIntegrationTestSuite) TestClientDialSecureToNonSecureBackend
 
 func (s *BackendPoolIntegrationTestSuite) invokeUnknownHandlerPingbackAndAssert(fullMethod string, conn *grpc.ClientConn) *unknownResponse {
 	resp := &unknownResponse{}
-	err := grpc.Invoke(s.SimpleCtx(), fullMethod, &unknownResponse{}, resp, s.proxyConn)
+	err := grpc.Invoke(s.SimpleCtx(), fullMethod, &unknownResponse{}, resp, conn)
 	require.NoError(s.T(), err, "no error on call to unknown handler call")
 	assert.Equal(s.T(), fullMethod, resp.Method)
 	return resp

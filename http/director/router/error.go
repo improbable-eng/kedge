@@ -1,8 +1,7 @@
 package router
 
-
 type Error struct {
-	msg string
+	msg    string
 	status int
 }
 

@@ -7,9 +7,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/mwitkow/kedge/server/sharedflags"
 	"github.com/mwitkow/go-nicejsonpb"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
+	"github.com/mwitkow/kedge/server/sharedflags"
 
 	grpc_bp "github.com/mwitkow/kedge/grpc/backendpool"
 	grpc_router "github.com/mwitkow/kedge/grpc/director/router"

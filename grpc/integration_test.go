@@ -14,8 +14,6 @@ import (
 	"io/ioutil"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/go-grpc-middleware/testing"
-	pb_testproto "github.com/mwitkow/go-grpc-middleware/testing/testproto"
 	"github.com/mwitkow/go-srvlb/srv"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
@@ -26,9 +24,13 @@ import (
 
 	"strings"
 
+	"net/url"
+
 	"github.com/mwitkow/kedge/grpc/backendpool"
+	"github.com/mwitkow/kedge/grpc/client"
 	"github.com/mwitkow/kedge/grpc/director"
 	"github.com/mwitkow/kedge/grpc/director/router"
+	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,14 +52,25 @@ var backendConfigs = []*pb_be.Backend{
 			},
 		},
 	},
+	&pb_be.Backend{
+		Name: "secure",
+		Resolver: &pb_be.Backend_Srv{
+			Srv: &pb_res.SrvResolver{
+				DnsName: "_grpctls._tcp.secure.backends.test.local",
+			},
+		},
+		Security: &pb_be.Security{
+			InsecureSkipVerify: true,
+		},
+	},
 }
 
 var defaultBackendCount = 5
 
 var routeConfigs = []*pb_route.Route{
 	&pb_route.Route{
-		BackendName:        "non_secure",
-		ServiceNameMatcher: "mwitkow.*", // testservice is mwitkow.testproto
+		BackendName:        "secure",
+		ServiceNameMatcher: "hand_rolled.secure.*", // testservice is mwitkow.testproto
 	},
 	&pb_route.Route{
 		BackendName:        "non_secure",
@@ -67,28 +80,40 @@ var routeConfigs = []*pb_route.Route{
 		BackendName:        "unspecified_backend",
 		ServiceNameMatcher: "bad.backend.*", // bad.backend will match a bad tests
 	},
+	&pb_route.Route{
+		BackendName:        "secure",
+		ServiceNameMatcher: "hand_rolled.common.*", // these will be used in unknownPingBackHandler-based tests
+		AuthorityMatcher:   "secure.ext.test.local",
+	},
+	&pb_route.Route{
+		BackendName:        "non_secure",
+		ServiceNameMatcher: "hand_rolled.common.*", // bad.backend will match a bad tests
+		AuthorityMatcher:   "non_secure.ext.test.local",
+	},
 }
 
 type unknownResponse struct {
-	Addr   string `protobuf:"bytes,1,opt,name=addr,json=value"`
-	Method string `protobuf:"bytes,2,opt,name=method"`
+	Addr    string `protobuf:"bytes,1,opt,name=addr,json=value"`
+	Method  string `protobuf:"bytes,2,opt,name=method"`
+	Backend string `protobuf:"bytes,3,opt,name=backend"`
 }
 
 func (m *unknownResponse) Reset()         { *m = unknownResponse{} }
 func (m *unknownResponse) String() string { return fmt.Sprintf("%v", m) }
 func (*unknownResponse) ProtoMessage()    {}
 
-func unknownPingbackHandler(serverAddr string) grpc.StreamHandler {
+func unknownPingbackHandler(backendName string, serverAddr string) grpc.StreamHandler {
 	return func(srv interface{}, stream grpc.ServerStream) error {
 		tr, ok := transport.StreamFromContext(stream.Context())
 		if !ok {
 			return fmt.Errorf("handler should have access to transport info")
 		}
-		return stream.SendMsg(&unknownResponse{Method: tr.Method(), Addr: serverAddr})
+		return stream.SendMsg(&unknownResponse{Method: tr.Method(), Addr: serverAddr, Backend: backendName})
 	}
 }
 
 type localBackends struct {
+	name       string
 	mu         sync.RWMutex
 	resolvable int
 	listeners  []net.Listener
@@ -99,9 +124,8 @@ func (l *localBackends) addServer(t *testing.T, serverOpt ...grpc.ServerOption) 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
 	// This is the point where we hook up the interceptor
-	serverOpt = append(serverOpt, grpc.UnknownServiceHandler(unknownPingbackHandler(listener.Addr().String())))
+	serverOpt = append(serverOpt, grpc.UnknownServiceHandler(unknownPingbackHandler(l.name, listener.Addr().String())))
 	server := grpc.NewServer(serverOpt...)
-	pb_testproto.RegisterTestServiceServer(server, &grpc_testing.TestPingService{T: t})
 	l.mu.Lock()
 	l.servers = append(l.servers, server)
 	l.listeners = append(l.listeners, listener)
@@ -147,6 +171,7 @@ type BackendPoolIntegrationTestSuite struct {
 	pool          backendpool.Pool
 
 	proxyConn           *grpc.ClientConn
+	kedgeMapper         kedge_map.Mapper
 	originalDialFunc    func(ctx context.Context, network, address string) (net.Conn, error)
 	originalSrvResolver srv.Resolver
 	localBackends       map[string]*localBackends
@@ -189,8 +214,10 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 		s.T().Logf("starting proxy with TLS at: %v", s.proxyListener.Addr().String())
 		s.proxy.Serve(s.proxyListener)
 	}()
-	proxyPort := s.proxyListener.Addr().String()[strings.LastIndex(s.proxyListener.Addr().String(), ":"):]
-	s.proxyConn, err = grpc.Dial(fmt.Sprintf("localhost%s", proxyPort),
+	proxyPort := s.proxyListener.Addr().String()[strings.LastIndex(s.proxyListener.Addr().String(), ":")+1:]
+	proxyUrl, _ := url.Parse(fmt.Sprintf("https://localhost:%s", proxyPort))
+	s.kedgeMapper = kedge_map.Single(proxyUrl)
+	s.proxyConn, err = grpc.Dial(fmt.Sprintf("localhost:%s", proxyPort),
 		grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfigForTest())),
 		grpc.WithBlock(),
 	)
@@ -199,12 +226,18 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 
 func (s *BackendPoolIntegrationTestSuite) buildBackends() {
 	s.localBackends = make(map[string]*localBackends)
-	nonSecure := &localBackends{}
+	nonSecure := &localBackends{name: "nonsecure_localbackends"}
 	for i := 0; i < defaultBackendCount; i++ {
 		nonSecure.addServer(s.T())
 	}
 	nonSecure.setResolvableCount(100)
 	s.localBackends["_grpc._tcp.nonsecure.backends.test.local"] = nonSecure
+	secure := &localBackends{name: "secure_localbackends"}
+	for i := 0; i < defaultBackendCount; i++ {
+		secure.addServer(s.T(), grpc.Creds(credentials.NewTLS(s.tlsConfigForTest())))
+	}
+	secure.setResolvableCount(100)
+	s.localBackends["_grpctls._tcp.secure.backends.test.local"] = secure
 }
 
 func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
@@ -213,17 +246,42 @@ func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackend() {
-	client := pb_testproto.NewTestServiceClient(s.proxyConn)
-	_, err := client.Ping(s.SimpleCtx(), &pb_testproto.PingRequest{})
+	resp := &unknownResponse{}
+	err := grpc.Invoke(s.SimpleCtx(), "/hand_rolled.non_secure.SomeService/Method", &unknownResponse{}, resp, s.proxyConn)
 	require.NoError(s.T(), err, "no error on simple call")
+	assert.Equal(s.T(), "/hand_rolled.non_secure.SomeService/Method", resp.Method)
+	assert.Equal(s.T(), "nonsecure_localbackends", resp.Backend)
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestCallToSecureBackend() {
+	resp := &unknownResponse{}
+	err := grpc.Invoke(s.SimpleCtx(), "/hand_rolled.secure.SomeService/Method", &unknownResponse{}, resp, s.proxyConn)
+	require.NoError(s.T(), err, "no error on simple call")
+	assert.Equal(s.T(), "/hand_rolled.secure.SomeService/Method", resp.Method)
+	assert.Equal(s.T(), "secure_localbackends", resp.Backend)
+}
+
+func (s *BackendPoolIntegrationTestSuite) TestClientDialSecureToNonSecureBackend() {
+	// This tests whether the DialThroughKedge passes the authority correctly
+	cc, err := kedge_grpc.DialThroughKedge(s.SimpleCtx(), "secure.ext.test.local", s.tlsConfigForTest(), s.kedgeMapper)
+	require.NoError(s.T(), err, "dialing through kedge must succeed")
+	defer cc.Close()
+	resp := s.invokeUnknownHandlerPingbackAndAssert("/hand_rolled.common.NonSpecificService/Method", cc)
+	assert.Equal(s.T(), "secure_localbackends", resp.Backend)
+}
+
+func (s *BackendPoolIntegrationTestSuite) invokeUnknownHandlerPingbackAndAssert(fullMethod string, conn *grpc.ClientConn) *unknownResponse {
+	resp := &unknownResponse{}
+	err := grpc.Invoke(s.SimpleCtx(), fullMethod, &unknownResponse{}, resp, s.proxyConn)
+	require.NoError(s.T(), err, "no error on call to unknown handler call")
+	assert.Equal(s.T(), fullMethod, resp.Method)
+	return resp
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackendLoadBalancesRoundRobin() {
 	backendResponse := make(map[string]int)
 	for i := 0; i < defaultBackendCount*10; i++ {
-		resp := &unknownResponse{}
-		err := grpc.Invoke(s.SimpleCtx(), "/hand_rolled.non_secure.SomeService/Method", &pb_testproto.Empty{}, resp, s.proxyConn)
-		require.NoError(s.T(), err, "unknownPingHandler should not return errors")
+		resp := s.invokeUnknownHandlerPingbackAndAssert("/hand_rolled.non_secure.SomeService/Method", s.proxyConn)
 		if _, ok := backendResponse[resp.Addr]; ok {
 			backendResponse[resp.Addr] += 1
 		} else {
@@ -237,12 +295,12 @@ func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackendLoadBalances
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownRouteCausesError() {
-	err := grpc.Invoke(s.SimpleCtx(), "/bad.route.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
+	err := grpc.Invoke(s.SimpleCtx(), "/bad.route.doesnt.exist/Method", &unknownResponse{}, &unknownResponse{}, s.proxyConn)
 	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown route to service", "no error on simple call")
 }
 
 func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownBackend() {
-	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &pb_testproto.Empty{}, &pb_testproto.Empty{}, s.proxyConn)
+	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &unknownResponse{}, &unknownResponse{}, s.proxyConn)
 	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown backend", "no error on simple call")
 }
 

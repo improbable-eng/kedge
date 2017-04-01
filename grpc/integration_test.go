@@ -263,7 +263,7 @@ func (s *BackendPoolIntegrationTestSuite) TestCallToSecureBackend() {
 
 func (s *BackendPoolIntegrationTestSuite) TestClientDialSecureToNonSecureBackend() {
 	// This tests whether the DialThroughKedge passes the authority correctly
-	cc, err := kedge_grpc.DialThroughKedge(s.SimpleCtx(), "secure.ext.test.local", s.tlsConfigForTest(), s.kedgeMapper)
+	cc, err := kedge_grpc.DialThroughKedge(context.TODO(), "secure.ext.test.local", s.tlsConfigForTest(), s.kedgeMapper)
 	require.NoError(s.T(), err, "dialing through kedge must succeed")
 	defer cc.Close()
 	resp := s.invokeUnknownHandlerPingbackAndAssert("/hand_rolled.common.NonSpecificService/Method", cc)

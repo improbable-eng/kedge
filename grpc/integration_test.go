@@ -241,7 +241,7 @@ func (s *BackendPoolIntegrationTestSuite) buildBackends() {
 }
 
 func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
-	ctx, _ := context.WithTimeout(context.TODO(), 2*time.Second)
+	ctx, _ := context.WithTimeout(context.TODO(), 5*time.Second)
 	return ctx
 }
 

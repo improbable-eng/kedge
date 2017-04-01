@@ -6,7 +6,8 @@ go:
 install:
   - go get -t ./...
 
-
-
 script:
- - go test -race -v ./...
+ - ./test_all.sh
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

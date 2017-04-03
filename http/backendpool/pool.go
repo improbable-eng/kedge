@@ -3,10 +3,11 @@ package backendpool
 import (
 	"fmt"
 
+	"net/http"
+
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"net/http"
 )
 
 var (

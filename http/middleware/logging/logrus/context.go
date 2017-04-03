@@ -5,7 +5,6 @@ package http_logrus
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/mwitkow/go-grpc-middleware/logging"
 	"golang.org/x/net/context"
 )
 

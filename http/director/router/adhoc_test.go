@@ -83,9 +83,9 @@ func TestAdhocMatches(t *testing.T) {
 			expectedAddr: "1.2.3.4:11200",
 		},
 		{
-			name:         "fails port check outside the boundary",
-			hostPort:     "1-2-3-4.namespace.pods.cluster.local:11201",
-			expectedErr:  "port 11201 is not allowed",
+			name:        "fails port check outside the boundary",
+			hostPort:    "1-2-3-4.namespace.pods.cluster.local:11201",
+			expectedErr: "port 11201 is not allowed",
 		},
 		{
 			name:         "matches non default allowed in list",
@@ -93,14 +93,14 @@ func TestAdhocMatches(t *testing.T) {
 			expectedAddr: "2.3.4.5:8081",
 		},
 		{
-			name:         "fails unmatched, even though addresses resolve",
-			hostPort:     "weird.cluster.local:8081",
-			expectedErr:  "unknown route to service",
+			name:        "fails unmatched, even though addresses resolve",
+			hostPort:    "weird.cluster.local:8081",
+			expectedErr: "unknown route to service",
 		},
 		{
-			name:         "fails dial errors",
-			hostPort:     "otherbackend.somenamespace.svc.cluster.local:8081",
-			expectedErr:  "cannot resolve host",
+			name:        "fails dial errors",
+			hostPort:    "otherbackend.somenamespace.svc.cluster.local:8081",
+			expectedErr: "cannot resolve host",
 		},
 	} {
 		t.Run(tcase.name, func(t *testing.T) {

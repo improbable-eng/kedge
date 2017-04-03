@@ -13,7 +13,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-flagz"
@@ -22,12 +21,13 @@ import (
 	"github.com/mwitkow/grpc-proxy/proxy"
 	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	http_director "github.com/mwitkow/kedge/http/director"
+	"github.com/mwitkow/kedge/http/middleware/logging/logrus"
 	"github.com/mwitkow/kedge/server/sharedflags"
+	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
 	_ "golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"github.com/mwitkow/kedge/http/middleware/logging/logrus"
 )
 
 var (
@@ -39,7 +39,7 @@ var (
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
-	flagGrpcWithTracing = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
+	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 )
 
 func main() {
@@ -55,7 +55,6 @@ func main() {
 	grpcRouter, httpRouter, httpAddresser := buildRouterOrFail()
 	grpcProxy := grpc_director.New(grpcBe, grpcRouter)
 	httpProxy := http_director.New(httpBe, httpRouter, httpAddresser)
-
 
 	grpcTlsCreds := newOptionalTlsCreds() // allows the server to listen both over tLS and nonTLS at the same time.
 	grpcServer := grpc.NewServer(
@@ -76,6 +75,7 @@ func main() {
 	tlsConfig := buildServerTlsOrFail()
 
 	registerDebugHandlers()
+	proxyHandler := chi.Chain(http_logrus.Middleware(logEntry)).Handler(httpProxy)
 
 	httpServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
@@ -88,7 +88,7 @@ func main() {
 			if strings.HasPrefix(req.URL.Path, "/debug") {
 				http.DefaultServeMux.ServeHTTP(w, req)
 			}
-			httpProxy.ServeHTTP(w, req)
+			proxyHandler.ServeHTTP(w, req)
 		}),
 	}
 

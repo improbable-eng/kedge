@@ -7,6 +7,10 @@ PROTOGEN_DIR=_protogen
 GENERATION_DIR=${GENERATION_DIR-${SCRIPT_DIR}/${PROTOGEN_DIR}}
 IMPORT_PREFIX="github.com/mwitkow/kedge/${PROTOGEN_DIR}"
 
+echo "Installing plugins"
+go get github.com/mwitkow/go-proto-validators/protoc-gen-govalidators
+go get github.com/golang/protobuf/protoc-gen-go
+
 # Builds all .proto files in a given package dirctory.
 # NOTE: All .proto files in a given package must be processed *together*, otherwise the self-referencing
 # between files in the same proto package will not work.
@@ -17,8 +21,10 @@ function proto_build_dir {
   echo -n "proto_build: $DIR_REL "
   mkdir -p ${GENERATION_DIR}/${DIR_REL} 2> /dev/null
   PATH=${GOPATH}/bin:$PATH protoc \
-    -I${PROTOBUF_DIR} \
+    --proto_path=${PROTOBUF_DIR} \
+    --proto_path=${GOPATH}/src \
     --go_out=plugins=grpc:${GENERATION_DIR} \
+    --govalidators_out=${GENERATION_DIR} \
     ${DIR_FULL}/*.proto || exit $?
   fix_imports ${GENERATION_DIR}/${DIR_REL}
   echo "DONE"

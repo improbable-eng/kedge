@@ -2,12 +2,13 @@ syntax = "proto3";
 
 package kedge.config.grpc.backends;
 
+import "github.com/mwitkow/go-proto-validators/validator.proto";
 import "kedge/config/common/resolvers/resolvers.proto";
 
 /// Backend is a gRPC ClientConn pool maintained to a single serivce.
 message Backend {
     /// name is the string identifying the bakcend in all other conifgs.
-    string name = 1;
+    string name = 1 [(validator.field) = {regex: "^[a-z_.]{2,64}$"}];
 
     /// balancer decides which balancing policy to use.
     Balancer balancer = 2;

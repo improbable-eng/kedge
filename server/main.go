@@ -21,9 +21,7 @@ import (
 	"github.com/mwitkow/grpc-proxy/proxy"
 	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	http_director "github.com/mwitkow/kedge/http/director"
-	"github.com/mwitkow/kedge/http/middleware/logging/logrus"
 	"github.com/mwitkow/kedge/server/sharedflags"
-	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
 	_ "golang.org/x/net/trace"
 	"google.golang.org/grpc"
@@ -39,7 +37,7 @@ var (
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
-	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
+	flagGrpcWithTracing = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 )
 
 func main() {
@@ -75,12 +73,11 @@ func main() {
 	tlsConfig := buildServerTlsOrFail()
 
 	registerDebugHandlers()
-	proxyHandler := chi.Chain(http_logrus.Middleware(logEntry)).Handler(httpProxy)
 
 	httpServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry),
+		ErrorLog:     nil, // TODO(mwitkow): Add this to log to logrus.
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
 				grpcServer.ServeHTTP(w, req)
@@ -88,7 +85,7 @@ func main() {
 			if strings.HasPrefix(req.URL.Path, "/debug") {
 				http.DefaultServeMux.ServeHTTP(w, req)
 			}
-			proxyHandler.ServeHTTP(w, req)
+			httpProxy.ServeHTTP(w, req)
 		}),
 	}
 

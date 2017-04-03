@@ -26,6 +26,7 @@ import (
 	_ "golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"github.com/mwitkow/kedge/http/middleware/logging/logrus"
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
-	flagGrpcWithTracing = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
+	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 )
 
 func main() {
@@ -77,7 +78,7 @@ func main() {
 	httpServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     nil, // TODO(mwitkow): Add this to log to logrus.
+		ErrorLog:     http_logrus.AsHttpLogger(logEntry),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
 				grpcServer.ServeHTTP(w, req)

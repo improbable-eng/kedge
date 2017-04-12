@@ -2,12 +2,13 @@ syntax = "proto3";
 
 package kedge.config.http.backends;
 
+import "github.com/mwitkow/go-proto-validators/validator.proto";
 import "kedge/config/common/resolvers/resolvers.proto";
 
 /// Backend is a pool of HTTP endpoints that are kept open
 message Backend {
     /// name is the string identifying the bakcend in all other conifgs.
-    string name = 1;
+    string name = 1  [(validator.field) = {regex: "^[a-z_.]{2,64}$"}];
 
     /// balancer decides which balancing policy to use.
     Balancer balancer = 2;
@@ -54,7 +55,7 @@ message Security {
     bool insecure_skip_verify = 1;
 
     /// config_name indicates the TlsServerConfig to be used for this connection.
-    string config_name = 2;
+    string config_name = 2 [(validator.field) = {regex: "^[a-z_.]{2,64}$"}];
     // TODO(mwitkow): add tls-config specification for server-side (CA certs etc.).
     // TODO(mwitkow): add tls-config specification for testclient-side (testclient-cert etc.).
 }

@@ -3,6 +3,8 @@ syntax = "proto3";
 
 package kedge.config;
 
+import "github.com/mwitkow/go-proto-validators/validator.proto";
+
 import "kedge/config/grpc/backends/backend.proto";
 import "kedge/config/http/backends/backend.proto";
 
@@ -23,7 +25,7 @@ message BackendPoolConfig {
 }
 
 message TlsServerConfig {
-    string name = 1;
+    string name = 1 [(validator.field) = {regex: "^[a-z_.]{2,64}$"}];
     // TODO(mwitkow): add tls-config declarations.
 }
 

@@ -2,10 +2,12 @@ syntax = "proto3";
 
 package kedge.config.http.routes;
 
+import "github.com/mwitkow/go-proto-validators/validator.proto";
+
 /// Route describes a mapping between a stable proxying endpoint and a pre-defined backend.
 message Route {
     /// backend_name is the string identifying the HTTP backend pool to send data to.
-    string backend_name = 1;
+    string backend_name = 1 [(validator.field) = {regex: "^[a-z_.]{2,64}$"}];
 
     /// path_rules is a globbing expression that matches a URL path of the request.
     /// See: https://cloud.google.com/compute/docs/load-balancing/http/url-map

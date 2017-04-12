@@ -1,4 +1,3 @@
-
 // Integration tests for the HTTP dispatching part of kedge
 //
 // These integration tests check the client, the routing and the backend handling for HTTP backends.
@@ -43,8 +42,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/mwitkow/kedge/lib/map"
-	"github.com/mwitkow/kedge/http/client"
 )
 
 var backendResolutionDuration = 10 * time.Millisecond
@@ -189,7 +186,7 @@ type HttpProxyingIntegrationSuite struct {
 	proxyListenerPlain net.Listener
 	proxyListenerTls   net.Listener
 
-	mapper kedge_map.Mapper
+	mapper              kedge_map.Mapper
 	originalSrvResolver srv.Resolver
 	originalAResolver   func(addr string) (names []string, err error)
 
@@ -309,8 +306,8 @@ func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Reques
 	require.NoError(s.T(), err, "no error on a call to a nonsecure reverse proxy addr")
 	assert.Empty(s.T(), resp.Header.Get("x-kedge-error"))
 	require.Equal(s.T(), http.StatusAccepted, resp.StatusCode)
-	assert.Equal(s.T(), req.URL.Path, resp.Header.Get("x-test-req-url"),  "path seen on backend must match requested path")
-	assert.Equal(s.T(), req.URL.Host, resp.Header.Get("x-test-req-host"),  "host seen on backend must match requested host")
+	assert.Equal(s.T(), req.URL.Path, resp.Header.Get("x-test-req-url"), "path seen on backend must match requested path")
+	assert.Equal(s.T(), req.URL.Host, resp.Header.Get("x-test-req-host"), "host seen on backend must match requested host")
 }
 
 func (s *HttpProxyingIntegrationSuite) xTestSuccessOverForwardProxy_DialUsingAddresser() {
@@ -427,14 +424,12 @@ func (s *HttpProxyingIntegrationSuite) xTestLoadbalacingToNonSecureBackend() {
 	}
 }
 
-
 func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
 	cl := kedge_http.NewClient(s.mapper, s.tlsConfigForTest(), http.DefaultTransport.(*http.Transport))
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://nonsecure.ext.example.com/some/strict/path")}
 	resp, err := cl.Do(req)
 	s.assertSuccessfulPingback(req, resp, err)
 }
-
 
 func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 	// Restore old resolver.

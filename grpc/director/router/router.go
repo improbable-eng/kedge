@@ -5,6 +5,7 @@ import (
 
 	"strings"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -30,10 +31,7 @@ func NewStatic(routes []*pb.Route) *router {
 }
 
 func (r *router) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
-	md, ok := metadata.FromContext(ctx)
-	if !ok {
-		md = emptyMd
-	}
+	md := metautils.ExtractIncoming(ctx)
 	if strings.HasPrefix(fullMethodName, "/") {
 		fullMethodName = fullMethodName[1:]
 	}
@@ -62,18 +60,18 @@ func (r *router) serviceNameMatches(fullMethodName string, matcher string) bool 
 	return fullMethodName == matcher
 }
 
-func (r *router) authorityMatches(md metadata.MD, matcher string) bool {
+func (r *router) authorityMatches(md metautils.NiceMD, matcher string) bool {
 	if matcher == "" {
 		return true
 	}
-	auth, ok := md[":authority"]
-	if !ok || len(auth) == 0 {
+	auth := md.Get(":authority")
+	if auth == "" {
 		return false // there was no authority header and it was expected
 	}
-	return auth[0] == matcher
+	return auth == matcher
 }
 
-func (r *router) metadataMatches(md metadata.MD, expectedKv map[string]string) bool {
+func (r *router) metadataMatches(md metautils.NiceMD, expectedKv map[string]string) bool {
 	for expK, expV := range expectedKv {
 		vals, ok := md[strings.ToLower(expK)]
 		if !ok {

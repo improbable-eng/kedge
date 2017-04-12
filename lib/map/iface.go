@@ -1,8 +1,8 @@
 package kedge_map
 
 import (
-	"net/url"
 	"errors"
+	"net/url"
 )
 
 var (

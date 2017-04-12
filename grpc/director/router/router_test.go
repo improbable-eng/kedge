@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -103,7 +104,7 @@ func TestRouteMatches(t *testing.T) {
 		},
 	} {
 		t.Run(tcase.name, func(t *testing.T) {
-			ctx := metadata.NewContext(context.TODO(), tcase.md)
+			ctx := metautils.NiceMD(tcase.md).ToIncoming(context.TODO())
 			be, _ := r.Route(ctx, tcase.fullServiceName)
 			assert.Equal(t, be, tcase.expectedBackend, "must match expected backend")
 		})

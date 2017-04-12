@@ -1,12 +1,12 @@
 package resolvers
 
-
 import (
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 
-	"google.golang.org/grpc/naming"
 	"fmt"
+
 	"github.com/sercand/kuberesolver"
+	"google.golang.org/grpc/naming"
 )
 
 func NewK8sFromConfig(conf *pb.KubeResolver) (target string, namer naming.Resolver, err error) {

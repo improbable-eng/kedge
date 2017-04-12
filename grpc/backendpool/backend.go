@@ -56,7 +56,12 @@ func (b *backend) Conn() (*grpc.ClientConn, error) {
 }
 
 func (b *backend) Close() error {
-	return b.conn.Close()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.conn != nil {
+		return b.conn.Close()
+	}
+	return nil
 }
 
 func newBackend(cnf *pb.Backend) (*backend, error) {

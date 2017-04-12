@@ -1,11 +1,10 @@
 package router
 
 import (
-
-	"strings"
+	"errors"
 	"net/http"
 	"net/url"
-	"errors"
+	"strings"
 
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"google.golang.org/grpc/metadata"
@@ -14,7 +13,7 @@ import (
 )
 
 var (
-	emptyMd       = metadata.Pairs()
+	emptyMd          = metadata.Pairs()
 	ErrRouteNotFound = errors.New("unknown route to service")
 )
 

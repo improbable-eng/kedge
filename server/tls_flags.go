@@ -28,7 +28,7 @@ var (
 
 	flagTlsServerClientCertRequired = sharedflags.Set.Bool(
 		"server_tls_client_cert_required",
-		false,
+		true,
 		"Controls whether a testclient certificate is required. Only used if server_tls_client_ca_files is not empty. If true, connections that don't have a testclient CA will be rejected.")
 )
 

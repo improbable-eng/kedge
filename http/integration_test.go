@@ -1,34 +1,27 @@
 package http_integration
 
 import (
-	"net"
-
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"net/url"
 	"path"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"io/ioutil"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-srvlb/srv"
 	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
-
-	"fmt"
-
-	"context"
-	"net/http"
-	"net/url"
-
-	"errors"
-
-	"strings"
-
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/http/director/router"
@@ -284,7 +277,7 @@ func (s *BackendPoolIntegrationTestSuite) buildBackends() {
 }
 
 func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
-	ctx, _ := context.WithTimeout(context.TODO(), 2*time.Second)
+	ctx, _ := context.WithTimeout(context.TODO(), 5*time.Second)
 	return ctx
 }
 

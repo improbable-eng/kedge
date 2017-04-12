@@ -60,6 +60,7 @@ func (s *BalancedTransportSuite) SetupSuite() {
 	for i := 0; i < backendCount; i++ {
 		s.backends = append(s.backends, httptest.NewServer(funcForBackend(i)))
 	}
+	time.Sleep(500 * time.Millisecond) // wait for the backends to come up.
 	s.lbTrans, err = lbtransport.New(
 		"my-magic-srv",
 		http.DefaultTransport,

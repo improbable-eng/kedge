@@ -3,6 +3,7 @@ package kedge_map_test
 import (
 	"testing"
 
+	"github.com/mwitkow/kedge/lib/map"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -27,8 +27,10 @@ import (
 	"net/url"
 
 	"github.com/mwitkow/kedge/grpc/backendpool"
+	"github.com/mwitkow/kedge/grpc/client"
 	"github.com/mwitkow/kedge/grpc/director"
 	"github.com/mwitkow/kedge/grpc/director/router"
+	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

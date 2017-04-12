@@ -14,7 +14,7 @@ var (
 type Mapper interface {
 	// Map maps a target's DNS name (e.g. myservice.prod.ext.europe-cluster.local) to a (public) URL of the Kedge
 	// fronting that destination. The returned Scheme is deciding whether the Kedge connection is secure.
-	// An error c
+	// If the targets shouldn't go through a kedge, ErrNotKedgeDestination should be returned.
 	Map(targetAuthorityDnsName string) (*url.URL, error)
 }
 

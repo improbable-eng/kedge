@@ -9,9 +9,9 @@ import (
 
 	"sync"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/mwitkow/go-conntrack"
-	"github.com/mwitkow/go-grpc-middleware"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
 	"github.com/mwitkow/kedge/lib/resolvers"

@@ -99,7 +99,7 @@ func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
 	dialFunc := ParentDialFunc
 	if !cnf.DisableConntracking {
 		dialFunc = conntrack.NewDialContextFunc(
-			conntrack.DialWithName("backend_"+cnf.Name),
+			conntrack.DialWithName("grpc_backend_"+cnf.Name),
 			conntrack.DialWithDialContextFunc(dialFunc),
 			conntrack.DialWithTracing(),
 		)

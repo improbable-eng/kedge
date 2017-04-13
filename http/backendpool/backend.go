@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net"
 	"time"
-
 	"net/http"
-
 	"errors"
 	"sync"
 
@@ -19,6 +17,8 @@ import (
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
+	"github.com/mwitkow/kedge/lib/sharedflags"
+
 )
 
 var (
@@ -71,6 +71,8 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	b.transport = &http.Transport{
 		DialContext:     chooseDialFuncOpt(cnf),
 		TLSClientConfig: tlsConfig,
+		MaxIdleConnsPerHost: 2,
+		MaxIdleConns: 4,
 		// TODO(mwitkow): add idle conn configuration.
 	}
 	// We want there to be h2 on outbound SSL connections, this mangles tlsConfig
@@ -90,7 +92,7 @@ func chooseDialFuncOpt(cnf *pb.Backend) func(ctx context.Context, network, addr 
 	dialFunc := ParentDialFunc
 	if !cnf.DisableConntracking {
 		dialFunc = conntrack.NewDialContextFunc(
-			conntrack.DialWithName("backend_"+cnf.Name),
+			conntrack.DialWithName("http_backend_"+cnf.Name),
 			conntrack.DialWithDialContextFunc(dialFunc),
 			conntrack.DialWithTracing(),
 		)
@@ -119,9 +121,8 @@ func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	if s := cnf.GetSrv(); s != nil {
 		return resolvers.NewSrvFromConfig(s)
 	} else if k := cnf.GetK8S(); k != nil {
-		// TODO(mwitkow): Deal with HTTP URLs to resolver for K8s. It sets a target==kubernetes://.
-		// This needs to be done in lbtransport validation of targets.
-		return "", nil, fmt.Errorf("Kubernetes resolution is not supported at the moment for HTTP targets.")
+		// TODO(mwitkow): Deal with HTTP URLs to resolver for K8s. It sets a target==kubernetes://. This may not work.
+		return resolvers.NewK8sFromConfig(k)
 	}
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)
 }

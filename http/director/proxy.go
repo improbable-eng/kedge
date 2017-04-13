@@ -6,6 +6,8 @@ import (
 
 	"fmt"
 
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-httpwares/tags"
@@ -13,10 +15,16 @@ import (
 	"github.com/mwitkow/kedge/http/director/adhoc"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/oxtoacart/bpool"
 )
 
 var (
 	AdhocTransport = &(*(http.DefaultTransport.(*http.Transport))) // shallow copy
+
+	flagBufferSizeBytes  = sharedflags.Set.Int("http_reverseproxy_buffer_size_bytes", 32*1024, "Size (bytes) of reusable buffer used for copying HTTP reverse proxy responses.")
+	flagBufferCount      = sharedflags.Set.Int("http_reverseproxy_buffer_count", 2*1024, "Maximum number of of reusable buffer used for copying HTTP reverse proxy responses.")
+	flagFlushingInterval = sharedflags.Set.Duration("http_reverseproxy_flushing_interval", 10*time.Millisecond, "Interval for flushing the responses in HTTP reverse proxy code.")
 )
 
 // New creates a forward/reverse proxy that is either Route+Backend and Adhoc Rules forwarding.
@@ -28,14 +36,19 @@ var (
 func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser) *Proxy {
 	adhocTripper := &(*AdhocTransport) // shallow copy
 	adhocTripper.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
+	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	p := &Proxy{
 		backendReverseProxy: &httputil.ReverseProxy{
-			Director:  func(r *http.Request) {},
-			Transport: &backendPoolTripper{pool: pool},
+			Director:      func(r *http.Request) {},
+			Transport:     &backendPoolTripper{pool: pool},
+			FlushInterval: *flagFlushingInterval,
+			BufferPool:    bufferpool,
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
-			Director:  func(r *http.Request) {},
-			Transport: adhocTripper,
+			Director:      func(r *http.Request) {},
+			Transport:     adhocTripper,
+			FlushInterval: *flagFlushingInterval,
+			BufferPool:    bufferpool,
 		},
 		router:    router,
 		addresser: addresser,

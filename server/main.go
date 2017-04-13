@@ -7,7 +7,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"time"
-
 	"crypto/tls"
 	"strings"
 
@@ -22,7 +21,7 @@ import (
 	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	"github.com/mwitkow/kedge/server/sharedflags"
+	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
 	_ "golang.org/x/net/trace"

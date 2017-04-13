@@ -15,6 +15,9 @@ import (
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
+	"sync"
+	"github.com/mwitkow/go-httpwares"
+	"errors"
 )
 
 var (
@@ -22,21 +25,38 @@ var (
 		Timeout:   1 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}).DialContext
+
+	closedTripper = httpwares.RoundTripperFunc(func (*http.Request) (*http.Response, error) {
+		return nil, errors.New("backend transport closed")
+	})
 )
 
 type backend struct {
+	mu sync.RWMutex
 	transport *http.Transport
 	tripper   http.RoundTripper
 	config    *pb.Backend
+	closed bool
 }
 
 func (b *backend) Tripper() http.RoundTripper {
-	return b.tripper
+	b.mu.RLock()
+	t := b.tripper
+	if b.closed {
+		t = closedTripper
+	}
+	b.mu.RUnlock()
+	return t
 }
 
 func (b *backend) Close() error {
-	// TODO(mwitkow): Return tripper errors when stuff's closed.
-	b.transport.CloseIdleConnections()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.closed = true
+	if b.transport != nil {
+		b.transport.CloseIdleConnections()
+	}
+	b.transport = nil
 	return nil
 }
 

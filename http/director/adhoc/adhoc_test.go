@@ -1,4 +1,4 @@
-package router
+package adhoc
 
 import (
 	"errors"
@@ -59,7 +59,7 @@ func TestAdhocMatches(t *testing.T) {
 		}
 	}
 
-	a := NewAddresser(config.AdhocRules)
+	a := NewStaticAddresser(config.AdhocRules)
 
 	for _, tcase := range []struct {
 		name         string

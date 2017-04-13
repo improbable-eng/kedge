@@ -25,9 +25,9 @@ func (s *dynamic) Close() error {
 }
 
 // NewDynamic creates a pool with a dynamic allocator
-func NewDynamic() (Pool, error) {
+func NewDynamic() *dynamic {
 	s := &dynamic{backends: make(map[string]*backend), backendFactory: newBackend}
-	return s, nil
+	return s
 }
 
 func (s *dynamic) Conn(backendName string) (*grpc.ClientConn, error) {

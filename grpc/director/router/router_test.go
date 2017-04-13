@@ -44,7 +44,7 @@ func TestRouteMatches(t *testing.T) {
 ]}`
 	config := &pb.DirectorConfig_Grpc{}
 	require.NoError(t, jsonpb.UnmarshalString(configJson, config))
-	r := &router{routes: config.Routes}
+	r := &static{routes: config.Routes}
 
 	for _, tcase := range []struct {
 		name            string

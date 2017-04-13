@@ -1,69 +1,80 @@
 package main
 
 import (
-	"bytes"
-	"io/ioutil"
-
-	log "github.com/Sirupsen/logrus"
-
 	"github.com/golang/protobuf/proto"
-	"github.com/mwitkow/go-nicejsonpb"
+	"github.com/mwitkow/go-flagz/protobuf"
+	"github.com/mwitkow/go-proto-validators"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
-	"github.com/mwitkow/kedge/server/sharedflags"
-
 	grpc_bp "github.com/mwitkow/kedge/grpc/backendpool"
+	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	grpc_router "github.com/mwitkow/kedge/grpc/director/router"
 	http_bp "github.com/mwitkow/kedge/http/backendpool"
+	http_director "github.com/mwitkow/kedge/http/director"
+	http_adhoc "github.com/mwitkow/kedge/http/director/adhoc"
 	http_router "github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/server/sharedflags"
+	"github.com/Sirupsen/logrus"
+	"github.com/coreos/etcd/mvcc/backend"
 )
 
 var (
-	flagConfigDirectorPath = sharedflags.Set.String(
-		"grpcproxy_config_director_path",
-		"../misc/director.json",
-		"Path to the jsonPB file configuring the director.")
-	flagConfigBackendPoolPath = sharedflags.Set.String(
-		"grpcproxy_config_backendpool_path",
-		"../misc/backendpool.json",
-		"Path to the jsonPB file configuring the backend pool.")
+	flagConfigDirector = protoflagz.DynProto3(sharedflags.Set,
+		"kedge_config_director_config",
+		&pb_config.DirectorConfig{
+			Grpc: &pb_config.DirectorConfig_Grpc{},
+			Http: &pb_config.DirectorConfig_Http{},
+		},
+		"Contents of the Kedge Director configuration. Dynamically settable or read from file").WithFileFlag("../misc/director.json").WithValidator(generalValidator).WithNotifier(directorConfigReload)
+
+	flagConfigBackendpool = protoflagz.DynProto3(sharedflags.Set,
+		"kedge_config_backendpool_config",
+		&pb_config.DirectorConfig{
+			Grpc: &pb_config.DirectorConfig_Grpc{},
+			Http: &pb_config.DirectorConfig_Http{},
+		},
+		"Contents of the Kedge Backendpool configuration. Dynamically settable or read from file").WithFileFlag("../misc/backendpool.json").WithValidator(generalValidator)
+
+	grpcBackendPool = grpc_bp.NewDynamic()
+	httpBackendPool = http_bp.NewDynamic()
+	grpcRouter      = grpc_router.NewDynamic()
+	httpRouter      = http_router.NewDynamic()
+	httpAddresser   = http_adhoc.NewDynamic()
+
+	httpDirector = http_director.New(httpBackendPool, httpRouter, httpAddresser)
+	grpcDirector = grpc_director.New(grpcBackendPool, grpcRouter)
 )
 
-func buildRouterOrFail() (grpc_router.Router, http_router.Router, http_router.AdhocAddresser) {
-	cnf := &pb_config.DirectorConfig{}
-	if err := readAsJson(*flagConfigDirectorPath, cnf); err != nil {
-		log.Fatalf("failed reading director director config: %v", err)
-	}
-	grpcRouter := grpc_router.NewStatic(cnf.Grpc.Routes)
-	httpRouter := http_router.NewStatic(cnf.Http.Routes)
-	httpAddresser := http_router.NewAddresser(cnf.Http.AdhocRules)
-	return grpcRouter, httpRouter, httpAddresser
-}
-
-func buildBackendPoolOrFail() (grpc_bp.Pool, http_bp.Pool) {
-	cnf := &pb_config.BackendPoolConfig{}
-	if err := readAsJson(*flagConfigBackendPoolPath, cnf); err != nil {
-		log.Fatalf("failed reading backend pool config: %v", err)
-	}
-	grpcBePool, err := grpc_bp.NewStatic(cnf.GetGrpc().GetBackends())
-	if err != nil {
-		log.Fatalf("failed creating grpc backend pool: %v", err)
-	}
-	httpBePool, err := http_bp.NewStatic(cnf.GetHttp().GetBackends())
-	if err != nil {
-		log.Fatalf("failed creating http backend pool: %v", err)
-	}
-	return grpcBePool, httpBePool
-}
-
-func readAsJson(filePath string, destination proto.Message) error {
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return err
-	}
-	um := &nicejsonpb.Unmarshaler{AllowUnknownFields: false}
-	err = um.Unmarshal(bytes.NewReader(data), destination)
-	if err != nil {
-		return err
+func generalValidator(msg proto.Message) error {
+	if val, ok := msg.(validator.Validator); ok {
+		if err := val.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func directorConfigReload(oldValue proto.Message, newValue proto.Message) {
+	newConfig := newValue.(*pb_config.DirectorConfig)
+
+	// The gRPC and HTTP fields are guaranteed to be there because of validation.
+	grpcRouter.Update(newConfig.GetGrpc().Routes)
+	httpRouter.Update(newConfig.GetHttp().Routes)
+	httpAddresser.Update(newConfig.GetHttp().AdhocRules)
+}
+
+func backendConfigReloaded(oldValue proto.Message, newValue proto.Message) {
+	newConfig := newValue.(*pb_config.BackendPoolConfig)
+
+	// The gRPC and HTTP fields are guaranteed to be there because of validation.
+	grpcBackendInNewConfig := make(map[string]struct{})
+	currentGrpcBackends := grpcBackendPool.Configs()
+	for _, backend := range newConfig.GetGrpc().Backends {
+		if _, exists := currentGrpcBackends[backend.Name]; exists {
+			if err := grpcBackendPool.AddOrUpdate(backend); err != nil {
+				logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
+			}
+		} else {
+			grpcBackendPool.Remove(backend.Name)
+		}
+	}
 }

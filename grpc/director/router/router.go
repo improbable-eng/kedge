@@ -5,6 +5,8 @@ import (
 
 	"strings"
 
+	"sync"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -17,20 +19,46 @@ var (
 	routeNotFound = grpc.Errorf(codes.Unimplemented, "unknown route to service")
 )
 
+// Router is an interface that decides what backend a given stream should be directed to.
 type Router interface {
 	// Route returns a backend name for a given call, or an error.
 	Route(ctx context.Context, fullMethodName string) (backendName string, err error)
 }
 
-type router struct {
+type dynamic struct {
+	mu           sync.RWMutex
+	staticRouter *static
+}
+
+// NewDynamic creates a new dynamic router that can be have its routes updated.
+func NewDynamic() *dynamic {
+	return &dynamic{staticRouter: NewStatic([]*pb.Route{})}
+}
+
+func (d *dynamic) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
+	d.mu.RLock()
+	staticRouter := d.staticRouter
+	d.mu.RUnlock()
+	return staticRouter.Route(ctx, fullMethodName)
+}
+
+// Update sets the routing table to the provided set of routes.
+func (d *dynamic) Update(routes []*pb.Route) {
+	staticRouter := NewStatic(routes)
+	d.mu.Lock()
+	d.staticRouter = staticRouter
+	d.mu.Unlock()
+}
+
+type static struct {
 	routes []*pb.Route
 }
 
-func NewStatic(routes []*pb.Route) *router {
-	return &router{routes: routes}
+func NewStatic(routes []*pb.Route) *static {
+	return &static{routes: routes}
 }
 
-func (r *router) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
+func (r *static) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
 	md := metautils.ExtractIncoming(ctx)
 	if strings.HasPrefix(fullMethodName, "/") {
 		fullMethodName = fullMethodName[1:]
@@ -50,7 +78,7 @@ func (r *router) Route(ctx context.Context, fullMethodName string) (backendName 
 	return "", routeNotFound
 }
 
-func (r *router) serviceNameMatches(fullMethodName string, matcher string) bool {
+func (r *static) serviceNameMatches(fullMethodName string, matcher string) bool {
 	if matcher == "" || matcher == "*" {
 		return true
 	}
@@ -60,7 +88,7 @@ func (r *router) serviceNameMatches(fullMethodName string, matcher string) bool 
 	return fullMethodName == matcher
 }
 
-func (r *router) authorityMatches(md metautils.NiceMD, matcher string) bool {
+func (r *static) authorityMatches(md metautils.NiceMD, matcher string) bool {
 	if matcher == "" {
 		return true
 	}
@@ -71,7 +99,7 @@ func (r *router) authorityMatches(md metautils.NiceMD, matcher string) bool {
 	return auth == matcher
 }
 
-func (r *router) metadataMatches(md metautils.NiceMD, expectedKv map[string]string) bool {
+func (r *static) metadataMatches(md metautils.NiceMD, expectedKv map[string]string) bool {
 	for expK, expV := range expectedKv {
 		vals, ok := md[strings.ToLower(expK)]
 		if !ok {

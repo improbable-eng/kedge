@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
+	"sync"
 )
 
 var (
@@ -23,15 +24,40 @@ type Router interface {
 	Route(req *http.Request) (backendName string, err error)
 }
 
-type router struct {
+type dynamic struct {
+	mu sync.RWMutex
+	staticRouter *static
+}
+
+// NewDynamic creates a new dynamic router that can be have its routes updated.
+func NewDynamic() *dynamic {
+	return &dynamic{staticRouter: NewStatic([]*pb.Route{})}
+}
+
+func (d *dynamic) Route(req *http.Request) (backendName string, err error) {
+	d.mu.RLock()
+	staticRouter := d.staticRouter
+	d.mu.RUnlock()
+	return staticRouter.Route(req)
+}
+
+// Update sets the routing table to the provided set of routes.
+func (d *dynamic) Update(routes []*pb.Route) {
+	staticRouter := NewStatic(routes)
+	d.mu.Lock()
+	d.staticRouter = staticRouter
+	d.mu.Unlock()
+}
+
+type static struct {
 	routes []*pb.Route
 }
 
-func NewStatic(routes []*pb.Route) *router {
-	return &router{routes: routes}
+func NewStatic(routes []*pb.Route) *static {
+	return &static{routes: routes}
 }
 
-func (r *router) Route(req *http.Request) (backendName string, err error) {
+func (r *static) Route(req *http.Request) (backendName string, err error) {
 	for _, route := range r.routes {
 		if !r.urlMatches(req.URL, route.PathRules) {
 			continue
@@ -50,7 +76,7 @@ func (r *router) Route(req *http.Request) (backendName string, err error) {
 	return "", ErrRouteNotFound
 }
 
-func (r *router) urlMatches(u *url.URL, matchers []string) bool {
+func (r *static) urlMatches(u *url.URL, matchers []string) bool {
 	if len(matchers) == 0 {
 		return true
 	}
@@ -70,7 +96,7 @@ func (r *router) urlMatches(u *url.URL, matchers []string) bool {
 	return false
 }
 
-func (r *router) hostMatches(host string, matcher string) bool {
+func (r *static) hostMatches(host string, matcher string) bool {
 	if host == "" {
 		return false // we can't handle empty hosts
 	}
@@ -80,7 +106,7 @@ func (r *router) hostMatches(host string, matcher string) bool {
 	return host == matcher
 }
 
-func (r *router) headersMatch(header http.Header, expectedKv map[string]string) bool {
+func (r *static) headersMatch(header http.Header, expectedKv map[string]string) bool {
 	for expK, expV := range expectedKv {
 		headerVal := header.Get(expK)
 		if headerVal == "" {
@@ -93,7 +119,7 @@ func (r *router) headersMatch(header http.Header, expectedKv map[string]string) 
 	return true
 }
 
-func (r *router) requestTypeMatch(requestMode proxyreq.ProxyMode, routeMode pb.ProxyMode) bool {
+func (r *static) requestTypeMatch(requestMode proxyreq.ProxyMode, routeMode pb.ProxyMode) bool {
 	if routeMode == pb.ProxyMode_ANY {
 		return true
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/http/director/adhoc"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 // sent to. The backends in the Pool have pre-dialed connections and are load balanced.
 //
 // If  Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
-func New(pool backendpool.Pool, router router.Router, adhoc router.AdhocAddresser) *Proxy {
+func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser) *Proxy {
 	adhocTripper := &(*AdhocTransport) // shallow copy
 	adhocTripper.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
 	p := &Proxy{
@@ -35,7 +36,7 @@ func New(pool backendpool.Pool, router router.Router, adhoc router.AdhocAddresse
 			Transport: adhocTripper,
 		},
 		router:    router,
-		addresser: adhoc,
+		addresser: addresser,
 	}
 	return p
 }
@@ -43,7 +44,7 @@ func New(pool backendpool.Pool, router router.Router, adhoc router.AdhocAddresse
 // Proxy is a forward/reverse proxy that implements Route+Backend and Adhoc Rules forwarding.
 type Proxy struct {
 	router    router.Router
-	addresser router.AdhocAddresser
+	addresser adhoc.Addresser
 
 	backendReverseProxy *httputil.ReverseProxy
 	adhocReverseProxy   *httputil.ReverseProxy

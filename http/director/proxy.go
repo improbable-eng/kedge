@@ -6,10 +6,12 @@ import (
 
 	"fmt"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/http/middleware/logging/logrus"
 )
 
 var (
@@ -59,10 +61,11 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if err == nil {
 		resp.Header().Set("x-kedge-backend-name", backend)
 		normReq.URL.Host = backend
+		http_logrus.AddFields(req.Context(), logrus.Fields{"kedge_backend": backend})
 		p.backendReverseProxy.ServeHTTP(resp, normReq)
 		return
 	} else if err != router.ErrRouteNotFound {
-		respondWithError(err, resp)
+		respondWithError(err, req, resp)
 		return
 	}
 	addr, err := p.addresser.Address(req)
@@ -71,7 +74,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		p.adhocReverseProxy.ServeHTTP(resp, normReq)
 		return
 	}
-	respondWithError(err, resp)
+	respondWithError(err, req, resp)
 }
 
 // backendPoolTripper assumes the response has been rewritten by the proxy to have the backend as req.URL.Host
@@ -87,11 +90,12 @@ func (t *backendPoolTripper) RoundTrip(req *http.Request) (*http.Response, error
 	return nil, err
 }
 
-func respondWithError(err error, resp http.ResponseWriter) {
+func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 	status := http.StatusBadGateway
 	if rErr, ok := (err).(*router.Error); ok {
 		status = rErr.StatusCode()
 	}
+	http_logrus.AddFields(req.Context(), logrus.Fields{logrus.ErrorKey: err})
 	resp.Header().Set("x-kedge-error", err.Error())
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)

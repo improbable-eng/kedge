@@ -6,13 +6,10 @@ import (
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDynamic_Operations(t *testing.T) {
-	someDyn, err := NewDynamic()
-	require.NoError(t, err)
-	d := someDyn.(*dynamic)
+	d := NewDynamic()
 	d.backendFactory = func(config *pb.Backend) (*backend, error) {
 		return &backend{config: config}, nil
 	}

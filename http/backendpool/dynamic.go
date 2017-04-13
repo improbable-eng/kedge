@@ -4,8 +4,9 @@ import (
 	"hash/fnv"
 	"sync"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	"net/http"
+
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 )
 
 // dynamic is a Pool to which you can update or remove routes.
@@ -25,14 +26,14 @@ func (s *dynamic) Close() error {
 }
 
 // NewDynamic creates a pool with a dynamic allocator
-func NewDynamic() *dynamic{
+func NewDynamic() *dynamic {
 	s := &dynamic{backends: make(map[string]*backend), backendFactory: newBackend}
 	return s
 }
 
 func (s *dynamic) Tripper(backendName string) (http.RoundTripper, error) {
 	s.mu.RLock()
-	defer s.mu.Unlock()
+	defer s.mu.RUnlock()
 	be, ok := s.backends[backendName]
 	if !ok {
 		return nil, ErrUnknownBackend

@@ -32,7 +32,7 @@ func NewDynamic() *dynamic {
 
 func (s *dynamic) Conn(backendName string) (*grpc.ClientConn, error) {
 	s.mu.RLock()
-	defer s.mu.Unlock()
+	defer s.mu.RUnlock()
 	be, ok := s.backends[backendName]
 	if !ok {
 		return nil, ErrUnknownBackend

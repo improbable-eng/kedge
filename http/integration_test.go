@@ -38,13 +38,13 @@ import (
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/client"
 	"github.com/mwitkow/kedge/http/director"
+	"github.com/mwitkow/kedge/http/director/adhoc"
 	"github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/mwitkow/kedge/http/director/adhoc"
 )
 
 var backendResolutionDuration = 10 * time.Millisecond

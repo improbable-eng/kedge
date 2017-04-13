@@ -9,8 +9,9 @@ import (
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"google.golang.org/grpc/metadata"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 	"sync"
+
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 )
 
 var (
@@ -25,7 +26,7 @@ type Router interface {
 }
 
 type dynamic struct {
-	mu sync.RWMutex
+	mu           sync.RWMutex
 	staticRouter *static
 }
 

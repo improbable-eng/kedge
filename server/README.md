@@ -6,35 +6,72 @@ This server starts up a gRPC reverse proxy.
 
 Driven through two config files: 
 
-[backendpool.json](misc/backendpool.json):
+`--kedge_config_backendpool_config` command line content or read from file using `--kedge_config_backendpool_config_path`:
 ```json
 {
-  "backends": [
-    {
-      "name": "controller",
-      "balancer": "ROUND_ROBIN",
-      "interceptors": [
-        { "prometheus": true }
-
-      ],
-      "srv": {
-        "dns_name": "controller.eu1-prod.internal.improbable.io"
+  "grpc": {
+    "backends": [
+      {
+        "name": "controller",
+        "balancer": "ROUND_ROBIN",
+        "interceptors": [
+          {
+            "prometheus": true
+          }
+        ],
+        "srv": {
+          "dns_name": "controller.eu1-prod.internal.improbable.io"
+        }
       }
-    }
-  ]
+    ]
+  },
+  "http": {
+    "backends": [
+      {
+        "name": "controller",
+        "balancer": "ROUND_ROBIN",
+        "srv": {
+          "dns_name": "controller.metrics.eu1-prod.internal.improbable.io"
+        }
+      }
+    ]
+  }
 }
 ```
 
-[director.json](misc/director.json):
+`--kedge_config_director_config` command line content or read from file using `--kedge_config_director_config_path`:
 ```json
 {
-  "routes": [
-    {
-      "backend_name": "controller",
-      "service_name_matcher": "*",
-      "authority_matcher": "controller.eu1-prod.improbable.local"
-    }
-  ]
+  "grpc": {
+    "routes": [
+      {
+        "backend_name": "controller",
+        "service_name_matcher": "*",
+        "authority_matcher": "controller.ext.cluster.local"
+      }
+    ]
+  },
+  "http": {
+    "routes": [
+      {
+        "backend_name": "controller",
+        "host_matcher": "controller.ext.cluster.local"
+      }
+    ],
+    "adhoc_rules": [
+      {
+        "dns_name_matcher": "*.pod.cluster.local",
+        "port": {
+          "allowed_ranges": [
+            {
+              "from": 40,
+              "to": 10000
+            }
+          ]
+        }
+      }
+     ]
+  }
 }
 ```
 
@@ -52,5 +89,7 @@ go build
   --server_tls_cert_file=misc/localhost.crt \ 
   --server_tls_key_file=misc/localhost.key \
   --server_tls_client_ca_files=misc/ca.crt \ 
-  --server_tls_client_cert_required=true
+  --server_tls_client_cert_required=true \
+  --kedge_config_director_config_path=../misc/director.json \
+  --kedge_config_backendpool_config_path=../misc/backendpool.json 
 ```

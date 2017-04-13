@@ -9,15 +9,16 @@ import (
 
 	"net/http"
 
+	"errors"
+	"sync"
+
 	"github.com/mwitkow/go-conntrack"
+	"github.com/mwitkow/go-httpwares"
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	"github.com/mwitkow/kedge/http/lbtransport"
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
-	"sync"
-	"github.com/mwitkow/go-httpwares"
-	"errors"
 )
 
 var (
@@ -26,17 +27,17 @@ var (
 		KeepAlive: 30 * time.Second,
 	}).DialContext
 
-	closedTripper = httpwares.RoundTripperFunc(func (*http.Request) (*http.Response, error) {
+	closedTripper = httpwares.RoundTripperFunc(func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("backend transport closed")
 	})
 )
 
 type backend struct {
-	mu sync.RWMutex
+	mu        sync.RWMutex
 	transport *http.Transport
 	tripper   http.RoundTripper
 	config    *pb.Backend
-	closed bool
+	closed    bool
 }
 
 func (b *backend) Tripper() http.RoundTripper {

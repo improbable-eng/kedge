@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/proto"
 	"github.com/mwitkow/go-flagz/protobuf"
 	"github.com/mwitkow/go-proto-validators"
@@ -13,8 +14,6 @@ import (
 	http_adhoc "github.com/mwitkow/kedge/http/director/adhoc"
 	http_router "github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/server/sharedflags"
-	"github.com/Sirupsen/logrus"
-	"github.com/coreos/etcd/mvcc/backend"
 )
 
 var (
@@ -28,11 +27,11 @@ var (
 
 	flagConfigBackendpool = protoflagz.DynProto3(sharedflags.Set,
 		"kedge_config_backendpool_config",
-		&pb_config.DirectorConfig{
-			Grpc: &pb_config.DirectorConfig_Grpc{},
-			Http: &pb_config.DirectorConfig_Http{},
+		&pb_config.BackendPoolConfig{
+			Grpc: &pb_config.BackendPoolConfig_Grpc{},
+			Http: &pb_config.BackendPoolConfig_Http{},
 		},
-		"Contents of the Kedge Backendpool configuration. Dynamically settable or read from file").WithFileFlag("../misc/backendpool.json").WithValidator(generalValidator)
+		"Contents of the Kedge Backendpool configuration. Dynamically settable or read from file").WithFileFlag("../misc/backendpool.json").WithValidator(generalValidator).WithNotifier(backendConfigReloaded)
 
 	grpcBackendPool = grpc_bp.NewDynamic()
 	httpBackendPool = http_bp.NewDynamic()
@@ -67,14 +66,36 @@ func backendConfigReloaded(oldValue proto.Message, newValue proto.Message) {
 
 	// The gRPC and HTTP fields are guaranteed to be there because of validation.
 	grpcBackendInNewConfig := make(map[string]struct{})
-	currentGrpcBackends := grpcBackendPool.Configs()
+	grpcBackendInOldConfig := grpcBackendPool.Configs()
 	for _, backend := range newConfig.GetGrpc().Backends {
-		if _, exists := currentGrpcBackends[backend.Name]; exists {
-			if err := grpcBackendPool.AddOrUpdate(backend); err != nil {
-				logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
-			}
-		} else {
-			grpcBackendPool.Remove(backend.Name)
+		if err := grpcBackendPool.AddOrUpdate(backend); err != nil {
+			logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
+		}
+		logrus.Infof("adding new gRPC backend: %v", backend.Name)
+
+		grpcBackendInNewConfig[backend.Name] = struct{}{}
+	}
+	for backendName, _ := range grpcBackendInOldConfig {
+		if _, exists := grpcBackendInNewConfig[backendName]; !exists {
+			logrus.Infof("removing gRPC backend: %v", backendName)
+			grpcBackendPool.Remove(backendName)
+		}
+	}
+	httpBackendInNewConfig := make(map[string]struct{})
+	httpBackendInOldConfig := httpBackendPool.Configs()
+	for _, backend := range newConfig.GetHttp().Backends {
+		if err := httpBackendPool.AddOrUpdate(backend); err != nil {
+			logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
+		}
+		logrus.Infof("adding new http backend: %v", backend.Name)
+
+		httpBackendInNewConfig[backend.Name] = struct{}{}
+	}
+	for backendName, _ := range httpBackendInOldConfig {
+		if _, exists := grpcBackendInNewConfig[backendName]; !exists {
+			logrus.Infof("removing http backend: %v", backendName)
+
+			grpcBackendPool.Remove(backendName)
 		}
 	}
 }

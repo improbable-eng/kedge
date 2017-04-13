@@ -2,14 +2,12 @@ package backendpool
 
 import (
 	"testing"
+
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
-
-
-
 
 func TestDynamic_Operations(t *testing.T) {
 	someDyn, err := NewDynamic()
@@ -30,4 +28,3 @@ func TestDynamic_Operations(t *testing.T) {
 	assert.NoError(t, d.Remove("foobar"), "removing a non existing backend should return error")
 	assert.Len(t, d.Configs(), 1, "we now should have two")
 }
-

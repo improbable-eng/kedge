@@ -1,14 +1,14 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"time"
-	"crypto/tls"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
@@ -20,11 +20,12 @@ import (
 	"github.com/mwitkow/go-flagz"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
+	"github.com/mwitkow/go-httpwares/tracing/debug"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
-	_ "golang.org/x/net/trace"
+	_ "golang.org/x/net/trace" // so /debug/requst gets registered.
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -72,7 +73,8 @@ func main() {
 	registerDebugHandlers()
 
 	secureDirectorChain := chi.Chain(
-		httpwares_ctxtags.Middleware(),
+		http_ctxtags.Middleware(),
+		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry)).Handler(httpDirector)
 	secureHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/_healthz" {
@@ -98,7 +100,8 @@ func main() {
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField("http.port", "tls")),
 		Handler: chi.Chain(
-			httpwares_ctxtags.Middleware(),
+			http_ctxtags.Middleware(),
+			http_debug.Middleware(),
 			http_logrus.Middleware(logEntry.WithField("http.port", "plain")),
 		).Handler(http.DefaultServeMux),
 	}
@@ -154,6 +157,7 @@ func main() {
 
 func registerDebugHandlers() {
 	// TODO(mwitkow): Add middleware for making these only visible to private IPs.
+	http.Handle("/_healthz", http.HandlerFunc(healthEndpoint))
 	http.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
 	http.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 	//http.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))

@@ -72,9 +72,12 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	// note resp needs to implement Flusher, otherwise flush intervals won't work.
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	backend, err := p.router.Route(req)
+	tags := http_ctxtags.ExtractInbound(req)
+	tags.Set(http_ctxtags.TagForCallService, "proxy")
 	if err == nil {
 		resp.Header().Set("x-kedge-backend-name", backend)
-		httpwares_ctxtags.Extract(req).Set("http.proxy.backend", backend)
+		tags.Set("http.proxy.backend", backend)
+		tags.Set(http_ctxtags.TagForHandlerMethod, backend)
 		normReq.URL.Host = backend
 		p.backendReverseProxy.ServeHTTP(resp, normReq)
 		return
@@ -85,7 +88,8 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	addr, err := p.addresser.Address(req)
 	if err == nil {
 		normReq.URL.Host = addr
-		httpwares_ctxtags.Extract(req).Set("http.proxy.adhoc", addr)
+		tags.Set("http.proxy.adhoc", addr)
+		tags.Set(http_ctxtags.TagForHandlerMethod, "_adhoc")
 		p.adhocReverseProxy.ServeHTTP(resp, normReq)
 		return
 	}
@@ -110,7 +114,7 @@ func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 	if rErr, ok := (err).(*router.Error); ok {
 		status = rErr.StatusCode()
 	}
-	httpwares_ctxtags.Extract(req).Set(logrus.ErrorKey, err)
+	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
 	resp.Header().Set("x-kedge-error", err.Error())
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)

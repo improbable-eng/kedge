@@ -3,12 +3,12 @@ package backendpool
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
-	"time"
 	"net/http"
-	"errors"
 	"sync"
+	"time"
 
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-httpwares"
@@ -17,8 +17,6 @@ import (
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
-	"github.com/mwitkow/kedge/lib/sharedflags"
-
 )
 
 var (
@@ -69,10 +67,10 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	}
 	scheme, tlsConfig := buildTls(cnf)
 	b.transport = &http.Transport{
-		DialContext:     chooseDialFuncOpt(cnf),
-		TLSClientConfig: tlsConfig,
+		DialContext:         chooseDialFuncOpt(cnf),
+		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: 2,
-		MaxIdleConns: 4,
+		MaxIdleConns:        4,
 		// TODO(mwitkow): add idle conn configuration.
 	}
 	// We want there to be h2 on outbound SSL connections, this mangles tlsConfig

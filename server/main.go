@@ -73,7 +73,7 @@ func main() {
 	registerDebugHandlers()
 
 	secureDirectorChain := chi.Chain(
-		http_ctxtags.Middleware(),
+		http_ctxtags.Middleware("proxy"),
 		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry)).Handler(httpDirector)
 	secureHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -100,7 +100,7 @@ func main() {
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField("http.port", "tls")),
 		Handler: chi.Chain(
-			http_ctxtags.Middleware(),
+			http_ctxtags.Middleware("debug"),
 			http_debug.Middleware(),
 			http_logrus.Middleware(logEntry.WithField("http.port", "plain")),
 		).Handler(http.DefaultServeMux),

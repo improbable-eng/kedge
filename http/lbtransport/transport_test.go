@@ -62,13 +62,16 @@ func (s *BalancedTransportSuite) SetupSuite() {
 	}
 	for _, server := range s.backends {
 		server.Start() // this may be racy, no synchronization in the httptest :(
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(25 * time.Millisecond)
 	}
 	s.lbTrans, err = lbtransport.New(
 		"my-magic-srv",
 		http.DefaultTransport,
 		grpcsrvlb.New(s), // self implements resolver.Lookup
 		lbtransport.RoundRobinPolicy())
+	// Sleep to let the lbtransport actually prepare all the targets, can be racy but would need to introduce a
+	// separate synchronization primitive just for the test.
+	time.Sleep(50 * time.Millisecond)
 	require.NoError(s.T(), err, "cannot fail on initialization")
 }
 

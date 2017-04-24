@@ -77,7 +77,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if err == nil {
 		resp.Header().Set("x-kedge-backend-name", backend)
 		tags.Set("http.proxy.backend", backend)
-		tags.Set(http_ctxtags.TagForHandlerMethod, backend)
+		tags.Set(http_ctxtags.TagForHandlerName, backend)
 		normReq.URL.Host = backend
 		p.backendReverseProxy.ServeHTTP(resp, normReq)
 		return
@@ -89,7 +89,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if err == nil {
 		normReq.URL.Host = addr
 		tags.Set("http.proxy.adhoc", addr)
-		tags.Set(http_ctxtags.TagForHandlerMethod, "_adhoc")
+		tags.Set(http_ctxtags.TagForHandlerName, "_adhoc")
 		p.adhocReverseProxy.ServeHTTP(resp, normReq)
 		return
 	}

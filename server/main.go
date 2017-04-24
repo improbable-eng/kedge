@@ -18,6 +18,7 @@ import (
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-flagz"
+	"github.com/mwitkow/go-flagz/configmap"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
@@ -39,16 +40,33 @@ var (
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
 	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
+
+	flagConfigMapDir = sharedflags.Set.String("flagz_configmap_dir", "", "Path to read dynamic flagz from a configmap. Useful for providing the routing and backend configs. See https://github.com/mwitkow/go-flagz/tree/master/configmap")
 )
 
 func main() {
+	log.SetOutput(os.Stdout)
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
 		log.Fatalf("failed parsing flags: %v", err)
 	}
-	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
-		log.Fatalf("failed reading flagz from files: %v", err)
+	if *flagConfigMapDir != "" {
+		u, err := configmap.New(sharedflags.Set, *flagConfigMapDir, log.StandardLogger())
+		if err != nil {
+			log.Fatalf("failed flagz config map initialization: %v", err)
+		}
+		// Read flagz from configmaps and update their values in common.SharedFlagSet
+		if err := u.Initialize(); err != nil {
+			log.Fatalf("failed flagz config map initial read: %v", err)
+		}
+		if err := u.Start(); err != nil {
+			log.Fatalf("failed starting the configmap updater: %v", err)
+		}
+	} else {
+		if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
+			log.Fatalf("failed reading flagz from files: %v", err)
+		}
 	}
-	log.SetOutput(os.Stdout)
+
 	grpc.EnableTracing = *flagGrpcWithTracing
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)

@@ -6,14 +6,25 @@ import (
 
 	"fmt"
 
+	"time"
+
+	"github.com/Sirupsen/logrus"
 	"github.com/mwitkow/go-conntrack"
+	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/backendpool"
+	"github.com/mwitkow/kedge/http/director/adhoc"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/oxtoacart/bpool"
 )
 
 var (
 	AdhocTransport = &(*(http.DefaultTransport.(*http.Transport))) // shallow copy
+
+	flagBufferSizeBytes  = sharedflags.Set.Int("http_reverseproxy_buffer_size_bytes", 32*1024, "Size (bytes) of reusable buffer used for copying HTTP reverse proxy responses.")
+	flagBufferCount      = sharedflags.Set.Int("http_reverseproxy_buffer_count", 2*1024, "Maximum number of of reusable buffer used for copying HTTP reverse proxy responses.")
+	flagFlushingInterval = sharedflags.Set.Duration("http_reverseproxy_flushing_interval", 10*time.Millisecond, "Interval for flushing the responses in HTTP reverse proxy code.")
 )
 
 // New creates a forward/reverse proxy that is either Route+Backend and Adhoc Rules forwarding.
@@ -22,20 +33,25 @@ var (
 // sent to. The backends in the Pool have pre-dialed connections and are load balanced.
 //
 // If  Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
-func New(pool backendpool.Pool, router router.Router, adhoc router.AdhocAddresser) *Proxy {
+func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser) *Proxy {
 	adhocTripper := &(*AdhocTransport) // shallow copy
 	adhocTripper.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
+	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	p := &Proxy{
 		backendReverseProxy: &httputil.ReverseProxy{
-			Director:  func(r *http.Request) {},
-			Transport: &backendPoolTripper{pool: pool},
+			Director:      func(r *http.Request) {},
+			Transport:     &backendPoolTripper{pool: pool},
+			FlushInterval: *flagFlushingInterval,
+			BufferPool:    bufferpool,
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
-			Director:  func(r *http.Request) {},
-			Transport: adhocTripper,
+			Director:      func(r *http.Request) {},
+			Transport:     adhocTripper,
+			FlushInterval: *flagFlushingInterval,
+			BufferPool:    bufferpool,
 		},
 		router:    router,
-		addresser: adhoc,
+		addresser: addresser,
 	}
 	return p
 }
@@ -43,7 +59,7 @@ func New(pool backendpool.Pool, router router.Router, adhoc router.AdhocAddresse
 // Proxy is a forward/reverse proxy that implements Route+Backend and Adhoc Rules forwarding.
 type Proxy struct {
 	router    router.Router
-	addresser router.AdhocAddresser
+	addresser adhoc.Addresser
 
 	backendReverseProxy *httputil.ReverseProxy
 	adhocReverseProxy   *httputil.ReverseProxy
@@ -56,22 +72,28 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	// note resp needs to implement Flusher, otherwise flush intervals won't work.
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	backend, err := p.router.Route(req)
+	tags := http_ctxtags.ExtractInbound(req)
+	tags.Set(http_ctxtags.TagForCallService, "proxy")
 	if err == nil {
 		resp.Header().Set("x-kedge-backend-name", backend)
+		tags.Set("http.proxy.backend", backend)
+		tags.Set(http_ctxtags.TagForHandlerMethod, backend)
 		normReq.URL.Host = backend
 		p.backendReverseProxy.ServeHTTP(resp, normReq)
 		return
 	} else if err != router.ErrRouteNotFound {
-		respondWithError(err, resp)
+		respondWithError(err, req, resp)
 		return
 	}
 	addr, err := p.addresser.Address(req)
 	if err == nil {
 		normReq.URL.Host = addr
+		tags.Set("http.proxy.adhoc", addr)
+		tags.Set(http_ctxtags.TagForHandlerMethod, "_adhoc")
 		p.adhocReverseProxy.ServeHTTP(resp, normReq)
 		return
 	}
-	respondWithError(err, resp)
+	respondWithError(err, req, resp)
 }
 
 // backendPoolTripper assumes the response has been rewritten by the proxy to have the backend as req.URL.Host
@@ -87,11 +109,12 @@ func (t *backendPoolTripper) RoundTrip(req *http.Request) (*http.Response, error
 	return nil, err
 }
 
-func respondWithError(err error, resp http.ResponseWriter) {
+func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 	status := http.StatusBadGateway
 	if rErr, ok := (err).(*router.Error); ok {
 		status = rErr.StatusCode()
 	}
+	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
 	resp.Header().Set("x-kedge-error", err.Error())
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)

@@ -4,7 +4,7 @@
       {
         "backend_name": "controller",
         "service_name_matcher": "*",
-        "authority_matcher": "controller.eu1-prod.improbable.local"
+        "authority_matcher": "controller.ext.cluster.local"
       }
     ]
   },
@@ -12,7 +12,20 @@
     "routes": [
       {
         "backend_name": "controller",
-        "host_matcher": "controller.eu1-prod.improbable.local"
+        "host_matcher": "controller.ext.cluster.local"
+      }
+    ],
+    "adhoc_rules": [
+      {
+        "dns_name_matcher": "*.pod.cluster.local",
+        "port": {
+          "allowed_ranges": [
+            {
+              "from": 40,
+              "to": 10000
+            }
+          ]
+        }
       }
     ]
   }

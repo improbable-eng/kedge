@@ -16,6 +16,7 @@ import (
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/naming"
 )
@@ -31,6 +32,7 @@ type backend struct {
 	mu     sync.RWMutex
 	conn   *grpc.ClientConn
 	config *pb.Backend
+	closed bool
 }
 
 func (b *backend) Conn() (*grpc.ClientConn, error) {
@@ -47,6 +49,9 @@ func (b *backend) Conn() (*grpc.ClientConn, error) {
 	if b.conn != nil {
 		return b.conn, nil
 	}
+	if b.closed {
+		return nil, grpc.Errorf(codes.Internal, "backend already closed")
+	}
 	cc, err := buildClientConn(b.config)
 	if err != nil {
 		return nil, err
@@ -57,6 +62,7 @@ func (b *backend) Conn() (*grpc.ClientConn, error) {
 
 func (b *backend) Close() error {
 	b.mu.Lock()
+	b.closed = true
 	defer b.mu.Unlock()
 	if b.conn != nil {
 		return b.conn.Close()
@@ -65,7 +71,6 @@ func (b *backend) Close() error {
 }
 
 func newBackend(cnf *pb.Backend) (*backend, error) {
-
 	cc, err := buildClientConn(cnf)
 	if err != nil && err.Error() == "grpc: there is no address available to dial" {
 		return &backend{conn: nil, config: cnf}, nil // make this lazy
@@ -94,7 +99,7 @@ func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
 	dialFunc := ParentDialFunc
 	if !cnf.DisableConntracking {
 		dialFunc = conntrack.NewDialContextFunc(
-			conntrack.DialWithName("backend_"+cnf.Name),
+			conntrack.DialWithName("grpc_backend_"+cnf.Name),
 			conntrack.DialWithDialContextFunc(dialFunc),
 			conntrack.DialWithTracing(),
 		)

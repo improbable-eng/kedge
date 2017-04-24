@@ -1,4 +1,4 @@
-package router
+package adhoc
 
 import (
 	"fmt"
@@ -7,7 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"sync"
+
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
+	"github.com/mwitkow/kedge/http/director/router"
 )
 
 var (
@@ -16,24 +19,49 @@ var (
 	DefaultALookup = net.LookupAddr
 )
 
-// AdhocAddresser implements logic that decides what "ad-hoc" ip:port to dial for a backend, if any.
+// Addresser implements logic that decides what "ad-hoc" ip:port to dial for a backend, if any.
 //
 // Adhoc rules are a way of forwarding requests to services that fall outside of pre-defined Routes and Backends.
-type AdhocAddresser interface {
+type Addresser interface {
 	// Address decides the ip:port to send the request to, if any. Errors may be returned if permission is denied.
 	// The returned string must contain contain both ip and port separated by colon.
 	Address(r *http.Request) (string, error)
 }
 
-type addresser struct {
+type dynamic struct {
+	mu        sync.RWMutex
+	addresser *static
+}
+
+// NewDynamic creates a new dynamic router that can be have its routes updated.
+func NewDynamic() *dynamic {
+	return &dynamic{addresser: NewStaticAddresser([]*pb.Adhoc{})}
+}
+
+func (d *dynamic) Address(req *http.Request) (string, error) {
+	d.mu.RLock()
+	addresser := d.addresser
+	d.mu.RUnlock()
+	return addresser.Address(req)
+}
+
+// Update sets addresser behaviour to the provided set of adhoc rules.
+func (d *dynamic) Update(rules []*pb.Adhoc) {
+	addresser := NewStaticAddresser(rules)
+	d.mu.Lock()
+	d.addresser = addresser
+	d.mu.Unlock()
+}
+
+type static struct {
 	rules []*pb.Adhoc
 }
 
-func NewAddresser(rules []*pb.Adhoc) AdhocAddresser {
-	return &addresser{rules: rules}
+func NewStaticAddresser(rules []*pb.Adhoc) *static {
+	return &static{rules: rules}
 }
 
-func (a *addresser) Address(req *http.Request) (string, error) {
+func (a *static) Address(req *http.Request) (string, error) {
 	hostName, port, err := a.extractHostPort(req.URL.Host)
 	if err != nil {
 		return "", err
@@ -51,7 +79,7 @@ func (a *addresser) Address(req *http.Request) (string, error) {
 			}
 		}
 		if !a.portAllowed(portForRule, rule.Port) {
-			return "", NewError(http.StatusBadRequest, fmt.Sprintf("port %d is not allowed", portForRule))
+			return "", router.NewError(http.StatusBadRequest, fmt.Sprintf("port %d is not allowed", portForRule))
 		}
 		ipAddr, err := a.resolveHost(hostName)
 		if err != nil {
@@ -60,18 +88,18 @@ func (a *addresser) Address(req *http.Request) (string, error) {
 		return net.JoinHostPort(ipAddr, strconv.FormatInt(int64(portForRule), 10)), nil
 
 	}
-	return "", ErrRouteNotFound
+	return "", router.ErrRouteNotFound
 }
 
-func (*addresser) resolveHost(hostStr string) (string, error) {
+func (*static) resolveHost(hostStr string) (string, error) {
 	addrs, err := DefaultALookup(hostStr)
 	if err != nil {
-		return "", NewError(http.StatusBadGateway, "cannot resolve host")
+		return "", router.NewError(http.StatusBadGateway, "cannot resolve host")
 	}
 	return addrs[0], nil
 }
 
-func (*addresser) extractHostPort(hostStr string) (hostName string, port int, err error) {
+func (*static) extractHostPort(hostStr string) (hostName string, port int, err error) {
 	// Using SplitHostPort is a pain due to opaque error messages. Let's assume we only do hostname matches, they fall
 	// through later anyway.
 	portOffset := strings.LastIndex(hostStr, ":")
@@ -81,12 +109,12 @@ func (*addresser) extractHostPort(hostStr string) (hostName string, port int, er
 	portPart := hostStr[portOffset+1:]
 	pNum, err := strconv.ParseInt(portPart, 10, 32)
 	if err != nil {
-		return "", 0, NewError(http.StatusBadRequest, fmt.Sprintf("malformed port number: %v", err))
+		return "", 0, router.NewError(http.StatusBadRequest, fmt.Sprintf("malformed port number: %v", err))
 	}
 	return hostStr[:portOffset], int(pNum), nil
 }
 
-func (*addresser) hostMatches(host string, matcher string) bool {
+func (*static) hostMatches(host string, matcher string) bool {
 	if matcher == "" {
 		return false
 	}
@@ -96,7 +124,7 @@ func (*addresser) hostMatches(host string, matcher string) bool {
 	return strings.HasSuffix(host, matcher[1:])
 }
 
-func (*addresser) portAllowed(port int, portRule *pb.Adhoc_Port) bool {
+func (*static) portAllowed(port int, portRule *pb.Adhoc_Port) bool {
 	uPort := uint32(port)
 	for _, p := range portRule.Allowed {
 		if p == uPort {

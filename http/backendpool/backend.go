@@ -3,13 +3,15 @@ package backendpool
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"sync"
 	"time"
 
-	"net/http"
-
 	"github.com/mwitkow/go-conntrack"
+	"github.com/mwitkow/go-httpwares"
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	"github.com/mwitkow/kedge/http/lbtransport"
 	"github.com/mwitkow/kedge/lib/resolvers"
@@ -22,21 +24,38 @@ var (
 		Timeout:   1 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}).DialContext
+
+	closedTripper = httpwares.RoundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("backend transport closed")
+	})
 )
 
 type backend struct {
+	mu        sync.RWMutex
 	transport *http.Transport
 	tripper   http.RoundTripper
 	config    *pb.Backend
+	closed    bool
 }
 
 func (b *backend) Tripper() http.RoundTripper {
-	return b.tripper
+	b.mu.RLock()
+	t := b.tripper
+	if b.closed {
+		t = closedTripper
+	}
+	b.mu.RUnlock()
+	return t
 }
 
 func (b *backend) Close() error {
-	// TODO(mwitkow): Return tripper errors when stuff's closed.
-	b.transport.CloseIdleConnections()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.closed = true
+	if b.transport != nil {
+		b.transport.CloseIdleConnections()
+	}
+	b.transport = nil
 	return nil
 }
 
@@ -48,8 +67,10 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	}
 	scheme, tlsConfig := buildTls(cnf)
 	b.transport = &http.Transport{
-		DialContext:     chooseDialFuncOpt(cnf),
-		TLSClientConfig: tlsConfig,
+		DialContext:         chooseDialFuncOpt(cnf),
+		TLSClientConfig:     tlsConfig,
+		MaxIdleConnsPerHost: 2,
+		MaxIdleConns:        4,
 		// TODO(mwitkow): add idle conn configuration.
 	}
 	// We want there to be h2 on outbound SSL connections, this mangles tlsConfig
@@ -69,7 +90,7 @@ func chooseDialFuncOpt(cnf *pb.Backend) func(ctx context.Context, network, addr 
 	dialFunc := ParentDialFunc
 	if !cnf.DisableConntracking {
 		dialFunc = conntrack.NewDialContextFunc(
-			conntrack.DialWithName("backend_"+cnf.Name),
+			conntrack.DialWithName("http_backend_"+cnf.Name),
 			conntrack.DialWithDialContextFunc(dialFunc),
 			conntrack.DialWithTracing(),
 		)
@@ -98,9 +119,8 @@ func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	if s := cnf.GetSrv(); s != nil {
 		return resolvers.NewSrvFromConfig(s)
 	} else if k := cnf.GetK8S(); k != nil {
-		// TODO(mwitkow): Deal with HTTP URLs to resolver for K8s. It sets a target==kubernetes://.
-		// This needs to be done in lbtransport validation of targets.
-		return "", nil, fmt.Errorf("Kubernetes resolution is not supported at the moment for HTTP targets.")
+		// TODO(mwitkow): Deal with HTTP URLs to resolver for K8s. It sets a target==kubernetes://. This may not work.
+		return resolvers.NewK8sFromConfig(k)
 	}
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)
 }

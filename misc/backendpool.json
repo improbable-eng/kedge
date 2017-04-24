@@ -10,7 +10,7 @@
           }
         ],
         "srv": {
-          "dns_name": "controller.eu1-prod.internal.improbable.io"
+          "dns_name": "_grpc._tcp.controller.default.svc.cluster.local"
         }
       }
     ]
@@ -21,7 +21,7 @@
         "name": "controller",
         "balancer": "ROUND_ROBIN",
         "srv": {
-          "dns_name": "controller.metrics.eu1-prod.internal.improbable.io"
+          "dns_name": "_http._tcp.controller.default.svc.cluster.local"
         }
       }
     ]

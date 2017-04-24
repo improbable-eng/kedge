@@ -38,6 +38,7 @@ import (
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/client"
 	"github.com/mwitkow/kedge/http/director"
+	"github.com/mwitkow/kedge/http/director/adhoc"
 	"github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/resolvers"
@@ -227,15 +228,15 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 	s.originalSrvResolver = resolvers.ParentSrvResolver
 	resolvers.ParentSrvResolver = s
 	// Make ourselves the A resolver for backends for the Addresser.
-	s.originalAResolver = router.DefaultALookup
-	router.DefaultALookup = s.LookupAddr
+	s.originalAResolver = adhoc.DefaultALookup
+	adhoc.DefaultALookup = s.LookupAddr
 
 	s.buildBackends()
 
 	pool, err := backendpool.NewStatic(backendConfigs)
 	require.NoError(s.T(), err, "backend pool creation must not fail")
 	staticRouter := router.NewStatic(routeConfigs)
-	addresser := router.NewAddresser(adhocConfig)
+	addresser := adhoc.NewStaticAddresser(adhocConfig)
 	s.proxy = &http.Server{
 		Handler: director.New(pool, staticRouter, addresser),
 	}
@@ -439,7 +440,7 @@ func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 		resolvers.ParentSrvResolver = s.originalSrvResolver
 	}
 	if s.originalAResolver != nil {
-		router.DefaultALookup = s.originalAResolver
+		adhoc.DefaultALookup = s.originalAResolver
 	}
 	time.Sleep(10 * time.Millisecond)
 	if s.proxy != nil {

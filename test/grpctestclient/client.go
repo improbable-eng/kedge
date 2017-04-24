@@ -1,11 +1,9 @@
 package main
 
 import (
-	"net"
 	"time"
 
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/Sirupsen/logrus"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -16,11 +14,14 @@ import (
 
 	"crypto/tls"
 
-	"google.golang.org/grpc"
+	"net/url"
+
+	"github.com/mwitkow/kedge/grpc/client"
+	"github.com/mwitkow/kedge/lib/map"
 )
 
 var (
-	proxyHostPort = "127.0.0.1:8444" // use 8081 for plain text
+	proxyHostPort = "https://127.0.0.1:8443" // use 8081 for plain text
 )
 
 func addClientCerts(tlsConfig *tls.Config) {
@@ -37,10 +38,9 @@ func main() {
 	}
 	addClientCerts(tlsConfig)
 	logrus.SetOutput(os.Stdout)
-	conn, err := grpc.Dial("controller.eu1-prod.improbable.local:9999",
-		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-		grpc.WithDialer(spoofedGrpcDialer),
-	)
+
+	kedgeUrl, _ := url.Parse(proxyHostPort)
+	conn, err := kedge_grpc.DialThroughKedge(context.TODO(), "controller.ext.cluster.local", tlsConfig, kedge_map.Single(kedgeUrl))
 	if err != nil {
 		logrus.Fatalf("cannot dial: %v", err)
 	}
@@ -58,17 +58,5 @@ func main() {
 			logrus.Fatalf("request failed mid way: %v", err)
 		}
 		logrus.Info("Flag: ", msg)
-	}
-}
-
-// spoofedGrpcDialer pretends to dial over a remote DNS name, but resolves to localhost.
-// This is to send the requests to the director
-func spoofedGrpcDialer(addr string, t time.Duration) (net.Conn, error) {
-	host, _, _ := net.SplitHostPort(addr)
-	switch host {
-	case "controller.eu1-prod.improbable.local":
-		return net.DialTimeout("tcp", proxyHostPort, t)
-	default:
-		return net.DialTimeout("tcp", addr, t)
 	}
 }

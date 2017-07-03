@@ -25,7 +25,7 @@ import (
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	_ "golang.org/x/net/trace" // so /debug/requst gets registered.
+	_ "golang.org/x/net/trace" // so /debug/request gets registered.
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )

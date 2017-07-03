@@ -77,13 +77,12 @@ Driven through two config files:
 
 ## Running:
 
-Here's an example that runs the server listening on four ports (80 for debug HTTP, 443 for HTTPS+gRPCTLS, 444 for gRPCTLS, 81 for gRPC plain text), and requiring 
+Here's an example that runs the server listening on four ports (80 for debug HTTP, 443 for HTTPS+gRPCTLS, 444 for gRPCTLS), and requiring 
 client side certs:
 
 ```sh
 go build 
 ./server \
-  --server_grpc_port=81 \
   --server_grpc_tls_port=444 \
   --server_http_port=80 \
   --server_http_tls_port=443 \ 

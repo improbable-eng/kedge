@@ -60,7 +60,26 @@ func RoundRobinPolicy(backoffDuration time.Duration, dialTimeout time.Duration) 
 		tryDialFunc: tryDial,
 		timeNow:     time.Now,
 	}
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			rr.cleanUpBlacklist()
+		}
+	}()
 	return rr
+}
+
+func (rr *roundRobinPolicy) cleanUpBlacklist() {
+	rr.blacklistMu.Lock()
+	defer rr.blacklistMu.Unlock()
+
+	for target, failTime := range rr.blacklistedTargets {
+		if failTime.Add(rr.blacklistBackoffDuration).Before(rr.timeNow()) {
+			// Expired.
+			delete(rr.blacklistedTargets, target)
+		}
+	}
 }
 
 func (rr *roundRobinPolicy) isTargetBlacklisted(target *Target) bool {

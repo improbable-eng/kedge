@@ -135,3 +135,47 @@ func TestRoundRobinPolicy_PickWithBlacklist(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testTargets[1], target)
 }
+
+func TestRoundRobinPolicy_CleanupBlacklist(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://127.0.0.1/x", nil)
+	rr := &roundRobinPolicy{
+		blacklistBackoffDuration: testFailBlacklistDuration,
+		blacklistedTargets:       make(map[Target]time.Time),
+		tryDialFunc:              testOKDial,
+	}
+
+	now := time.Now()
+	rr.timeNow = func() time.Time {
+
+		return now
+	}
+
+	testTargets := []*Target{
+		{
+			DialAddr: "0",
+		},
+		{
+			DialAddr: "1",
+		},
+		{
+			DialAddr: "2",
+		},
+	}
+	assert.Equal(t, 0, len(rr.blacklistedTargets), "at the beginning blacklist should be empty.")
+	rr.tryDialFunc = func(_ context.Context, target *Target) bool {
+		if target == testTargets[1] {
+			return false
+		}
+		return true
+	}
+	_, err := rr.Pick(req, testTargets)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(rr.blacklistedTargets), "after one fail blacklist should include one target")
+	rr.cleanUpBlacklist()
+	assert.Equal(t, 1, len(rr.blacklistedTargets), "after cleanup report blacklist should still include one target, since time not passed")
+	rr.timeNow = func() time.Time {
+		return now.Add(testFailBlacklistDuration).Add(5 * time.Millisecond)
+	}
+	rr.cleanUpBlacklist()
+	assert.Equal(t, 0, len(rr.blacklistedTargets), "after cleanup report blacklist should include zero targets, since failBlacklistDuration passed")
+}

@@ -67,31 +67,41 @@ func backendConfigReloaded(oldValue proto.Message, newValue proto.Message) {
 	// The gRPC and HTTP fields are guaranteed to be there because of validation.
 	grpcBackendInNewConfig := make(map[string]struct{})
 	grpcBackendInOldConfig := grpcBackendPool.Configs()
-	for _, backend := range newConfig.GetGrpc().Backends {
-		if err := grpcBackendPool.AddOrUpdate(backend); err != nil {
-			logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
-		}
-		logrus.Infof("adding new gRPC backend: %v", backend.Name)
+	grpcConfig := newConfig.GetGrpc()
+	if grpcConfig != nil {
+		for _, backend := range grpcConfig.Backends {
+			if err := grpcBackendPool.AddOrUpdate(backend); err != nil {
+				logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
+			}
+			logrus.Infof("adding new gRPC backend: %v", backend.Name)
 
-		grpcBackendInNewConfig[backend.Name] = struct{}{}
+			grpcBackendInNewConfig[backend.Name] = struct{}{}
+		}
 	}
-	for backendName, _ := range grpcBackendInOldConfig {
+
+	for backendName := range grpcBackendInOldConfig {
 		if _, exists := grpcBackendInNewConfig[backendName]; !exists {
 			logrus.Infof("removing gRPC backend: %v", backendName)
 			grpcBackendPool.Remove(backendName)
 		}
 	}
+
 	httpBackendInNewConfig := make(map[string]struct{})
 	httpBackendInOldConfig := httpBackendPool.Configs()
-	for _, backend := range newConfig.GetHttp().Backends {
-		if err := httpBackendPool.AddOrUpdate(backend); err != nil {
-			logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
-		}
-		logrus.Infof("adding new http backend: %v", backend.Name)
 
-		httpBackendInNewConfig[backend.Name] = struct{}{}
+	httpConfig := newConfig.GetHttp()
+	if httpConfig != nil {
+		for _, backend := range newConfig.GetHttp().Backends {
+			if err := httpBackendPool.AddOrUpdate(backend); err != nil {
+				logrus.Errorf("failed creating http backend %v: %v", backend.Name, err)
+			}
+			logrus.Infof("adding new http backend: %v", backend.Name)
+
+			httpBackendInNewConfig[backend.Name] = struct{}{}
+		}
 	}
-	for backendName, _ := range httpBackendInOldConfig {
+
+	for backendName := range httpBackendInOldConfig {
 		if _, exists := grpcBackendInNewConfig[backendName]; !exists {
 			logrus.Infof("removing http backend: %v", backendName)
 

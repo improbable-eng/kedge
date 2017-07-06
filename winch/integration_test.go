@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"path"
 	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,8 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"strconv"
-	"strings"
 )
 
 var (
@@ -35,6 +35,7 @@ func unknownPingbackHandler(id int) http.Handler {
 		resp.Header().Set("x-test-req-url", req.URL.String())
 		resp.Header().Set("x-test-req-host", req.Host)
 		resp.Header().Set("x-test-kedge-id", strconv.Itoa(id))
+		resp.Header().Set("x-test-auth-value", req.Header.Get("Authorization"))
 		resp.WriteHeader(http.StatusAccepted) // accepted to make sure stuff is slightly different.
 	})
 }
@@ -195,6 +196,15 @@ func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute() {
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://service1.ab1-prod.internal.example.com/some/strict/path")}
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertSuccessfulPingback(req, resp, err, 2)
+}
+
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute_PreserveAuthHeader() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://service1.ab1-prod.internal.example.com/some/strict/path")}
+	req.Header = http.Header{}
+	req.Header.Set("Authorization", "bearer test-secret")
+	resp, err := s.forwardProxyClient().Do(req)
+	s.assertSuccessfulPingback(req, resp, err, 2)
+	assert.Equal(s.T(), "bearer test-secret", resp.Header.Get("x-test-auth-value"))
 }
 
 // Client that will proxy through winch.

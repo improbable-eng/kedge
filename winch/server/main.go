@@ -35,7 +35,7 @@ var (
 		"server_config_mapper",
 		&pb_config.MapperConfig{},
 		"Contents of the Winch Mapper configuration. Dynamically settable or read from file").
-		WithFileFlag("../misc/lol.json").WithValidator(routesConfigReload)
+		WithFileFlag("../../misc/winch_mapper.json").WithValidator(routesConfigReload)
 
 	routes = winch.NewDynamicRoutes()
 )

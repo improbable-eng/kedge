@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/go-srvlb/srv"
+	"github.com/improbable-eng/go-srvlb/srv"
 	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"

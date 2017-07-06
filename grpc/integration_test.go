@@ -14,7 +14,7 @@ import (
 	"io/ioutil"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/go-srvlb/srv"
+	"github.com/improbable-eng/go-srvlb/srv"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"

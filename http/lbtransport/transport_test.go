@@ -10,8 +10,8 @@ import (
 
 	"io"
 
-	"github.com/mwitkow/go-srvlb/grpc"
-	"github.com/mwitkow/go-srvlb/srv"
+	"github.com/improbable-eng/go-srvlb/grpc"
+	"github.com/improbable-eng/go-srvlb/srv"
 	"github.com/mwitkow/kedge/http/lbtransport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

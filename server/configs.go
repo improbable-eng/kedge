@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/proto"
 	"github.com/mwitkow/go-flagz/protobuf"
 	"github.com/mwitkow/go-proto-validators"
@@ -14,6 +13,7 @@ import (
 	http_adhoc "github.com/mwitkow/kedge/http/director/adhoc"
 	http_router "github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/sirupsen/logrus"
 )
 
 var (

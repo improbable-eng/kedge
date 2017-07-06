@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -25,6 +24,7 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 	_ "golang.org/x/net/trace" // so /debug/requst gets registered.
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

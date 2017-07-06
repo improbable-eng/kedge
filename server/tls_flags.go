@@ -32,7 +32,6 @@ var (
 )
 
 func buildServerTlsOrFail() *tls.Config {
-
 	tlsConfig, err := connhelpers.TlsConfigForServerCerts(*flagTlsServerCert, *flagTlsServerKey)
 	if err != nil {
 		log.Fatalf("failed reading TLS server keys: %v", err)

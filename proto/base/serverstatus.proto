@@ -1,7 +1,4 @@
 // ServerStatus Service.
-//
-// This should be implemented by all Go servers in Improbable.
-
 syntax = "proto3";
 
 package base;

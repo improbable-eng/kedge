@@ -1,23 +1,18 @@
 package main
 
 import (
+	"crypto/tls"
+	"io"
+	"net/url"
+	"os"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"github.com/Sirupsen/logrus"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	pb_base "github.com/mwitkow/kedge/_protogen/base"
-
-	"io"
-	"os"
-
-	"crypto/tls"
-
-	"net/url"
-
 	"github.com/mwitkow/kedge/grpc/client"
 	"github.com/mwitkow/kedge/lib/map"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 )
 
 var (

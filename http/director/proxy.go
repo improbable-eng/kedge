@@ -1,14 +1,11 @@
 package director
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
-
-	"fmt"
-
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/backendpool"
@@ -17,6 +14,7 @@ import (
 	"github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
+	"github.com/sirupsen/logrus"
 )
 
 var (

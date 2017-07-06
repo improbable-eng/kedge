@@ -1,14 +1,13 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
-
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/kedge/lib/sharedflags"
+	log "github.com/sirupsen/logrus"
 )
 
 var (

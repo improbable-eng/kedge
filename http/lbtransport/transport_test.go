@@ -1,6 +1,7 @@
-package lbtransport_test
+package lbtransport
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -8,94 +9,130 @@ import (
 	"testing"
 	"time"
 
-	"io"
-
-	"github.com/improbable-eng/go-srvlb/grpc"
-	"github.com/improbable-eng/go-srvlb/srv"
-	"github.com/mwitkow/kedge/http/lbtransport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/naming"
 )
 
 var (
-	backendCount = 5
+	testBackendCount = 5
+	testDialTimeout  = 500 * time.Millisecond
 )
 
-type BalancedTransportSuite struct {
+// BalancedRRTransportSuite test lbtransport with round robin + blacklist load balancing.
+type BalancedRRTransportSuite struct {
 	suite.Suite
 
-	lbTrans http.RoundTripper
+	policy  *roundRobinPolicy
+	lbTrans *tripper
 
-	backendHandler http.HandlerFunc
-	backends       []*httptest.Server
-	mu             sync.RWMutex // for overwriting the backendHandler
+	backendHandler   http.HandlerFunc
+	backendHandlerMu sync.RWMutex
+
+	backendSRVWatcher *mockSRVWatcher
+	backends          []*httptest.Server
 }
 
-func TestBalancedTransportSuite(t *testing.T) {
-	suite.Run(t, new(BalancedTransportSuite))
+func TestRRBalancedTransportSuite(t *testing.T) {
+	suite.Run(t, new(BalancedRRTransportSuite))
 }
 
-// implementation of the srv.Resolver against the suite's backends.
-func (s *BalancedTransportSuite) Lookup(domainName string) ([]*srv.Target, error) {
-	targets := []*srv.Target{}
-	for _, b := range s.backends {
-		t := &srv.Target{DialAddr: b.Listener.Addr().String(), Ttl: 1 * time.Second}
-		targets = append(targets, t)
+// implementation of the naming.Resolver returning mocked watcher.
+func (s *BalancedRRTransportSuite) Resolve(_ string) (naming.Watcher, error) {
+	return s.backendSRVWatcher, nil
+}
+
+// mockedHandler mocks backend behaviour, which fills request header with proper backend number.
+func (s *BalancedRRTransportSuite) mockedHandler(id int) http.HandlerFunc {
+	return func(wrt http.ResponseWriter, req *http.Request) {
+		s.backendHandlerMu.RLock()
+		req.Header.Add("X-TEST-BACKEND-ID", fmt.Sprintf("%d", id))
+		s.backendHandler(wrt, req)
+		s.backendHandlerMu.RUnlock()
 	}
-	return targets, nil
 }
 
-func (s *BalancedTransportSuite) SetupSuite() {
+func (s *BalancedRRTransportSuite) SetupSuite() {
+	s.backendSRVWatcher = &mockSRVWatcher{
+		backendAddrUpdatesCh: make(chan []*naming.Update),
+	}
 	var err error
-	// add `backendCount` backends to which we will be sending requests.
-	funcForBackend := func(id int) http.HandlerFunc {
-		return func(wrt http.ResponseWriter, req *http.Request) {
-			s.mu.RLock()
-			req.Header.Add("X-TEST-BACKEND-ID", fmt.Sprintf("%d", id))
-			s.backendHandler(wrt, req)
-			s.mu.RUnlock()
-		}
-	}
-	for i := 0; i < backendCount; i++ {
-		s.backends = append(s.backends, httptest.NewUnstartedServer(funcForBackend(i)))
-	}
-	for _, server := range s.backends {
-		server.Start() // this may be racy, no synchronization in the httptest :(
+	// add `testBackendCount` backends to which we will be sending requests.
+	for i := 0; i < testBackendCount; i++ {
+		s.backends = append(s.backends, httptest.NewServer(s.mockedHandler(i)))
+		// This may be racy, no synchronization for server start in the httptest :(
 		time.Sleep(25 * time.Millisecond)
 	}
-	s.lbTrans, err = lbtransport.New(
+	s.policy = RoundRobinPolicy(testFailBlacklistDuration, testDialTimeout).(*roundRobinPolicy)
+	s.lbTrans, err = New(
 		"my-magic-srv",
 		http.DefaultTransport,
-		grpcsrvlb.New(s), // self implements resolver.Lookup
-		lbtransport.RoundRobinPolicy())
-	// Sleep to let the lbtransport actually prepare all the targets, can be racy but would need to introduce a
-	// separate synchronization primitive just for the test.
-	time.Sleep(50 * time.Millisecond)
+		s, // self implements naming.Resolver
+		s.policy,
+	)
 	require.NoError(s.T(), err, "cannot fail on initialization")
+
+	// This will update LB internal SRV lookup with new backends.
+	s.backendSRVWatcher.UpdateBackends(s.backends)
+	s.waitForSRVPropagation(s.backends, 1*time.Second)
 }
 
-func (s *BalancedTransportSuite) SetupTest() {
+func (s *BalancedRRTransportSuite) waitForSRVPropagation(backends []*httptest.Server, timeout time.Duration) {
+	backLookupMap := map[string]struct{}{}
+	for _, b := range backends {
+		backLookupMap[b.Listener.Addr().String()] = struct{}{}
+	}
+	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			s.T().Errorf("Timeout on waiting for new SRV changes. Given backend list never appeared in lbtransport.")
+			return
+		default:
+		}
+
+		time.Sleep(25 * time.Millisecond)
+		foundAll := true
+		s.lbTrans.mu.Lock()
+		for _, t := range s.lbTrans.currentTargets {
+			if _, ok := backLookupMap[t.DialAddr]; !ok {
+				foundAll = false
+				break
+			}
+		}
+		s.lbTrans.mu.Unlock()
+
+		if foundAll {
+			return
+		}
+	}
+}
+
+func (s *BalancedRRTransportSuite) SetupTest() {
 	// reset the backendHandler
 	s.setBackendHandler(func(resp http.ResponseWriter, req *http.Request) {
 		resp.WriteHeader(200)
 	})
+	s.backendSRVWatcher.UpdateBackends(s.backends)
+	s.waitForSRVPropagation(s.backends, 1*time.Second)
 }
 
-func (s *BalancedTransportSuite) setBackendHandler(handler http.HandlerFunc) {
-	s.mu.Lock()
+func (s *BalancedRRTransportSuite) setBackendHandler(handler http.HandlerFunc) {
+	s.backendHandlerMu.Lock()
 	s.backendHandler = handler
-	s.mu.Unlock()
+	s.backendHandlerMu.Unlock()
 }
 
-func (s *BalancedTransportSuite) TearDownSuite() {
+func (s *BalancedRRTransportSuite) TearDownSuite() {
 	for _, b := range s.backends {
 		b.Close()
 	}
-	s.lbTrans.(io.Closer).Close()
+	s.lbTrans.Close()
 }
 
-func (s *BalancedTransportSuite) TestRoundRobinSendsRequestsToAllBackends() {
+func (s *BalancedRRTransportSuite) callLBTransportAndAssert(requestsPerBackend int, backendsCount int) {
 	backendMapMu := sync.RWMutex{}
 	backendMap := make(map[string]int)
 	s.setBackendHandler(func(resp http.ResponseWriter, req *http.Request) {
@@ -110,29 +147,112 @@ func (s *BalancedTransportSuite) TestRoundRobinSendsRequestsToAllBackends() {
 	})
 
 	wg := sync.WaitGroup{}
-	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
-	requestsPerBackend := 50
-	for i := 0; i < requestsPerBackend*backendCount; i++ {
+	client := &http.Client{Transport: s.lbTrans, Timeout: 10 * time.Second}
+	for i := 0; i < requestsPerBackend*backendsCount; i++ {
 		wg.Add(1)
 		go func(id int) {
 			_, err := client.Get("http://my-magic-srv/something")
 			if err != nil {
-				s.T().Logf("Encountered error on request %v: %v", id, err)
+				s.T().Errorf("Encountered error on request %v: %v", id, err)
 			}
 			wg.Done()
 		}(i)
 	}
+
 	wg.Wait()
+
 	backendMapMu.RLock()
 	defer backendMapMu.RUnlock()
-	assert.Equal(s.T(), backendCount, len(backendMap), "srvlb should round robin across all backends")
+	assert.Equal(s.T(), backendsCount, len(backendMap), "srvlb should round robin across all backends. Got: %v", backendMap)
 	for k, val := range backendMap {
 		assert.Equal(s.T(), requestsPerBackend, val, "backend %v is expected to have its share of requests", k)
 	}
 }
 
-//func (s *BalancedTransportSuite) TestSrvLbErrorsOnBadTarget() {
+func (s *BalancedRRTransportSuite) TestRoundRobinSendsRequestsToAllBackends() {
+	s.callLBTransportAndAssert(50, testBackendCount)
+}
+
+func (s *BalancedRRTransportSuite) TestRoundRobinRetryRequestsForInvalidBackends() {
+	// For this test add fake backend with rekt listener.
+	backends := append(s.backends, httptest.NewUnstartedServer(nil))
+	// Don't even listen on socket - we want dial to fail immediately.
+	backends[len(backends)-1].Close()
+
+	s.backendSRVWatcher.UpdateBackends(backends)
+	s.waitForSRVPropagation(backends, 1*time.Second)
+
+	now := time.Now()
+	s.policy.timeNow = func() time.Time {
+		return now
+	}
+
+	// Let's do 50*(old testBackendCount) requests. Even with the failing one we should have 50 per valid backend.
+	s.callLBTransportAndAssert(50, testBackendCount)
+
+	// this may be racy, no synchronization in the httptest :(
+	backends = append(s.backends, httptest.NewServer(s.mockedHandler(testBackendCount+1)))
+	defer backends[len(backends)-1].Close()
+
+	// Does not update stuff.
+	s.backendSRVWatcher.UpdateBackends(backends)
+	s.waitForSRVPropagation(backends, 1*time.Second)
+
+	s.policy.timeNow = func() time.Time {
+		// Let's make blacklist obsolete.
+		return now.Add(testFailBlacklistDuration).Add(5 * time.Millisecond)
+	}
+
+	// Now all servers are expected to work and each of them should get 50.
+	s.callLBTransportAndAssert(50, testBackendCount+1)
+}
+
+//func (s *BalancedRRTransportSuite) TestSrvLbErrorsOnBadTarget() {
 //	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
 //	_, err := client.Get("http://not-my-magic-srv/something")
 //	require.Error(s.T(), err, "srvlb should not be able to dial targets thOat are not known")
 //}
+
+// mockSRVWatcher implements naming.Watcher that is used inside lbtransport to watch for SRV lookup changes.
+type mockSRVWatcher struct {
+	currentBackendsMap   map[string]struct{}
+	backendAddrUpdatesCh chan []*naming.Update
+}
+
+// UpdateBackends update SRV targets.
+func (t *mockSRVWatcher) UpdateBackends(newBackends []*httptest.Server) {
+	var updates []*naming.Update
+
+	newBackendsMap := make(map[string]struct{})
+	for _, nb := range newBackends {
+		newBackendsMap[nb.Listener.Addr().String()] = struct{}{}
+		if _, ok := t.currentBackendsMap[nb.Listener.Addr().String()]; ok {
+			continue
+		}
+		updates = append(updates, &naming.Update{
+			Addr: nb.Listener.Addr().String(),
+			Op:   naming.Add,
+		})
+	}
+
+	for cbAddr := range t.currentBackendsMap {
+		if _, ok := newBackendsMap[cbAddr]; ok {
+			continue
+		}
+		updates = append(updates, &naming.Update{
+			Addr: cbAddr,
+			Op:   naming.Delete,
+		})
+	}
+
+	t.backendAddrUpdatesCh <- updates
+	t.currentBackendsMap = newBackendsMap
+}
+
+func (t *mockSRVWatcher) Next() ([]*naming.Update, error) {
+	return <-t.backendAddrUpdatesCh, nil
+}
+
+func (t *mockSRVWatcher) Close() {
+	close(t.backendAddrUpdatesCh)
+}

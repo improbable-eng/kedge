@@ -35,31 +35,33 @@ var (
 		"server_config_mapper",
 		&pb_config.MapperConfig{},
 		"Contents of the Winch Mapper configuration. Dynamically settable or read from file").
-		WithFileFlag("../../misc/winch_mapper.json").WithValidator(routesConfigReload)
-
-	routes = winch.NewDynamicRoutes()
+		WithFileFlag("../../misc/winch_mapper.json").WithValidator(validateMapper)
 )
 
-func routesConfigReload(msg proto.Message) error {
+func validateMapper(msg proto.Message) error {
 	if val, ok := msg.(validator.Validator); ok {
 		if err := val.Validate(); err != nil {
 			return err
 		}
 	}
-	newConfig := msg.(*pb_config.MapperConfig)
-	return routes.Update(newConfig)
+	return nil
 }
 
 func main() {
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
-		log.Fatalf("failed parsing flags: %v", err)
+		log.WithError(err).Fatalf("failed parsing flags")
 	}
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
-		log.Fatalf("failed reading flagz from files: %v", err)
+		log.WithError(err).Fatalf("failed reading flagz from files")
 	}
 
 	log.SetOutput(os.Stdout)
 	logEntry := log.NewEntry(log.StandardLogger())
+
+	routes, err := winch.NewStaticRoutes(flagConfigMapper.Get().(*pb_config.MapperConfig))
+	if err != nil {
+		log.Fatalf("failed reading flagz from files: %v", err)
+	}
 
 	http.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 	http.Handle("/", winch.New(kedge_map.RouteMapper(routes),

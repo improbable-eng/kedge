@@ -5,54 +5,42 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"sync"
 	"text/template"
 
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
 )
 
-type DynamicRoutes struct {
-	mu     sync.Mutex
+type StaticRoutes struct {
 	routes []kedge_map.Route
 }
 
-func NewDynamicRoutes() *DynamicRoutes {
-	return &DynamicRoutes{}
-}
-
-func (r *DynamicRoutes) Update(config *pb.MapperConfig) error {
-	var newRoutes []kedge_map.Route
+func NewStaticRoutes(config *pb.MapperConfig) (*StaticRoutes, error) {
+	var routes []kedge_map.Route
 	for _, route := range config.Routes {
 		if direct := route.GetDirect(); direct != nil {
 			d, err := newDirect(direct)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			newRoutes = append(newRoutes, d)
+			routes = append(routes, d)
 		}
 
 		if re := route.GetRegexp(); re != nil {
 			r, err := newRegexp(re)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			newRoutes = append(newRoutes, r)
+			routes = append(routes, r)
 		}
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	// Swap routes.
-	r.routes = newRoutes
-	return nil
+	return &StaticRoutes{
+		routes: routes,
+	}, nil
 }
 
-func (r *DynamicRoutes) Get() []kedge_map.Route {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
+func (r *StaticRoutes) Get() []kedge_map.Route {
 	return r.routes
 }
 

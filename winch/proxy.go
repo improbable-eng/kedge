@@ -2,7 +2,6 @@ package winch
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"time"
@@ -10,11 +9,9 @@ import (
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/client"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
-	"github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -28,13 +25,12 @@ func New(mapper kedge_map.Mapper, config *tls.Config) *Proxy {
 	parentTransport := http.DefaultTransport.(*http.Transport)
 	parentTransport.TLSClientConfig = config
 
-
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	p := &Proxy{
 		kedgeReverseProxy: &httputil.ReverseProxy{
 			Director: func(r *http.Request) {},
 			// Pass transport that will proxy to kedge in case of mapper match.
-			Transport:      kedge_http.WrapTransport(mapper, parentTransport),
+			Transport:     kedge_http.WrapTransport(mapper, parentTransport),
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 		},
@@ -59,16 +55,4 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	tags.Set(http_ctxtags.TagForCallService, "proxy")
 
 	p.kedgeReverseProxy.ServeHTTP(resp, normReq)
-}
-
-func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
-	status := http.StatusBadGateway
-	if rErr, ok := (err).(*router.Error); ok {
-		status = rErr.StatusCode()
-	}
-	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
-	resp.Header().Set("x-winch-error", err.Error())
-	resp.Header().Set("content-type", "text/plain")
-	resp.WriteHeader(status)
-	fmt.Fprintf(resp, "winch error: %v", err.Error())
 }

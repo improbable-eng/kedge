@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
@@ -23,10 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-)
-
-var (
-	backendResolutionDuration = 10 * time.Millisecond
 )
 
 func unknownPingbackHandler(id int) http.Handler {
@@ -84,7 +79,7 @@ type WinchIntegrationSuite struct {
 
 	winch              *http.Server
 	winchListenerPlain net.Listener
-	routes             *winch.DynamicRoutes
+	routes             *winch.StaticRoutes
 
 	// Will be used to call winch.
 	winchMapper kedge_map.Mapper
@@ -105,22 +100,15 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	s.winchListenerPlain, err = net.Listen("tcp", "localhost:0")
 	require.NoError(s.T(), err, "must be able to allocate a port for winchListenerPlain")
 
-	s.routes = winch.NewDynamicRoutes()
-	s.winch = &http.Server{
-		Handler: winch.New(kedge_map.RouteMapper(s.routes), s.tlsClientConfigForTest()),
-	}
-	go func() {
-		s.winch.Serve(s.winchListenerPlain)
-	}()
-
 	http2ServerTlsConfig, err := connhelpers.TlsConfigWithHttp2Enabled(s.tlsServerConfigForTest())
 	if err != nil {
 		s.FailNow("cannot configure the tls config for http2")
 	}
+
 	// It does not make sense if kedge is not secure.
 	s.localSecureKedges.SetupKedges(s.T(), http2ServerTlsConfig, 3)
 
-	s.routes.Update(&pb.MapperConfig{
+	s.routes, err = winch.NewStaticRoutes(&pb.MapperConfig{
 		Routes: []*pb.Route{
 			{
 				Type: &pb.Route_Direct{
@@ -149,6 +137,14 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 			},
 		},
 	})
+	require.NoError(s.T(), err, "config must be parsable")
+
+	s.winch = &http.Server{
+		Handler: winch.New(kedge_map.RouteMapper(s.routes), s.tlsClientConfigForTest()),
+	}
+	go func() {
+		s.winch.Serve(s.winchListenerPlain)
+	}()
 }
 
 func (s *WinchIntegrationSuite) TearDownSuite() {

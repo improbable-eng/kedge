@@ -7,6 +7,7 @@ import (
 
 	"github.com/mwitkow/kedge/lib/map"
 	"golang.org/x/net/http2"
+	"github.com/mwitkow/go-httpwares/tags"
 )
 
 // tripper is a piece of tripperware that dials certain destinations (indicated by a mapper) through a remote kedge.
@@ -22,10 +23,19 @@ func (t *tripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if strings.Contains(host, ":") {
 		host = host[:strings.LastIndex(host, ":")]
 	}
+
 	destURL, err := t.mapper.Map(host)
 	if err == kedge_map.ErrNotKedgeDestination {
 		return t.parent.RoundTrip(req)
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	tags := http_ctxtags.ExtractInbound(req)
+	tags.Set("http.proxy.kedge_url", destURL)
+	tags.Set(http_ctxtags.TagForHandlerName, destURL)
+
 	// Copy the URL and the request to not override the callers info.
 	copyUrl := *req.URL
 	copyUrl.Scheme = destURL.Scheme
@@ -47,4 +57,9 @@ func NewClient(mapper kedge_map.Mapper, clientTls *tls.Config, parentTransport *
 	return &http.Client{
 		Transport: &tripper{mapper: mapper, parent: cloneTransport},
 	}
+}
+
+func WrapTransport(mapper kedge_map.Mapper, parentTransport *http.Transport) http.RoundTripper {
+	cloneTransport := &(*parentTransport)
+	return &tripper{mapper: mapper, parent: cloneTransport}
 }

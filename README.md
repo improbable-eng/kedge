@@ -55,12 +55,7 @@ Kedge Service:
  * [ ] - support for load balanced CONNECT method proxying for TLS passthrough to backends - if needed
  
 Kedge Client:
- * [ ] - matching logic for "remap something.my_cluster.cluster.local to my_cluster.internalapi.example.com" for finding Kedges on the internet
- * [ ] - reading of TLS client certs from ~/.config/kedge
- * [ ] - Forward Proxy to remote Kedges for a CLI command (setting HTTP_PROXY) "kedge_local <cmd>"
- * [ ] - Forward Proxy in daemon mode with an auto-gen [PAC](https://en.wikipedia.org/wiki/Proxy_auto-config) file
- 
-
+ * See [winch](./winch/README.md) 
 
 ## License
 

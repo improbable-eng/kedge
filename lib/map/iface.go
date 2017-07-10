@@ -17,16 +17,3 @@ type Mapper interface {
 	// If the targets shouldn't go through a kedge, ErrNotKedgeDestination should be returned.
 	Map(targetAuthorityDnsName string) (*url.URL, error)
 }
-
-// Single is a simplistic kedge mapper that forwards all traffic through the same kedge.
-func Single(kedgeUrl *url.URL) Mapper {
-	return &single{kedgeUrl}
-}
-
-type single struct {
-	kedgeUrl *url.URL
-}
-
-func (s *single) Map(targetAuthorityDnsName string) (*url.URL, error) {
-	return s.kedgeUrl, nil
-}

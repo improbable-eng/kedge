@@ -11,7 +11,7 @@ echo "Installing plugins"
 go get github.com/mwitkow/go-proto-validators/protoc-gen-govalidators
 go get github.com/golang/protobuf/protoc-gen-go
 
-# Builds all .proto files in a given package dirctory.
+# Builds all .proto files in a given package directory.
 # NOTE: All .proto files in a given package must be processed *together*, otherwise the self-referencing
 # between files in the same proto package will not work.
 function proto_build_dir {
@@ -22,6 +22,7 @@ function proto_build_dir {
   mkdir -p ${GENERATION_DIR}/${DIR_REL} 2> /dev/null
   PATH=${GOPATH}/bin:$PATH protoc \
     --proto_path=${PROTOBUF_DIR} \
+    --proto_path=${GOPATH}/src/github.com/google/protobuf/src \
     --proto_path=${GOPATH}/src \
     --go_out=plugins=grpc:${GENERATION_DIR} \
     --govalidators_out=${GENERATION_DIR} \

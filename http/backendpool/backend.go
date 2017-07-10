@@ -128,9 +128,9 @@ func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 func chooseBalancerPolicy(cnf *pb.Backend) lbtransport.LBPolicy {
 	switch cnf.GetBalancer() {
 	case pb.Balancer_ROUND_ROBIN:
-		return lbtransport.RoundRobinPolicy()
+		return lbtransport.RoundRobinPolicyFromFlags()
 	default:
-		return lbtransport.RoundRobinPolicy()
+		return lbtransport.RoundRobinPolicyFromFlags()
 	}
 }
 

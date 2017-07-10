@@ -100,10 +100,12 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if len(targetRef) == 0 {
 		return nil, fmt.Errorf("lb: no targets available, last resolve err: %v", lastResolvErr)
 	}
+
 	target, err := s.policy.Pick(r, targetRef)
 	if err != nil {
 		return nil, fmt.Errorf("lb: failed choosing target: %v", err)
 	}
+
 	// Override the host for downstream Tripper, usually http.DefaultTransport.
 	// http.Default transport uses `URL.Host` for Dial(<host>) and relevant connection pooling.
 	// We override it to make sure it enters the appropriate dial method and hte appropriate connection pool.

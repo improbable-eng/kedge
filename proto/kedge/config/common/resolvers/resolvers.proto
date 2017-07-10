@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kedge.config.common.resolvers;
 
-/// SrvBackend describes a gRPC backend that is resolved and load balanced using SRV.
+/// SrvBackend describes a backend that is resolved and load balanced using SRV.
 message SrvResolver {
     /// dns_name specifies the address to look up using DNS SRV. Needs to be a FQDN.
     /// E.g. "_grpc._tcp.someservice.somenamespace.svc.cluster.local"

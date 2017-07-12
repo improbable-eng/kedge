@@ -9,6 +9,9 @@ import (
 
 // K8s is a special source that get's auth info from kubeconfig and returns deducted source.
 func K8s(name string, configPath string, userName string) (Source, error) {
+	if configPath == "" {
+		configPath = k8s.DefaultKubeConfigPath
+	}
 	k8sConfig, err := cfg.LoadFromFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to load k8s config from file %v. Make sure it is there or change"+

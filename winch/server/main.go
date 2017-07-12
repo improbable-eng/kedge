@@ -38,7 +38,7 @@ var (
 		WithFileFlag("../../misc/winch_mapper.json").WithValidator(validateMapper)
 	flagAuthConfig = protoflagz.DynProto3(sharedflags.Set,
 		"server_auth_config",
-		&pb_config.MapperConfig{},
+		&pb_config.AuthConfig{},
 		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
 		WithFileFlag("../../misc/winch_auth.json").WithValidator(validateMapper)
 )

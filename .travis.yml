@@ -5,7 +5,7 @@ go:
   - master
 
 install:
-  - go get -d -v -t ./... && go build -v ./...
+  - go get -v -t ./...
 
 script:
  - ./test_all.sh

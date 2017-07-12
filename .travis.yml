@@ -2,10 +2,9 @@ sudo: false
 language: go
 go:
   - 1.8
-  - master
 
 install:
-  - go get -v -t ./...
+  - go get -t ./...
 
 script:
  - ./test_all.sh

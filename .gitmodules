@@ -37,9 +37,6 @@
 [submodule "vendor/github.com/sercand/kuberesolver"]
 	path = vendor/github.com/sercand/kuberesolver
 	url = https://github.com/sercand/kuberesolver
-[submodule "vendor/github.com/sirupsen/logrus"]
-	path = vendor/github.com/sirupsen/logrus
-	url = https://github.com/sirupsen/logrus
 [submodule "vendor/github.com/spf13/pflag"]
 	path = vendor/github.com/spf13/pflag
 	url = https://github.com/spf13/pflag

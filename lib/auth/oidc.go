@@ -50,5 +50,5 @@ func (s *oidcSource) HeaderValue() (string, error) {
 		return "", fmt.Errorf("failed to obtain ID Token. Err: %v", err)
 	}
 
-	return "Bearer " + token.IDToken, nil
+	return fmt.Sprintf("Bearer %s", token.IDToken), nil
 }

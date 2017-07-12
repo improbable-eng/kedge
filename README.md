@@ -32,7 +32,13 @@ The inbound requests are directed to *backends* based on *routes* (see [gRPC](pr
 
 ## Usage
 
-Please see the [server](server/) readme for an actual guide.
+Kedge package is using submodule vendoring. To get vendored modules use:
+
+`git submodule update --init --recursive`
+
+Please see 
+* the [server](server/README.md) for an actual guide.
+* the [winch (client)](winch/README.md) for a local forward proxy targeting kedge.
 
 ## Status
 

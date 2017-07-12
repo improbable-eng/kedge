@@ -7,35 +7,46 @@ import (
 	"time"
 
 	"github.com/mwitkow/go-httpwares/tags"
-	"github.com/mwitkow/kedge/http/client"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
+	"github.com/mwitkow/kedge/lib/http/tripperware"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 )
 
 var (
-	flagBufferSizeBytes  = sharedflags.Set.Int("http_reverseproxy_buffer_size_bytes", 32*1024, "Size (bytes) of reusable buffer used for copying HTTP reverse proxy responses.")
-	flagBufferCount      = sharedflags.Set.Int("http_reverseproxy_buffer_count", 2*1024, "Maximum number of of reusable buffer used for copying HTTP reverse proxy responses.")
-	flagFlushingInterval = sharedflags.Set.Duration("http_reverseproxy_flushing_interval", 10*time.Millisecond, "Interval for flushing the responses in HTTP reverse proxy code.")
+	flagBufferSizeBytes  = sharedflags.Set.Int("winch_reverseproxy_buffer_size_bytes", 32*1024, "Size (bytes) of reusable buffer used for copying HTTP reverse proxy responses.")
+	flagBufferCount      = sharedflags.Set.Int("winch_reverseproxy_buffer_count", 2*1024, "Maximum number of of reusable buffer used for copying HTTP reverse proxy responses.")
+	flagFlushingInterval = sharedflags.Set.Duration("winch_reverseproxy_flushing_interval", 10*time.Millisecond, "Interval for flushing the responses in HTTP reverse proxy code.")
 )
 
-func New(mapper kedge_map.Mapper, config *tls.Config) *Proxy {
-	// Prepare transport for communication with our kedges.
-	parentTransport := http.DefaultTransport.(*http.Transport)
-	parentTransport.TLSClientConfig = config
+type winchMapper interface {
+	kedge_map.Mapper
+}
+
+func New(mapper winchMapper, config *tls.Config) *Proxy {
+	// Prepare chain of trippers for winch logic. (The last wrapped will be first in the chain of tripperwares)
+	// 5) Last, default transport for communication with our kedges.
+	// 4) Kedge auth tipper - injects auth for kedge based on route.
+	// 3) Backend auth tripper - injects auth for backend based on route.
+	// 2) Routing tripper - redirects to kedge if specified based on route.
+	// 1) First, mapping tripper - maps dns to route and puts it to request context for rest of the tripperwares.
+
+	parentTransport := tripperware.Default(config)
+	parentTransport = tripperware.WrapForKedgeAuth(parentTransport)
+	parentTransport = tripperware.WrapForBackendAuth(parentTransport)
+	parentTransport = tripperware.WrapForRouting(parentTransport)
+	parentTransport = tripperware.WrapForMapping(mapper, parentTransport)
 
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
-	p := &Proxy{
+	return &Proxy{
 		kedgeReverseProxy: &httputil.ReverseProxy{
-			Director: func(r *http.Request) {},
-			// Pass transport that will proxy to kedge in case of mapper match.
-			Transport:     kedge_http.WrapTransport(mapper, parentTransport),
+			Director:      func(r *http.Request) {},
+			Transport:     parentTransport,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 		},
 	}
-	return p
 }
 
 // Proxy is a forward/reverse proxy that implements Mapper+Kedge forwarding.
@@ -47,8 +58,6 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if _, ok := resp.(http.Flusher); !ok {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
 	}
-
-	// TODO(bplotka): Obtain fresh IDToken and pass as auth bearer in req.
 
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	tags := http_ctxtags.ExtractInbound(req)

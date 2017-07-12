@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/mwitkow/kedge/lib/auth"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,6 +14,7 @@ import (
 type testRoute struct {
 	dnsToMatch string
 	returnURL  *url.URL
+	returnAuth auth.Source
 	returnErr  error
 }
 
@@ -22,6 +24,10 @@ func (r testRoute) Match(dns string) bool {
 
 func (r testRoute) URL(_ string) (*url.URL, error) {
 	return r.returnURL, r.returnErr
+}
+
+func (r testRoute) Auth() (auth.Source, error) {
+	return r.returnAuth, r.returnErr
 }
 
 type testRoutes struct {

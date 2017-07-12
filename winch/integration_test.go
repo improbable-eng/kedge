@@ -31,6 +31,7 @@ func unknownPingbackHandler(id int) http.Handler {
 		resp.Header().Set("x-test-req-host", req.Host)
 		resp.Header().Set("x-test-kedge-id", strconv.Itoa(id))
 		resp.Header().Set("x-test-auth-value", req.Header.Get("Authorization"))
+		resp.Header().Set("x-test-proxy-auth-value", req.Header.Get("Proxy-Authorization"))
 		resp.WriteHeader(http.StatusAccepted) // accepted to make sure stuff is slightly different.
 	})
 }
@@ -91,7 +92,7 @@ func moveToLocalhost(addr string) string {
 	return strings.Replace(addr, "127.0.0.1", "localhost", -1)
 }
 
-func TestBackendPoolIntegrationTestSuite(t *testing.T) {
+func TestWinchIntegrationSuite(t *testing.T) {
 	suite.Run(t, &WinchIntegrationSuite{})
 }
 
@@ -111,27 +112,74 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	s.routes, err = winch.NewStaticRoutes(&pb.MapperConfig{
 		Routes: []*pb.Route{
 			{
+				BackendAuth: "access1",
 				Type: &pb.Route_Direct{
 					Direct: &pb.DirectRoute{
-						Key:      "resource1.ext.example.com",
-						KedgeUrl: "https://" + moveToLocalhost(s.localSecureKedges.listeners[0].Addr().String()),
+						Key: "resource1.ext.example.com",
+						Url: "https://" + moveToLocalhost(s.localSecureKedges.listeners[0].Addr().String()),
 					},
 				},
 			},
 			{
+				ProxyAuth: "proxy-access1",
 				Type: &pb.Route_Direct{
 					Direct: &pb.DirectRoute{
-						Key:      "resource2.ext.example.com",
-						KedgeUrl: "https://" + moveToLocalhost(s.localSecureKedges.listeners[1].Addr().String()),
+						Key: "resource2.ext.example.com",
+						Url: "https://" + moveToLocalhost(s.localSecureKedges.listeners[1].Addr().String()),
 					},
 				},
 			},
 			{
+				BackendAuth: "access2",
 				Type: &pb.Route_Regexp{
 					Regexp: &pb.RegexpRoute{
 						Exp:              "([a-z0-9-].*).(?P<cluster>[a-z0-9-].*).internal.example.com",
 						ClusterGroupName: "cluster",
-						KedgeUrl:         "https://" + moveToLocalhost(s.localSecureKedges.listeners[2].Addr().String()),
+						Url:              "https://" + moveToLocalhost(s.localSecureKedges.listeners[2].Addr().String()),
+					},
+				},
+			},
+			{
+				BackendAuth: "error-access",
+				Type: &pb.Route_Direct{
+					Direct: &pb.DirectRoute{
+						Key: "error.ext.example.com",
+						Url: "https://" + moveToLocalhost(s.localSecureKedges.listeners[1].Addr().String()),
+					},
+				},
+			},
+		},
+	}, &pb.AuthConfig{
+		AuthSources: []*pb.AuthSource{
+			{
+				Name: "access1",
+				Type: &pb.AuthSource_Dummy{
+					Dummy: &pb.DummyAccess{
+						Value: "Bearer test-token",
+					},
+				},
+			},
+			{
+				Name: "access2",
+				Type: &pb.AuthSource_Dummy{
+					Dummy: &pb.DummyAccess{
+						Value: "user:password",
+					},
+				},
+			},
+			{
+				Name: "proxy-access1",
+				Type: &pb.AuthSource_Dummy{
+					Dummy: &pb.DummyAccess{
+						Value: "Bearer proxy-test-token",
+					},
+				},
+			},
+			{
+				Name: "error-access",
+				Type: &pb.AuthSource_Dummy{
+					Dummy: &pb.DummyAccess{
+						Value: "", // No value will trigger error on HeaderValue() (inside auth tripper)
 					},
 				},
 			},
@@ -140,7 +188,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	require.NoError(s.T(), err, "config must be parsable")
 
 	s.winch = &http.Server{
-		Handler: winch.New(kedge_map.RouteMapper(s.routes), s.tlsClientConfigForTest()),
+		Handler: winch.New(kedge_map.RouteMapper(s.routes.Get()), s.tlsClientConfigForTest()),
 	}
 	go func() {
 		s.winch.Serve(s.winchListenerPlain)
@@ -170,37 +218,53 @@ func (s *WinchIntegrationSuite) assertBadGatewayPingback(req *http.Request, resp
 	assert.Empty(s.T(), resp.Header.Get("x-test-kedge-id"))
 }
 
-func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_NoRoute() {
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_NoRout() {
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://resourceXXX.ext.example.com/some/strict/path")}
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertBadGatewayPingback(req, resp, err)
 }
 
-func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute() {
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute_ValidAuth() {
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://resource1.ext.example.com/some/strict/path")}
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertSuccessfulPingback(req, resp, err, 0)
+
+	s.Assert().Equal("Bearer test-token", resp.Header.Get("x-test-auth-value"))
+	s.Assert().Equal("", resp.Header.Get("x-test-proxy-auth-value"))
 }
 
-func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute2() {
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute2_ProxyAuth() {
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://resource2.ext.example.com/some/strict/path")}
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertSuccessfulPingback(req, resp, err, 1)
+
+	s.Assert().Equal("", resp.Header.Get("x-test-auth-value"))
+	s.Assert().Equal("Bearer proxy-test-token", resp.Header.Get("x-test-proxy-auth-value"))
 }
 
-func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute() {
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute_ValidAuth() {
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://service1.ab1-prod.internal.example.com/some/strict/path")}
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertSuccessfulPingback(req, resp, err, 2)
+
+	s.Assert().Equal("user:password", resp.Header.Get("x-test-auth-value"))
+	s.Assert().Equal("", resp.Header.Get("x-test-proxy-auth-value"))
 }
 
-func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute_PreserveAuthHeader() {
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute_OverwriteAuthHeader() {
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://service1.ab1-prod.internal.example.com/some/strict/path")}
 	req.Header = http.Header{}
 	req.Header.Set("Authorization", "bearer test-secret")
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertSuccessfulPingback(req, resp, err, 2)
-	assert.Equal(s.T(), "bearer test-secret", resp.Header.Get("x-test-auth-value"))
+	s.Assert().Equal("user:password", resp.Header.Get("x-test-auth-value"))
+	s.Assert().Equal("", resp.Header.Get("x-test-proxy-auth-value"))
+}
+
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute3_AuthError() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://error.ext.example.com/some/strict/path")}
+	resp, err := s.forwardProxyClient().Do(req)
+	s.assertBadGatewayPingback(req, resp, err)
 }
 
 // Client that will proxy through winch.

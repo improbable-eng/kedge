@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -23,7 +24,6 @@ import (
 	"github.com/pressly/chi"
 	log "github.com/sirupsen/logrus"
 	_ "golang.org/x/net/trace" // so /debug/request gets registered.
-	"crypto/tls"
 )
 
 var (
@@ -31,11 +31,16 @@ var (
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
-	flagConfigMapper        = protoflagz.DynProto3(sharedflags.Set,
-		"server_config_mapper",
+	flagMapperConfig        = protoflagz.DynProto3(sharedflags.Set,
+		"server_mapper_config",
 		&pb_config.MapperConfig{},
-		"Contents of the Winch Mapper configuration. Dynamically settable or read from file").
+		"Contents of the Winch Mapper configuration. Content or read from file if _path suffix.").
 		WithFileFlag("../../misc/winch_mapper.json").WithValidator(validateMapper)
+	flagAuthConfig = protoflagz.DynProto3(sharedflags.Set,
+		"server_auth_config",
+		&pb_config.MapperConfig{},
+		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
+		WithFileFlag("../../misc/winch_auth.json").WithValidator(validateMapper)
 )
 
 func validateMapper(msg proto.Message) error {
@@ -58,13 +63,16 @@ func main() {
 	log.SetOutput(os.Stdout)
 	logEntry := log.NewEntry(log.StandardLogger())
 
-	routes, err := winch.NewStaticRoutes(flagConfigMapper.Get().(*pb_config.MapperConfig))
+	routes, err := winch.NewStaticRoutes(
+		flagMapperConfig.Get().(*pb_config.MapperConfig),
+		flagAuthConfig.Get().(*pb_config.AuthConfig),
+	)
 	if err != nil {
-		log.Fatalf("failed reading flagz from files: %v", err)
+		log.WithError(err).Fatalf("failed to init static routes.")
 	}
 
 	http.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-	http.Handle("/", winch.New(kedge_map.RouteMapper(routes),
+	http.Handle("/", winch.New(kedge_map.RouteMapper(routes.Get()),
 		// TODO(bplotka): Only for debug purposes.
 		&tls.Config{InsecureSkipVerify: true}))
 	winchServer := &http.Server{

@@ -21,7 +21,7 @@ type mappingTripper struct {
 }
 
 func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	host := req.Host
+	host := req.URL.Host
 	if strings.Contains(host, ":") {
 		host = host[:strings.LastIndex(host, ":")]
 	}

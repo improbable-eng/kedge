@@ -1,16 +1,15 @@
 package kedge_map
 
-type RouteMatcher interface {
-	Match(dns string) bool
-	Route(dns string) (*Route, error)
+type RouteGetter interface {
+	Route(dns string) (*Route, bool, error)
 }
 
 type routeMapper struct {
-	routes []RouteMatcher
+	routes []RouteGetter
 }
 
 // RouteMapper is a mapper that resolves Route based on given DNS.
-func RouteMapper(r []RouteMatcher) *routeMapper {
+func RouteMapper(r []RouteGetter) *routeMapper {
 	return &routeMapper{
 		routes: r,
 	}
@@ -18,11 +17,16 @@ func RouteMapper(r []RouteMatcher) *routeMapper {
 
 func (m *routeMapper) Map(targetAuthorityDnsName string) (*Route, error) {
 	for _, route := range m.routes {
-		if !route.Match(targetAuthorityDnsName) {
+		r, ok, err := route.Route(targetAuthorityDnsName)
+		if err != nil {
+			return nil, err
+		}
+
+		if !ok {
 			continue
 		}
 
-		return route.Route(targetAuthorityDnsName)
+		return r, nil
 	}
 
 	return nil, ErrNotKedgeDestination

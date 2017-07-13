@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/mwitkow/go-httpwares/tags"
+	"github.com/mwitkow/kedge/lib/http/ctxtags"
 )
 
 // routingTripper is a piece of tripperware that dials certain destinations (indicated by a route stored in request's context) through a remote proxy (kedge).
@@ -21,14 +22,18 @@ func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		host = host[:strings.LastIndex(host, ":")]
 	}
 
-	route, ok := getRoute(req.Context())
-	if !ok || route == nil {
+	route, ok, err := getRoute(req.Context())
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return t.parent.RoundTrip(req)
 	}
+
 	destURL := route.URL
 
 	tags := http_ctxtags.ExtractInbound(req)
-	tags.Set("http.proxy.kedge_url", destURL)
+	tags.Set(ctxtags.TagForProxyDestURL, destURL)
 	tags.Set(http_ctxtags.TagForHandlerName, destURL)
 
 	// Copy the URL and the request to not override the callers info.

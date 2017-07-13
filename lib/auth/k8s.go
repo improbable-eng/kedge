@@ -24,9 +24,9 @@ func K8s(name string, configPath string, userName string) (Source, error) {
 	}
 
 	if info.AuthProvider != nil {
-		switch info.AuthProvider.Name  {
+		switch info.AuthProvider.Name {
 		case "oidc":
-			cache, err := k8s.NewCacheFromUser(userName)
+			cache, err := k8s.NewCacheFromUser(configPath, userName)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to get OIDC configuration from user. Err: %v", err)
 			}

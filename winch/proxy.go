@@ -33,7 +33,7 @@ func New(mapper winchMapper, config *tls.Config) *Proxy {
 	// 1) First, mapping tripper - maps dns to route and puts it to request context for rest of the tripperwares.
 
 	parentTransport := tripperware.Default(config)
-	parentTransport = tripperware.WrapForKedgeAuth(parentTransport)
+	parentTransport = tripperware.WrapForProxyAuth(parentTransport)
 	parentTransport = tripperware.WrapForBackendAuth(parentTransport)
 	parentTransport = tripperware.WrapForRouting(parentTransport)
 	parentTransport = tripperware.WrapForMapping(mapper, parentTransport)
@@ -61,7 +61,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	tags := http_ctxtags.ExtractInbound(req)
-	tags.Set(http_ctxtags.TagForCallService, "proxy")
+	tags.Set(http_ctxtags.TagForCallService, "winch")
 
 	p.kedgeReverseProxy.ServeHTTP(resp, normReq)
 }

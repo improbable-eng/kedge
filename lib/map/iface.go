@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	ErrNotKedgeDestination = errors.New("not a kedge destination")
+	ErrNotKedgeDestination   = errors.New("not a kedge destination")
 )
 
 // Mapper is an interface that allows you to direct traffic to different kedges including various auth.

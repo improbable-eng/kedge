@@ -17,7 +17,7 @@ type oidcSource struct {
 }
 
 func OIDC(name string, config login.OIDCConfig, path string) (Source, error) {
-	return oidcWithCache(name, disk.NewCache(config, path))
+	return oidcWithCache(name, disk.NewCache(path, config))
 }
 
 func oidcWithCache(name string, cache login.Cache) (Source, error) {

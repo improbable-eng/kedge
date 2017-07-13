@@ -6,18 +6,29 @@ import (
 	"strings"
 
 	"github.com/mwitkow/kedge/lib/map"
+	"github.com/pkg/errors"
 )
 
+// routeContextKey specifies the key that route is stored inside request's context.
+// if no route is found the nil route is stored.
 const routeContextKey = "proxy-route"
 
-func getRoute(ctx context.Context) (*kedge_map.Route, bool) {
+func getRoute(ctx context.Context) (*kedge_map.Route, bool, error) {
 	r, ok := ctx.Value(routeContextKey).(*kedge_map.Route)
-	return r, ok
+	if !ok {
+		// Unit tests should catch that.
+		return nil, false, errors.New("InternalError: Tripperware misconfiguration. MappingTripper was not before current tripper.")
+	}
+	return r, r != nil, nil
 }
 
 type mappingTripper struct {
 	mapper kedge_map.Mapper
 	parent http.RoundTripper
+}
+
+func requestWithRoute(req *http.Request, r *kedge_map.Route) *http.Request {
+	return req.WithContext(context.WithValue(req.Context(), routeContextKey, r))
 }
 
 func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -28,14 +39,18 @@ func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	route, err := t.mapper.Map(host)
 	if err == kedge_map.ErrNotKedgeDestination {
-		return t.parent.RoundTrip(req)
+		return t.parent.RoundTrip(
+			// We store nil to ensure that we can catch case when mappingTripper is not in the chain before other trippers
+			// that requires stored route.
+			requestWithRoute(req, nil),
+		)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	return t.parent.RoundTrip(
-		req.WithContext(context.WithValue(req.Context(), routeContextKey, route)),
+		requestWithRoute(req, route),
 	)
 }
 

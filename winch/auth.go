@@ -44,7 +44,7 @@ func (f *authFactory) Get(configSource *pb.AuthSource) (auth.Source, error) {
 			s.Oidc.Path,
 		)
 	case *pb.AuthSource_Dummy:
-		source, err = auth.Dummy(
+		source = auth.Dummy(
 			configSource.Name,
 			s.Dummy.Value,
 		)

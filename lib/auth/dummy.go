@@ -7,11 +7,11 @@ type dummySource struct {
 	value string
 }
 
-func Dummy(name string, value string) (Source, error) {
+func Dummy(name string, value string) Source {
 	return &dummySource{
 		name:  name,
 		value: value,
-	}, nil
+	}
 }
 
 func (s *dummySource) Name() string {

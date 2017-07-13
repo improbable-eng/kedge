@@ -64,13 +64,13 @@ func (r *StaticRoutes) Get() []kedge_map.RouteMatcher {
 	return r.routes
 }
 
-func routeAuth(f *authFactory, authConfig *pb.AuthConfig, needle string) (auth.Source, error) {
-	if needle == "" {
+func routeAuth(f *authFactory, authConfig *pb.AuthConfig, authName string) (auth.Source, error) {
+	if authName == "" {
 		return NoAuth, nil
 	}
 
 	for _, source := range authConfig.AuthSources {
-		if source.Name == needle {
+		if source.Name == authName {
 			auth, err := f.Get(source)
 			if err != nil {
 				return nil, err
@@ -78,7 +78,7 @@ func routeAuth(f *authFactory, authConfig *pb.AuthConfig, needle string) (auth.S
 			return auth, nil
 		}
 	}
-	return nil, fmt.Errorf("Config validation failed. Not found auth source called %q", needle)
+	return nil, fmt.Errorf("Config validation failed. Not found auth source called %q", authName)
 }
 
 type regexpRoute struct {

@@ -12,7 +12,8 @@ This allows to have safe route to the internal services by the authorized user.
     ```
     go run ./winch/server/*.go \
       --server_http_port=8098 \
-      --server_config_mapper_path=./misc/winch_mapper.json
+      --server_mapper_config_path=./misc/winch_mapper.json
+      --server_auth_config_path=./misc/winch_auth.json
     ```
 3. Forward traffic to the `http://127.0.0.1:8098`
 

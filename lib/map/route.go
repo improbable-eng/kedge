@@ -1,34 +1,32 @@
 package kedge_map
 
-import "net/url"
-
-type Route interface {
-	Match(dns string) bool
-	URL(dns string) (*url.URL, error)
-}
-
-type Routes interface {
-	Get() []Route
+type RouteGetter interface {
+	Route(dns string) (*Route, bool, error)
 }
 
 type routeMapper struct {
-	r Routes
+	routes []RouteGetter
 }
 
-// RouteMapper is a mapper that resolves URL based on given routes.
-func RouteMapper(r Routes) Mapper {
+// RouteMapper is a mapper that resolves Route based on given DNS.
+func RouteMapper(r []RouteGetter) *routeMapper {
 	return &routeMapper{
-		r: r,
+		routes: r,
 	}
 }
-func (m *routeMapper) Map(targetAuthorityDnsName string) (*url.URL, error) {
-	routes := m.r.Get()
-	for _, route := range routes {
-		if !route.Match(targetAuthorityDnsName) {
+
+func (m *routeMapper) Map(targetAuthorityDnsName string) (*Route, error) {
+	for _, route := range m.routes {
+		r, ok, err := route.Route(targetAuthorityDnsName)
+		if err != nil {
+			return nil, err
+		}
+
+		if !ok {
 			continue
 		}
 
-		return route.URL(targetAuthorityDnsName)
+		return r, nil
 	}
 
 	return nil, ErrNotKedgeDestination

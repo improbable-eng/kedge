@@ -1,16 +1,19 @@
 package kedge_map
 
-import "net/url"
-
-// Single is a simplistic kedge mapper that forwards all traffic through the same kedge.
-func Single(kedgeUrl *url.URL) Mapper {
-	return &single{kedgeUrl}
-}
+import (
+	"net/url"
+)
 
 type single struct {
 	kedgeUrl *url.URL
 }
 
-func (s *single) Map(targetAuthorityDnsName string) (*url.URL, error) {
-	return s.kedgeUrl, nil
+// Single is a simplistic kedge mapper that forwards all traffic through the same kedge.
+// No auth is involved.
+func Single(kedgeUrl *url.URL) Mapper {
+	return &single{kedgeUrl: kedgeUrl}
+}
+
+func (s *single) Map(targetAuthorityDnsName string) (*Route, error) {
+	return &Route{URL: s.kedgeUrl}, nil
 }

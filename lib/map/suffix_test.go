@@ -39,10 +39,10 @@ func TestSuffix_MatchesOne(t *testing.T) {
 		},
 	} {
 		t.Run(tcase.target, func(t *testing.T) {
-			u, err := mapper.Map(tcase.target)
+			route, err := mapper.Map(tcase.target)
 			if tcase.expectedErr == nil {
 				require.NoError(t, err, "no error")
-				assert.Equal(t, tcase.kedgeUrl, u.String(), "urls must match")
+				assert.Equal(t, tcase.kedgeUrl, route.URL.String(), "urls must match")
 			} else {
 				require.Equal(t, tcase.expectedErr, err, "error expected")
 			}
@@ -81,10 +81,10 @@ func TestSuffix_MatchesMulti(t *testing.T) {
 		},
 	} {
 		t.Run(tcase.target, func(t *testing.T) {
-			u, err := mapper.Map(tcase.target)
+			route, err := mapper.Map(tcase.target)
 			if tcase.expectedErr == nil {
 				require.NoError(t, err, "no error")
-				assert.Equal(t, tcase.kedgeUrl, u.String(), "urls must match")
+				assert.Equal(t, tcase.kedgeUrl, route.URL.String(), "urls must match")
 			} else {
 				require.Equal(t, tcase.expectedErr, err, "error expected")
 			}

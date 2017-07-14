@@ -19,7 +19,7 @@ func DialThroughKedge(ctx context.Context, targetAuthority string, clientTls *tl
 	if err != nil {
 		return nil, err
 	}
-	if kedgeUrl.Scheme == "https" {
+	if kedgeUrl.URL.Scheme == "https" {
 		if clientTls == nil || (len(clientTls.Certificates) == 0 && clientTls.GetCertificate == nil) {
 			return nil, errors.New("dialing through kedge requires a tls.Config with client-side certificates")
 		}
@@ -30,7 +30,7 @@ func DialThroughKedge(ctx context.Context, targetAuthority string, clientTls *tl
 		grpcOpts = append(grpcOpts, grpc.WithInsecure(), grpc.WithAuthority(targetAuthority))
 	}
 	// TODO(mwitkow): Add pooled dialing a-la: https://sourcegraph.com/github.com/google/google-api-go-client@master/-/blob/internal/pool.go#L25:1-27:32
-	return grpc.DialContext(ctx, kedgeUrl.Host, grpcOpts...)
+	return grpc.DialContext(ctx, kedgeUrl.URL.Host, grpcOpts...)
 }
 
 type proxiedTlsCredentials struct {

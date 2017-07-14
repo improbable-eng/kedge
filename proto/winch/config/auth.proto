@@ -1,0 +1,47 @@
+
+syntax = "proto3";
+
+package winch.config;
+
+import "github.com/mwitkow/go-proto-validators/validator.proto";
+
+/// AuthConfig is the top level configuration message for a winch auth.
+message AuthConfig {
+    repeated AuthSource auth_sources = 1;
+}
+
+/// AuthSource specifies the kind of the backend auth we need to inject on winch reqeuest.
+message AuthSource {
+    // name is an ID of auth source. It can be referenced inside winch routing.
+    string name = 1;
+    oneof type {
+        DummyAccess dummy = 2;
+        KubernetesAccess kube = 3;
+        OIDCAccess oidc = 4;
+        // TODO(bplotka): Consider addining more sources e.g token or just user:passwd based.
+    }
+}
+
+/// KubernetesAccess is an convenient way of specifying auth for backend. It grabs the data inside already used
+/// ~/.kube/config (or any specified config path) and deducts the auth type based on that. NOTE that only these types are
+/// supported:
+/// - OIDC
+message KubernetesAccess {
+    // User to reference access credentials from.
+    string user = 1 [(validator.field) = {msg_exists : true}];
+    // By default ~/.kube/config as usual.
+    string path = 2;
+}
+
+message OIDCAccess {
+    string provider = 1 [(validator.field) = {msg_exists : true}];
+    string client_id = 2  [(validator.field) = {msg_exists : true}];
+    string secret = 3  [(validator.field) = {msg_exists : true}];
+    repeated string scopes = 4;
+    string path = 5;
+}
+
+// DummyAccess just directly passes specified value into auth header. If value is not specified it will return error.
+message DummyAccess {
+    string value = 1;
+}

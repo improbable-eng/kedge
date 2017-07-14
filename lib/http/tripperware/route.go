@@ -2,7 +2,6 @@ package tripperware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"

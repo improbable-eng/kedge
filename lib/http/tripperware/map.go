@@ -3,7 +3,6 @@ package tripperware
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/pkg/errors"

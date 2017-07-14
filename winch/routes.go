@@ -1,12 +1,10 @@
 package winch
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
-	"text/template"
 
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/auth"
@@ -14,13 +12,13 @@ import (
 )
 
 type StaticRoutes struct {
-	routes []kedge_map.RouteMatcher
+	routes []kedge_map.RouteGetter
 }
 
 func NewStaticRoutes(mapperConfig *pb.MapperConfig, authConfig *pb.AuthConfig) (*StaticRoutes, error) {
 	f := NewAuthFactory()
 
-	var routes []kedge_map.RouteMatcher
+	var routes []kedge_map.RouteGetter
 	for _, configRoute := range mapperConfig.Routes {
 		backendAuth, err := routeAuth(f, authConfig, configRoute.BackendAuth)
 		if err != nil {
@@ -37,7 +35,7 @@ func NewStaticRoutes(mapperConfig *pb.MapperConfig, authConfig *pb.AuthConfig) (
 			ProxyAuth:   proxyAuth,
 		}
 
-		var routeMatcher kedge_map.RouteMatcher
+		var routeMatcher kedge_map.RouteGetter
 		if direct := configRoute.GetDirect(); direct != nil {
 			routeMatcher, err = newDirect(direct, route)
 			if err != nil {
@@ -60,7 +58,7 @@ func NewStaticRoutes(mapperConfig *pb.MapperConfig, authConfig *pb.AuthConfig) (
 	}, nil
 }
 
-func (r *StaticRoutes) Get() []kedge_map.RouteMatcher {
+func (r *StaticRoutes) Get() []kedge_map.RouteGetter {
 	return r.routes
 }
 
@@ -86,16 +84,11 @@ type regexpRoute struct {
 
 	re               *regexp.Regexp
 	clusterGroupName string // optional.
-	urlTmpl          *template.Template
+	urlTemplated     string
 }
 
-func newRegexp(re *pb.RegexpRoute, route *kedge_map.Route) (kedge_map.RouteMatcher, error) {
+func newRegexp(re *pb.RegexpRoute, route *kedge_map.Route) (kedge_map.RouteGetter, error) {
 	reexp, err := regexp.Compile(re.Exp)
-	if err != nil {
-		return nil, err
-	}
-
-	tmpl, err := template.New("").Parse(re.Url)
 	if err != nil {
 		return nil, err
 	}
@@ -105,49 +98,23 @@ func newRegexp(re *pb.RegexpRoute, route *kedge_map.Route) (kedge_map.RouteMatch
 
 		re:               reexp,
 		clusterGroupName: re.ClusterGroupName,
-		urlTmpl:          tmpl,
+		urlTemplated:     re.Url,
 	}, nil
 }
 
-func (r *regexpRoute) Match(dns string) bool {
-	return r.re.Match([]byte(dns))
-}
-
-func (r *regexpRoute) renderURL(cluster string) (*kedge_map.Route, error) {
-	buf := &bytes.Buffer{}
-	err := r.urlTmpl.Execute(buf, struct {
-		Cluster string
-	}{
-		Cluster: cluster,
-	})
-	if err != nil {
-		return nil, err
+func (r *regexpRoute) Route(dns string) (*kedge_map.Route, bool, error) {
+	if !r.re.MatchString(dns) {
+		return nil, false, nil
 	}
 
-	u, err := url.Parse(buf.String())
+	u, err := url.Parse(r.re.ReplaceAllString(dns, r.urlTemplated))
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	route := &(*r.baseRoute)
 	route.URL = u
-	return route, nil
-}
-
-func (r *regexpRoute) Route(dns string) (*kedge_map.Route, error) {
-	if r.clusterGroupName == "" {
-		return r.renderURL("unknown")
-	}
-
-	match := r.re.FindStringSubmatch(dns)
-	for i, name := range r.re.SubexpNames() {
-		if r.clusterGroupName != name {
-			continue
-		}
-		return r.renderURL(match[i])
-	}
-	return nil, fmt.Errorf("failed to found given named group %q inside regexp %q. Misconfiguration.",
-		r.clusterGroupName, r.re.String())
+	return route, true, nil
 }
 
 type directRoute struct {
@@ -156,7 +123,7 @@ type directRoute struct {
 	dns string
 }
 
-func newDirect(direct *pb.DirectRoute, route *kedge_map.Route) (kedge_map.RouteMatcher, error) {
+func newDirect(direct *pb.DirectRoute, route *kedge_map.Route) (kedge_map.RouteGetter, error) {
 	parsed, err := url.Parse(direct.Url)
 	if err != nil {
 		return nil, err
@@ -169,10 +136,9 @@ func newDirect(direct *pb.DirectRoute, route *kedge_map.Route) (kedge_map.RouteM
 	}, nil
 }
 
-func (r directRoute) Match(dns string) bool {
-	return r.dns == dns
-}
-
-func (r directRoute) Route(_ string) (*kedge_map.Route, error) {
-	return &(*r.route), nil
+func (r directRoute) Route(dns string) (*kedge_map.Route, bool, error) {
+	if r.dns != dns {
+		return nil, false, nil
+	}
+	return &(*r.route), true, nil
 }

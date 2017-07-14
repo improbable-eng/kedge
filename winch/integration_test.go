@@ -134,7 +134,6 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				Type: &pb.Route_Regexp{
 					Regexp: &pb.RegexpRoute{
 						Exp:              "([a-z0-9-].*).(?P<cluster>[a-z0-9-].*).internal.example.com",
-						ClusterGroupName: "cluster",
 						Url:              "https://" + moveToLocalhost(s.localSecureKedges.listeners[2].Addr().String()),
 					},
 				},

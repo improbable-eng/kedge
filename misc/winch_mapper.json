@@ -3,9 +3,8 @@
     {
       "backend_auth": "some-access1",
       "regexp": {
-        "exp": "([a-z0-9-].*).(?P<cluster>[a-z0-9-].*).internal.example.com",
-        "cluster_group_name": "cluster",
-        "url": "{{.Cluster}}.kedge.ext.example.com"
+        "exp": "([a-z0-9-].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "url": "${cluster}.kedge.ext.example.com"
       }
     }
   ]

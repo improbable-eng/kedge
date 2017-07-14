@@ -27,13 +27,13 @@ message DirectRoute {
 }
 
 message RegexpRoute {
-    // Regexp expression that will be applied on given DNS.
+    // Regexp RE2 expression that will be applied on given DNS.
     string exp = 1 [(validator.field) = {msg_exists : true}];
 
-    // Kedge URL to be used if we have a match. It can be a string including two variables using
-    // go template:
-    // - {{ .Cluster }} if cluster_group_name is specified.
+    // Kedge URL to be used if we have a match. It can be a string including variable from regexp expression in a form
+    // of bash-like variable. E.g
+    // exp = ([a-z0-9-].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]org
+    // in that case you can use following variable:
+    // - ${cluster}
     string url = 2 [(validator.field) = {msg_exists : true}];
-    // If specified, target cluster name will be fetched from named regexp group.
-    string cluster_group_name = 3;
 }

@@ -25,7 +25,7 @@ func (t *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	assert.Equal(t.t, t.expectedURL, req.URL)
 
 	assert.Equal(t.t, t.expectedAuthValue, req.Header.Get(authHeader))
-	assert.Equal(t.t, t.expectedProxyAuthValue, req.Header.Get(proxyAuthHeader))
+	assert.Equal(t.t, t.expectedProxyAuthValue, req.Header.Get(ProxyAuthHeader))
 
 	r, ok, err := getRoute(req.Context())
 	if t.expectedMissingMappingTripper {

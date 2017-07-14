@@ -140,7 +140,7 @@ func main() {
 		}()
 	}
 
-	err := <-errChan // this waits for some server breaking
+	err = <-errChan // this waits for some server breaking
 	log.WithError(err).Fatalf("Fail")
 }
 

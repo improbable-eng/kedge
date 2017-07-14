@@ -8,6 +8,7 @@ import (
 
 	"github.com/Bplotka/oidc/authorize"
 	"github.com/mwitkow/go-conntrack"
+	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/adhoc"
@@ -18,8 +19,6 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
-	"github.com/mwitkow/go-httpwares"
-	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 var (
@@ -53,8 +52,8 @@ func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser)
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 		},
-		router:     router,
-		addresser:  addresser,
+		router:    router,
+		addresser: addresser,
 	}
 	return p
 }

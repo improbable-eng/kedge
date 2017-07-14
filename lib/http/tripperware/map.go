@@ -32,10 +32,7 @@ func requestWithRoute(req *http.Request, r *kedge_map.Route) *http.Request {
 }
 
 func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	host := req.URL.Host
-	if strings.Contains(host, ":") {
-		host = host[:strings.LastIndex(host, ":")]
-	}
+	host := getURLHost(req)
 
 	route, err := t.mapper.Map(host)
 	if err == kedge_map.ErrNotKedgeDestination {

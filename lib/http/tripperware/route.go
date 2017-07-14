@@ -17,10 +17,7 @@ type routingTripper struct {
 }
 
 func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	host := req.URL.Host
-	if strings.Contains(host, ":") {
-		host = host[:strings.LastIndex(host, ":")]
-	}
+	host := getURLHost(req)
 
 	route, ok, err := getRoute(req.Context())
 	if err != nil {

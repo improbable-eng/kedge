@@ -96,9 +96,8 @@ func newRegexp(re *pb.RegexpRoute, route *kedge_map.Route) (kedge_map.RouteGette
 	return &regexpRoute{
 		baseRoute: route,
 
-		re:               reexp,
-		clusterGroupName: re.ClusterGroupName,
-		urlTemplated:     re.Url,
+		re:           reexp,
+		urlTemplated: re.Url,
 	}, nil
 }
 

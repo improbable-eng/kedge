@@ -12,6 +12,7 @@ This allows to have safe route to the internal services by the authorized user.
     ```
     go run ./winch/server/*.go \
       --server_http_port=8098 \
+      --pac_redirect_sh_expressions="*.*.internal.example.com" \
       --server_mapper_config_path=./misc/winch_mapper.json
       --server_auth_config_path=./misc/winch_auth.json
     ```
@@ -30,11 +31,10 @@ To force an application to dial required URL through winch just set `HTTP_PROXY`
 * [ ] - forward Proxy to remote Kedges for a CLI command (setting HTTP_PROXY) "kedge_local <cmd>"
     * [x] - HTTP
     * [ ] - gRPC
-    * [ ] - HTTPS
 * [ ] - forward Proxy in daemon mode with an auto-gen [PAC](https://en.wikipedia.org/wiki/Proxy_auto-config) file
-    * [ ] - HTTP
+    * [x] - HTTP
     * [ ] - gRPC
-    * [ ] - HTTPS
+* [ ] - add auto-configuration for browser to use our PAC (WPAD)
 * [x] - matching logic for "remap something.my_cluster.cluster.local to my_cluster.internalapi.example.com" for finding Kedges on the internet
 * [ ] - support for custom root CA for TLS with kedge
 * [ ] - reading of TLS client certs from ~/.config/kedge

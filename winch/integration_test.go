@@ -109,7 +109,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	// It does not make sense if kedge is not secure.
 	s.localSecureKedges.SetupKedges(s.T(), http2ServerTlsConfig, 3)
 
-	s.routes, err = winch.NewStaticRoutes(&pb.MapperConfig{
+	testConfig := &pb.MapperConfig{
 		Routes: []*pb.Route{
 			{
 				BackendAuth: "access1",
@@ -133,8 +133,8 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				BackendAuth: "access2",
 				Type: &pb.Route_Regexp{
 					Regexp: &pb.RegexpRoute{
-						Exp:              "([a-z0-9-].*).(?P<cluster>[a-z0-9-].*).internal.example.com",
-						Url:              "https://" + moveToLocalhost(s.localSecureKedges.listeners[2].Addr().String()),
+						Exp: "([a-z0-9-].*).(?P<cluster>[a-z0-9-].*).internal.example.com",
+						Url: "https://" + moveToLocalhost(s.localSecureKedges.listeners[2].Addr().String()),
 					},
 				},
 			},
@@ -148,7 +148,8 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				},
 			},
 		},
-	}, &pb.AuthConfig{
+	}
+	authConfig := &pb.AuthConfig{
 		AuthSources: []*pb.AuthSource{
 			{
 				Name: "access1",
@@ -183,9 +184,11 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				},
 			},
 		},
-	})
+	}
+	s.routes, err = winch.NewStaticRoutes(testConfig, authConfig)
 	require.NoError(s.T(), err, "config must be parsable")
 
+	http.Handle("/", winch.New(kedge_map.RouteMapper(s.routes.Get()), s.tlsClientConfigForTest()))
 	s.winch = &http.Server{
 		Handler: winch.New(kedge_map.RouteMapper(s.routes.Get()), s.tlsClientConfigForTest()),
 	}

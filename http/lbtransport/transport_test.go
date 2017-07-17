@@ -132,6 +132,8 @@ func (s *BalancedRRTransportSuite) TearDownSuite() {
 	s.lbTrans.Close()
 }
 
+const requestedBackendMinimumShare = 0.3 // Relatively to equal share among backends.
+
 func (s *BalancedRRTransportSuite) callLBTransportAndAssert(requestsPerBackend int, backendsCount int) {
 	backendMapMu := sync.RWMutex{}
 	backendMap := make(map[string]int)
@@ -164,8 +166,12 @@ func (s *BalancedRRTransportSuite) callLBTransportAndAssert(requestsPerBackend i
 	backendMapMu.RLock()
 	defer backendMapMu.RUnlock()
 	assert.Equal(s.T(), backendsCount, len(backendMap), "srvlb should round robin across all backends. Got: %v", backendMap)
+
+	// This is to eliminate flakiness of this test on slow CI. We all guaranteeing statistical round robin only.
+	// NOTE: On fast machine doing requestedBackendMinimumShare = 1.0 should always work.
+	requestedMinimumCalls := int(requestedBackendMinimumShare * float64(requestsPerBackend))
 	for k, val := range backendMap {
-		assert.Equal(s.T(), requestsPerBackend, val, "backend %v is expected to have its share of requests", k)
+		assert.True(s.T(), requestedMinimumCalls < val, "backend %v is expected to have its minimum share %d of requests. Got: %d", k, requestedMinimumCalls, val)
 	}
 }
 

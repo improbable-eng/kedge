@@ -185,12 +185,14 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 			},
 		},
 	}
-	s.routes, err = winch.NewStaticRoutes(testConfig, authConfig)
+
+	m := http.NewServeMux()
+	s.routes, err = winch.NewStaticRoutes(winch.NewAuthFactory(s.winchListenerPlain.Addr().String(), m), testConfig, authConfig)
 	require.NoError(s.T(), err, "config must be parsable")
 
-	http.Handle("/", winch.New(kedge_map.RouteMapper(s.routes.Get()), s.tlsClientConfigForTest()))
+	m.Handle("/", winch.New(kedge_map.RouteMapper(s.routes.Get()), s.tlsClientConfigForTest()))
 	s.winch = &http.Server{
-		Handler: winch.New(kedge_map.RouteMapper(s.routes.Get()), s.tlsClientConfigForTest()),
+		Handler: m,
 	}
 	go func() {
 		s.winch.Serve(s.winchListenerPlain)

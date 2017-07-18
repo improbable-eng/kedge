@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"net/http/pprof"
 	"os"
 	"time"
 
@@ -16,14 +17,18 @@ import (
 	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
-	validator "github.com/mwitkow/go-proto-validators"
+	"github.com/mwitkow/go-proto-validators"
 	pb_config "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/mwitkow/kedge/winch"
 	"github.com/pressly/chi"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/trace"
 	_ "golang.org/x/net/trace" // so /debug/request gets registered.
+	"os/signal"
+	"sync"
+	"context"
 )
 
 var (
@@ -63,7 +68,27 @@ func main() {
 	log.SetOutput(os.Stdout)
 	logEntry := log.NewEntry(log.StandardLogger())
 
+	var httpPlainListener net.Listener
+	httpPlainListener = buildListenerOrFail("http_plain", *flagHttpPort)
+	log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
+
+	mux := http.NewServeMux()
+	mux.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
+	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+	mux.Handle("/debug/traces", http.HandlerFunc(trace.Traces))
+	mux.Handle("/debug/events", http.HandlerFunc(trace.Events))
+	pacHandle, err := winch.NewPacFromFlags(httpPlainListener.Addr().String())
+	if err != nil {
+		log.WithError(err).Fatalf("failed to init PAC handler")
+	}
+	mux.Handle("/wpad.dat", pacHandle)
+
 	routes, err := winch.NewStaticRoutes(
+		winch.NewAuthFactory(httpPlainListener.Addr().String(), mux),
 		flagMapperConfig.Get().(*pb_config.MapperConfig),
 		flagAuthConfig.Get().(*pb_config.AuthConfig),
 	)
@@ -71,19 +96,7 @@ func main() {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
 
-	var httpPlainListener net.Listener
-	httpPlainListener = buildListenerOrFail("http_plain", *flagHttpPort)
-	log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
-
-	http.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-
-	pacHandle, err := winch.NewPacFromFlags(httpPlainListener.Addr().String())
-	if err != nil {
-		log.WithError(err).Fatalf("failed to init PAC handler")
-	}
-
-	http.Handle("/wpad.dat", pacHandle)
-	http.Handle("/", winch.New(kedge_map.RouteMapper(routes.Get()),
+	mux.Handle("/", winch.New(kedge_map.RouteMapper(routes.Get()),
 		// TODO(bplotka): Only for debug purposes.
 		&tls.Config{InsecureSkipVerify: true},
 	))
@@ -95,13 +108,32 @@ func main() {
 			http_ctxtags.Middleware("winch"),
 			http_debug.Middleware(),
 			http_logrus.Middleware(logEntry),
-		).Handler(http.DefaultServeMux),
+		).Handler(mux),
 	}
+
+	cleanupWG := &sync.WaitGroup{}
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
+
+	go func() {
+		<-signalChan
+		cleanupWG.Add(1)
+		defer cleanupWG.Done()
+		log.Infof("\nReceived an interrupt, stopping services...\n")
+		ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+		err := winchServer.Shutdown(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to gracefully shutdown server.")
+		}
+		cancel()
+		httpPlainListener.Close()
+	}()
 
 	// Serve.
 	if err := winchServer.Serve(httpPlainListener); err != nil {
-		log.Fatalf("http_plain server error: %v", err)
+		log.WithError(err).Errorf("http_plain server error")
 	}
+	cleanupWG.Wait()
 }
 
 func buildListenerOrFail(name string, port int) net.Listener {

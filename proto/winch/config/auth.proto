@@ -31,6 +31,7 @@ message KubernetesAccess {
     string user = 1 [(validator.field) = {msg_exists : true}];
     // By default ~/.kube/config as usual.
     string path = 2;
+    // TODO(bplotka): Consider enabling login for OIDC from kube config.
 }
 
 message OIDCAccess {
@@ -39,6 +40,10 @@ message OIDCAccess {
     string secret = 3  [(validator.field) = {msg_exists : true}];
     repeated string scopes = 4;
     string path = 5;
+    // login_callback_path specified URL path for redirect URL to specify when doing OIDC login.
+    // If empty login will be disabled which means in case of no refresh token or not valid one, error will be returned
+    // thus not needing user interaction.
+    string login_callback_path = 6;
 }
 
 // DummyAccess just directly passes specified value into auth header. If value is not specified it will return error.

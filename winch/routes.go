@@ -15,17 +15,15 @@ type StaticRoutes struct {
 	routes []kedge_map.RouteGetter
 }
 
-func NewStaticRoutes(mapperConfig *pb.MapperConfig, authConfig *pb.AuthConfig) (*StaticRoutes, error) {
-	f := NewAuthFactory()
-
+func NewStaticRoutes(factory *AuthFactory, mapperConfig *pb.MapperConfig, authConfig *pb.AuthConfig) (*StaticRoutes, error) {
 	var routes []kedge_map.RouteGetter
 	for _, configRoute := range mapperConfig.Routes {
-		backendAuth, err := routeAuth(f, authConfig, configRoute.BackendAuth)
+		backendAuth, err := routeAuth(factory, authConfig, configRoute.BackendAuth)
 		if err != nil {
 			return nil, err
 		}
 
-		proxyAuth, err := routeAuth(f, authConfig, configRoute.ProxyAuth)
+		proxyAuth, err := routeAuth(factory, authConfig, configRoute.ProxyAuth)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +60,7 @@ func (r *StaticRoutes) Get() []kedge_map.RouteGetter {
 	return r.routes
 }
 
-func routeAuth(f *authFactory, authConfig *pb.AuthConfig, authName string) (auth.Source, error) {
+func routeAuth(f *AuthFactory, authConfig *pb.AuthConfig, authName string) (auth.Source, error) {
 	if authName == "" {
 		return NoAuth, nil
 	}

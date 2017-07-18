@@ -16,19 +16,19 @@ type oidcSource struct {
 	tokenSource oidc.TokenSource
 }
 
-func OIDC(name string, config login.OIDCConfig, path string) (Source, error) {
-	return oidcWithCache(name, disk.NewCache(path, config))
+func OIDC(name string, config login.OIDCConfig, path string, callbackSrv *login.CallbackServer) (Source, error) {
+	return oidcWithCache(name, disk.NewCache(path, config), callbackSrv)
 }
 
-func oidcWithCache(name string, cache login.Cache) (Source, error) {
+func oidcWithCache(name string, cache login.Cache, callbackSrv *login.CallbackServer) (Source, error) {
 	tokenSource, err := login.NewOIDCTokenSource(
 		context.Background(),
 		log.New(os.Stdout, "oidc auth", 0),
 		login.Config{
-			DisableLogin: true,
-			NonceCheck:   false,
+			NonceCheck: false,
 		},
 		cache,
+		callbackSrv,
 	)
 	if err != nil {
 		return nil, err

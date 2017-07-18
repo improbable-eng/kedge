@@ -87,7 +87,7 @@ func main() {
 
 	if authorizer != nil {
 		httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(authorizer))
-		logEntry.Info("Configured OIDC authorization for HTTPS proxy.")
+		logEntry.Info("configured OIDC authorization for HTTPS proxy.")
 	}
 
 	// Bouncer.
@@ -191,7 +191,7 @@ func debugMux() *chi.Mux {
 	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
 	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	m.Handle("/debug/events", http.HandlerFunc(trace.Traces))
+	m.Handle("/debug/traces", http.HandlerFunc(trace.Traces))
 	m.Handle("/debug/events", http.HandlerFunc(trace.Events))
 	return m
 }

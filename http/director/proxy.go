@@ -133,6 +133,7 @@ func AuthMiddleware(authorizer authorize.Authorizer) httpwares.Middleware {
 				return
 			}
 			// Request authorized - continue.
+			nextHandler.ServeHTTP(resp, req)
 		})
 	}
 }

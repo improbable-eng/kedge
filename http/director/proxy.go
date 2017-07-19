@@ -6,12 +6,16 @@ import (
 	"net/http/httputil"
 	"time"
 
+	"github.com/Bplotka/oidc/authorize"
 	"github.com/mwitkow/go-conntrack"
+	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/adhoc"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/http/director/router"
+	"github.com/mwitkow/kedge/lib/http/ctxtags"
+	"github.com/mwitkow/kedge/lib/http/tripperware"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
@@ -67,6 +71,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if _, ok := resp.(http.Flusher); !ok {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
 	}
+
 	// note resp needs to implement Flusher, otherwise flush intervals won't work.
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	backend, err := p.router.Route(req)
@@ -74,7 +79,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	tags.Set(http_ctxtags.TagForCallService, "proxy")
 	if err == nil {
 		resp.Header().Set("x-kedge-backend-name", backend)
-		tags.Set("http.proxy.backend", backend)
+		tags.Set(ctxtags.TagsForProxyBackend, backend)
 		tags.Set(http_ctxtags.TagForHandlerName, backend)
 		normReq.URL.Host = backend
 		p.backendReverseProxy.ServeHTTP(resp, normReq)
@@ -86,7 +91,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	addr, err := p.addresser.Address(req)
 	if err == nil {
 		normReq.URL.Host = addr
-		tags.Set("http.proxy.adhoc", addr)
+		tags.Set(ctxtags.TagForProxyAdhoc, addr)
 		tags.Set(http_ctxtags.TagForHandlerName, "_adhoc")
 		p.adhocReverseProxy.ServeHTTP(resp, normReq)
 		return
@@ -117,4 +122,31 @@ func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)
 	fmt.Fprintf(resp, "kedge error: %v", err.Error())
+}
+
+func AuthMiddleware(authorizer authorize.Authorizer) httpwares.Middleware {
+	return func(nextHandler http.Handler) http.Handler {
+		return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+			err := authorize.IsRequestAuthorized(req, authorizer, tripperware.ProxyAuthHeader)
+			if err != nil {
+				respondWithUnauthorized(err, req, resp)
+				return
+			}
+			// Request authorized - continue.
+			nextHandler.ServeHTTP(resp, req)
+		})
+	}
+}
+
+func respondWithUnauthorized(err error, req *http.Request, resp http.ResponseWriter) {
+	status := http.StatusUnauthorized
+	if rErr, ok := (err).(*router.Error); ok {
+		status = rErr.StatusCode()
+	}
+	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
+	resp.Header().Set("x-kedge-error", err.Error())
+	resp.Header().Set("content-type", "text/plain")
+	resp.WriteHeader(status)
+	// print?
+	fmt.Fprintf(resp, "kedge auth error: %v", err.Error())
 }

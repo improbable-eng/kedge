@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
 	"os"
 	"strings"
 	"time"
@@ -21,11 +21,13 @@ import (
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	http_director "github.com/mwitkow/kedge/http/director"
+	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	_ "golang.org/x/net/trace" // so /debug/request gets registered.
+	"golang.org/x/net/trace" // so /debug/request gets registered.
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -33,8 +35,8 @@ import (
 var (
 	flagBindAddr    = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
 	flagGrpcTlsPort = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
-	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls (insecure, debug). If 0, no insecure HTTP will be open.")
-	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If 0, no TLS will be open.")
+	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
+	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optinonal pprof (insecure). If 0, no insecure HTTP will be open.")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
@@ -54,7 +56,8 @@ func main() {
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
 	tlsConfig := buildServerTlsOrFail()
 
-	grpcServer := grpc.NewServer(
+	// GRPC kedge.
+	grpcDirectorServer := grpc.NewServer(
 		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
 		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcDirector)),
 		grpc_middleware.WithUnaryServerChain(
@@ -69,45 +72,31 @@ func main() {
 		),
 		grpc.Creds(credentials.NewTLS(tlsConfig)),
 	)
-	//grpc_prometheus.Register(grpcServer)
-	registerDebugHandlers()
 
-	secureDirectorChain := chi.Chain(
+	// HTTP kedge.
+	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
 		http_debug.Middleware(),
-		http_logrus.Middleware(logEntry)).Handler(httpDirector)
-	secureHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/_healthz" {
-			healthEndpoint(w, req)
-			return
-		}
-		if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
-			grpcServer.ServeHTTP(w, req)
-			return
-		}
-		secureDirectorChain.ServeHTTP(w, req)
-	}).ServeHTTP
+		http_logrus.Middleware(logEntry),
+	)
 
-	proxyServer := &http.Server{
-		WriteTimeout: *flagHttpMaxWriteTimeout,
-		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField("http.port", "tls")),
-		Handler:      http.HandlerFunc(secureHandler),
+	authorizer, err := authorizerFromFlags(logEntry)
+	if err != nil {
+		log.WithError(err).Fatal("failed to create authorizer.")
 	}
 
-	debugServer := &http.Server{
-		WriteTimeout: *flagHttpMaxWriteTimeout,
-		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField("http.port", "tls")),
-		Handler: chi.Chain(
-			http_ctxtags.Middleware("debug"),
-			http_debug.Middleware(),
-			http_logrus.Middleware(logEntry.WithField("http.port", "plain")),
-		).Handler(http.DefaultServeMux),
+	if authorizer != nil {
+		httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(authorizer))
+		logEntry.Info("Configured OIDC authorization for HTTPS proxy.")
 	}
+
+	// Bouncer.
+	httpsBouncerServer := httpsBouncerServer(grpcDirectorServer, httpDirectorChain.Handler(httpDirector), logEntry)
+
+	// Debug.
+	httpDebugServer := debugServer(logEntry)
 
 	errChan := make(chan error)
-
 	var grpcTlsListener net.Listener
 	var httpPlainListener net.Listener
 	var httpTlsListener net.Listener
@@ -129,7 +118,7 @@ func main() {
 	if grpcTlsListener != nil {
 		log.Infof("listening for gRPC TLS on: %v", grpcTlsListener.Addr().String())
 		go func() {
-			if err := grpcServer.Serve(grpcTlsListener); err != nil {
+			if err := grpcDirectorServer.Serve(grpcTlsListener); err != nil {
 				errChan <- fmt.Errorf("grpc_tls server error: %v", err)
 			}
 		}()
@@ -137,7 +126,7 @@ func main() {
 	if httpTlsListener != nil {
 		log.Infof("listening for HTTP TLS on: %v", httpTlsListener.Addr().String())
 		go func() {
-			if err := proxyServer.Serve(httpTlsListener); err != nil {
+			if err := httpsBouncerServer.Serve(httpTlsListener); err != nil {
 				errChan <- fmt.Errorf("http_tls server error: %v", err)
 			}
 		}()
@@ -145,34 +134,66 @@ func main() {
 	if httpPlainListener != nil {
 		log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
 		go func() {
-			if err := debugServer.Serve(httpPlainListener); err != nil {
+			if err := httpDebugServer.Serve(httpPlainListener); err != nil {
 				errChan <- fmt.Errorf("http_plain server error: %v", err)
 			}
 		}()
 	}
 
-	err := <-errChan // this waits for some server breaking
-	log.Fatalf("Error: %v", err)
+	err = <-errChan // this waits for some server breaking
+	log.WithError(err).Fatalf("Fail")
 }
 
-func registerDebugHandlers() {
+// httpsBouncerHandler decides what kind of requests it is and redirects to GRPC if needed.
+func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logEntry *log.Entry) *http.Server {
+	httpBouncerHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/_healthz" {
+			healthEndpoint(w, req)
+			return
+		}
+		if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
+			grpcHandler.ServeHTTP(w, req)
+			return
+		}
+		httpHandler.ServeHTTP(w, req)
+	}).ServeHTTP
+
+	return &http.Server{
+		WriteTimeout: *flagHttpMaxWriteTimeout,
+		ReadTimeout:  *flagHttpMaxReadTimeout,
+		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagsForScheme, "tls")),
+		Handler:      http.HandlerFunc(httpBouncerHandler),
+	}
+}
+
+func debugServer(logEntry *log.Entry) *http.Server {
+	return &http.Server{
+		WriteTimeout: *flagHttpMaxWriteTimeout,
+		ReadTimeout:  *flagHttpMaxReadTimeout,
+		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagsForScheme, "tls")),
+		Handler: chi.Chain(
+			http_ctxtags.Middleware("debug"),
+			http_debug.Middleware(),
+			http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain")),
+		).Handler(debugMux()),
+	}
+}
+
+func debugMux() *chi.Mux {
+	m := chi.NewMux()
 	// TODO(mwitkow): Add middleware for making these only visible to private IPs.
-	http.Handle("/_healthz", http.HandlerFunc(healthEndpoint))
-	http.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
-	http.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-	//http.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	//http.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	//http.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	//http.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	//http.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	//http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-	//	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	//	trace.Render(w, req /*sensitive*/, true)
-	//}))
-	//http.Handle("/debug/events", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-	//	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	//	trace.RenderEvents(w, req /*sensitive*/, true)
-	//}))
+	m.Handle("/_healthz", http.HandlerFunc(healthEndpoint))
+	m.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
+	m.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
+
+	m.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	m.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+	m.Handle("/debug/events", http.HandlerFunc(trace.Traces))
+	m.Handle("/debug/events", http.HandlerFunc(trace.Events))
+	return m
 }
 
 func buildListenerOrFail(name string, port int) net.Listener {

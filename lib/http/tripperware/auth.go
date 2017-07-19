@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	proxyAuthHeader = "Proxy-Authorization"
+	ProxyAuthHeader = "Proxy-Authorization"
 	authHeader      = "Authorization"
 )
 
@@ -58,7 +58,7 @@ func (t *authTripper) Clone() RoundTripper {
 func WrapForProxyAuth(parentTransport RoundTripper) RoundTripper {
 	return &authTripper{
 		parent:     parentTransport.Clone(),
-		authHeader: proxyAuthHeader,
+		authHeader: ProxyAuthHeader,
 		authTag:    ctxtags.TagForProxyAuth,
 		authFromRoute: func(route *kedge_map.Route) (auth.Source, bool) {
 			return route.ProxyAuth, route.ProxyAuth != nil

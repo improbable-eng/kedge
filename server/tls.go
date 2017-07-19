@@ -20,15 +20,13 @@ var (
 		"../misc/localhost.key",
 		"Path to the PEM key for the certificate for the server use.")
 	flagTlsServerClientCAFiles = sharedflags.Set.StringSlice(
-		"server_tls_client_ca_files",
-		[]string{},
-		"Paths (comma separated) to PEM certificate chains used for testclient-side verification. If empty, testclient side verification is disabled.",
+		"server_tls_client_ca_files",	[]string{},
+		"Paths (comma separated) to PEM certificate chains used for client-side verification. If empty, client-side verification is disabled.",
 	)
-
 	flagTlsServerClientCertRequired = sharedflags.Set.Bool(
-		"server_tls_client_cert_required",
-		true,
-		"Controls whether a testclient certificate is required. Only used if server_tls_client_ca_files is not empty. If true, connections that don't have a testclient CA will be rejected.")
+		"server_tls_client_cert_required",true,
+		"Controls whether a client certificate is required. Only used if server_tls_client_ca_files is not empty. " +
+			"If true, connections that are not certified by client CA will be rejected.")
 )
 
 func buildServerTlsOrFail() *tls.Config {
@@ -54,10 +52,10 @@ func addClientCertIfNeeded(tlsConfig *tls.Config) {
 		for _, path := range *flagTlsServerClientCAFiles {
 			data, err := ioutil.ReadFile(path)
 			if err != nil {
-				log.Fatalf("failed reading testclient CA file %v: %v", path, err)
+				log.Fatalf("failed reading client CA file %v: %v", path, err)
 			}
 			if ok := tlsConfig.ClientCAs.AppendCertsFromPEM(data); !ok {
-				log.Fatalf("failed processing testclient CA file %v", path)
+				log.Fatalf("failed processing client CA file %v", path)
 			}
 		}
 	}

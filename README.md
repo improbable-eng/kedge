@@ -51,13 +51,13 @@ Kedge Service:
  * [x] - HTTP(S) proxying based on routes (path, host) to defined backends
  * [x] - integration tests for HTTP, gRPC proxying (backend and routing)
  * [x] - TLS client-certificate verification based off CA chains
+ * [x] - support for Forward Proxying and Reverse Proxying in HTTP backends
+ * [x] - support for OpenID JWT token authentication on routes (claim matches) - useful for proxying to Kubernetes API Server
  * [ ] - example Kubernetes YAML files (deployment, config maps)
  * [ ] - TLS configuration (CA chains, etc.) for gRPC and HTTP backends 
- * [x] - support for Forward Proxying and Reverse Proxying in HTTP backends
  * [ ] - "adhoc routes" - support for HTTP Forward Proxying to an arbitrary (but filtered) SRV destination without a backend - calling pods
  * [ ] - support for K8S auto-discovery of service backends based off metadata
  * [ ] - support for TLS client certificate authentication on routes (metadata matches)
- * [ ] - support for OpenID JWT token authentication on routes (claim matches) - useful for proxying to Kubernetes API Server
  * [ ] - support for load balanced CONNECT method proxying for TLS passthrough to backends - if needed
  
 Kedge Client:

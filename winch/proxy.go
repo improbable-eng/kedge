@@ -59,6 +59,12 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
 	}
 
+	if req.URL.Scheme == "" {
+		// Local resource was requested and was not in previous route pattern.
+		http.NotFound(resp, req)
+		return
+	}
+
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	tags := http_ctxtags.ExtractInbound(req)
 	tags.Set(http_ctxtags.TagForCallService, "winch")

@@ -13,31 +13,33 @@ import (
 
 type oidcSource struct {
 	name        string
+	cache       login.Cache
 	tokenSource oidc.TokenSource
 }
 
-func OIDC(name string, config login.OIDCConfig, path string) (Source, error) {
-	return oidcWithCache(name, disk.NewCache(path, config))
+func OIDC(name string, config login.OIDCConfig, path string, callbackSrv *login.CallbackServer) (Source, func() error, error) {
+	return OIDCWithCache(name, disk.NewCache(path, config), callbackSrv)
 }
 
-func oidcWithCache(name string, cache login.Cache) (Source, error) {
-	tokenSource, err := login.NewOIDCTokenSource(
+func OIDCWithCache(name string, cache login.Cache, callbackSrv *login.CallbackServer) (Source, func() error, error) {
+	tokenSource, clearIDTokenFunc, err := login.NewOIDCTokenSource(
 		context.Background(),
 		log.New(os.Stdout, "oidc auth", 0),
 		login.Config{
-			DisableLogin: true,
-			NonceCheck:   false,
+			NonceCheck: false,
 		},
 		cache,
+		callbackSrv,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &oidcSource{
 		name:        name,
+		cache:       cache,
 		tokenSource: tokenSource,
-	}, nil
+	}, clearIDTokenFunc, nil
 }
 
 func (s *oidcSource) Name() string {

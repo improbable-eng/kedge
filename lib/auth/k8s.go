@@ -30,7 +30,8 @@ func K8s(name string, configPath string, userName string) (Source, error) {
 			if err != nil {
 				return nil, fmt.Errorf("Failed to get OIDC configuration from user. Err: %v", err)
 			}
-			return oidcWithCache(name, cache)
+			s, _, err := OIDCWithCache(name, cache, nil)
+			return s, err
 		default:
 			// TODO(bplotka): Add support for more of them.
 			return nil, fmt.Errorf("Not supported k8s Auth provider %v", info.AuthProvider.Name)

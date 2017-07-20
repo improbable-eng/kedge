@@ -79,3 +79,6 @@
 [submodule "vendor/github.com/pkg/errors"]
 	path = vendor/github.com/pkg/errors
 	url = https://github.com/pkg/errors
+[submodule "vendor/github.com/Bplotka/go-ipfilter"]
+	path = vendor/github.com/Bplotka/go-ipfilter
+	url = https://github.com/Bplotka/go-ipfilter

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Bplotka/go-ipfilter"
+	"github.com/Bplotka/go-ipfilter/http"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -17,6 +19,7 @@ import (
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-flagz"
+	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
@@ -33,10 +36,13 @@ import (
 )
 
 var (
-	flagBindAddr    = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
-	flagGrpcTlsPort = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
-	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
-	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optinonal pprof (insecure). If 0, no insecure HTTP will be open.")
+	flagBindAddr                = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
+	flagGrpcTlsPort             = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
+	flagHttpTlsPort             = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
+	flagHttpPort                = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")
+	flagDebugHttpAllowedIPs     = sharedflags.Set.StringSlice("server_debug_http_allowed_ips", nil, "Comma delimited list of IPs that are allowed to access debug endpoints in addtion to private IPs.")
+	flagDebugHttpPublicProxyIPs = sharedflags.Set.StringSlice("server_debug_http_public_proxy_ips", nil, "Comma delimited list of IPs that are public proxies (e.g load balancers) which are before kedge. "+
+		"This allows to properly assume remote address to enable 'server_debug_http_allowed_ips' logic")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
@@ -94,7 +100,10 @@ func main() {
 	httpsBouncerServer := httpsBouncerServer(grpcDirectorServer, httpDirectorChain.Handler(httpDirector), logEntry)
 
 	// Debug.
-	httpDebugServer := debugServer(logEntry)
+	httpDebugServer, err := debugServer(logEntry)
+	if err != nil {
+		log.WithError(err).Fatal("failed to create debug Server.")
+	}
 
 	errChan := make(chan error)
 	var grpcTlsListener net.Listener
@@ -166,7 +175,12 @@ func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logE
 	}
 }
 
-func debugServer(logEntry *log.Entry) *http.Server {
+func debugServer(logEntry *log.Entry) (*http.Server, error) {
+	restrictedIPMiddleware, err := ipFilteringMiddleware()
+	if err != nil {
+		return nil, err
+	}
+
 	return &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
@@ -175,13 +189,45 @@ func debugServer(logEntry *log.Entry) *http.Server {
 			http_ctxtags.Middleware("debug"),
 			http_debug.Middleware(),
 			http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain")),
+			restrictedIPMiddleware,
 		).Handler(debugMux()),
+	}, nil
+}
+
+func ipFilteringMiddleware() (httpwares.Middleware, error) {
+	var publicProxyIpNets []net.IPNet
+	for _, addr := range *flagDebugHttpPublicProxyIPs {
+		ip, err := ipfilter.ParseIP(addr)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse IP %s given in flagDebugHttpPublicProxyIPs. Err: %v", addr, err)
+		}
+		publicProxyIpNets = append(publicProxyIpNets, ipfilter.SingleIPNet(ip))
 	}
+	var allowedIPs []net.IPNet
+	for _, addr := range *flagDebugHttpAllowedIPs {
+		ip, err := ipfilter.ParseIP(addr)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse IP %s given in flagDebugHttpAllowedIPs. Err: %v", addr, err)
+		}
+		allowedIPs = append(allowedIPs, ipfilter.SingleIPNet(ip))
+	}
+
+	isAllowedIP := ipfilter.OR(
+		ipfilter.IsPrivate(),
+		ipfilter.IsWhitelisted(allowedIPs),
+	)
+
+	return http_ipfilter.Middleware(publicProxyIpNets, isAllowedIP, func(resp http.ResponseWriter, err error) {
+		status := http.StatusUnauthorized
+		resp.Header().Set("x-kedge-not-allowed-ip-error", err.Error())
+		resp.Header().Set("content-type", "text/plain")
+		resp.WriteHeader(status)
+		fmt.Fprintf(resp, "kedge no allowed IP error: %v", err.Error())
+	}), nil
 }
 
 func debugMux() *chi.Mux {
 	m := chi.NewMux()
-	// TODO(mwitkow): Add middleware for making these only visible to private IPs.
 	m.Handle("/_healthz", http.HandlerFunc(healthEndpoint))
 	m.Handle("/_version", http.HandlerFunc(versionEndpoint))
 	m.Handle("/debug/metrics", prometheus.UninstrumentedHandler())

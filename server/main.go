@@ -183,6 +183,7 @@ func debugMux() *chi.Mux {
 	m := chi.NewMux()
 	// TODO(mwitkow): Add middleware for making these only visible to private IPs.
 	m.Handle("/_healthz", http.HandlerFunc(healthEndpoint))
+	m.Handle("/_version", http.HandlerFunc(versionEndpoint))
 	m.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
 	m.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 

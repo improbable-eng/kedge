@@ -436,7 +436,7 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_NoAuthForProxy()
 	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
 	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "Unauthenticated. No \"Proxy-Authorization\" header.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
+	assert.Equal(s.T(), "Unauthenticated. No Proxy-Authorization header.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
 }
 
 func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_AuthForProxyNotABearer() {
@@ -444,7 +444,7 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_AuthForProxyNotA
 	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
 	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "Unauthenticated. \"Proxy-Authorization\" header does not have Bearer format.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
+	assert.Equal(s.T(), "Unauthenticated. Proxy-Authorization header does not have Bearer format.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
 }
 
 func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_WrongAuthForProxy() {

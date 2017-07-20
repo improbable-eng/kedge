@@ -76,3 +76,6 @@
 [submodule "vendor/github.com/Bplotka/oidc"]
 	path = vendor/github.com/Bplotka/oidc
 	url = https://github.com/Bplotka/oidc
+[submodule "vendor/github.com/Bplotka/go-ipfilter"]
+	path = vendor/github.com/Bplotka/go-ipfilter
+	url = https://github.com/Bplotka/go-ipfilter

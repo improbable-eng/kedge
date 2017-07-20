@@ -76,3 +76,6 @@
 [submodule "vendor/github.com/Bplotka/oidc"]
 	path = vendor/github.com/Bplotka/oidc
 	url = https://github.com/Bplotka/oidc
+[submodule "vendor/github.com/pkg/errors"]
+	path = vendor/github.com/pkg/errors
+	url = https://github.com/pkg/errors

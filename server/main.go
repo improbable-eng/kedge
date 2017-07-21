@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Bplotka/go-ipfilter"
-	"github.com/Bplotka/go-ipfilter/http"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -19,7 +17,6 @@ import (
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-flagz"
-	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
@@ -79,12 +76,21 @@ func main() {
 		grpc.Creds(credentials.NewTLS(tlsConfig)),
 	)
 
-	// HTTP kedge.
+	// HTTPS kedge chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
 		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry),
 	)
+
+	// HTTPs kedge chain.
+	httpDebugChain := chi.Chain(
+		http_ctxtags.Middleware("debug"),
+		http_debug.Middleware(),
+		http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain")),
+	)
+	// httpNonAuthDebugChain chain is shares the same base but will not include auth. It is for metrics and _healthz.
+	httpNonAuthDebugChain := httpDebugChain
 
 	authorizer, err := authorizerFromFlags(logEntry)
 	if err != nil {
@@ -99,8 +105,13 @@ func main() {
 	// Bouncer.
 	httpsBouncerServer := httpsBouncerServer(grpcDirectorServer, httpDirectorChain.Handler(httpDirector), logEntry)
 
+	if authorizer != nil && *flagEnableOIDCAuthForDebugEnpoints {
+		httpDebugChain = append(httpDebugChain, http_director.AuthMiddleware(authorizer))
+		logEntry.Info("configured OIDC authorization for HTTP debug server.")
+	}
+
 	// Debug.
-	httpDebugServer, err := debugServer(logEntry)
+	httpDebugServer, err := debugServer(logEntry, httpDebugChain, httpNonAuthDebugChain)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create debug Server.")
 	}
@@ -175,72 +186,29 @@ func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logE
 	}
 }
 
-func debugServer(logEntry *log.Entry) (*http.Server, error) {
-	restrictedIPMiddleware, err := ipFilteringMiddleware()
-	if err != nil {
-		return nil, err
-	}
+func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlewares chi.Middlewares) (*http.Server, error) {
+	m := chi.NewMux()
+	m.Handle("/_healthz", noAuthMiddlewares.HandlerFunc(healthEndpoint))
+	m.Handle("/debug/metrics", noAuthMiddlewares.Handler(prometheus.UninstrumentedHandler()))
+
+	m.Handle("/_version", middlewares.HandlerFunc(versionEndpoint))
+	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
+
+	m.Handle("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))
+	m.Handle("/debug/pprof/cmdline", middlewares.HandlerFunc(pprof.Cmdline))
+	m.Handle("/debug/pprof/profile", middlewares.HandlerFunc(pprof.Profile))
+	m.Handle("/debug/pprof/symbol", middlewares.HandlerFunc(pprof.Symbol))
+	m.Handle("/debug/pprof/trace", middlewares.HandlerFunc(pprof.Trace))
+	m.Handle("/debug/traces", middlewares.HandlerFunc(trace.Traces))
+	m.Handle("/debug/events", middlewares.HandlerFunc(trace.Events))
+	m.Use()
 
 	return &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagsForScheme, "tls")),
-		Handler: chi.Chain(
-			http_ctxtags.Middleware("debug"),
-			http_debug.Middleware(),
-			http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain")),
-			restrictedIPMiddleware,
-		).Handler(debugMux()),
+		Handler:      http.HandlerFunc(m),
 	}, nil
-}
-
-func ipFilteringMiddleware() (httpwares.Middleware, error) {
-	var publicProxyIpNets []net.IPNet
-	for _, addr := range *flagDebugHttpPublicProxyIPs {
-		ip, err := ipfilter.ParseIP(addr)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to parse IP %s given in flagDebugHttpPublicProxyIPs. Err: %v", addr, err)
-		}
-		publicProxyIpNets = append(publicProxyIpNets, ipfilter.SingleIPNet(ip))
-	}
-	var allowedIPs []net.IPNet
-	for _, addr := range *flagDebugHttpAllowedIPs {
-		ip, err := ipfilter.ParseIP(addr)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to parse IP %s given in flagDebugHttpAllowedIPs. Err: %v", addr, err)
-		}
-		allowedIPs = append(allowedIPs, ipfilter.SingleIPNet(ip))
-	}
-
-	isAllowedIP := ipfilter.OR(
-		ipfilter.IsPrivate(),
-		ipfilter.IsWhitelisted(allowedIPs),
-	)
-
-	return http_ipfilter.Middleware(publicProxyIpNets, isAllowedIP, func(resp http.ResponseWriter, err error) {
-		status := http.StatusUnauthorized
-		resp.Header().Set("x-kedge-not-allowed-ip-error", err.Error())
-		resp.Header().Set("content-type", "text/plain")
-		resp.WriteHeader(status)
-		fmt.Fprintf(resp, "kedge no allowed IP error: %v", err.Error())
-	}), nil
-}
-
-func debugMux() *chi.Mux {
-	m := chi.NewMux()
-	m.Handle("/_healthz", http.HandlerFunc(healthEndpoint))
-	m.Handle("/_version", http.HandlerFunc(versionEndpoint))
-	m.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
-	m.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-
-	m.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	m.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	m.Handle("/debug/traces", http.HandlerFunc(trace.Traces))
-	m.Handle("/debug/events", http.HandlerFunc(trace.Events))
-	return m
 }
 
 func buildListenerOrFail(name string, port int) net.Listener {

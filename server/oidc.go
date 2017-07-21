@@ -18,6 +18,8 @@ var (
 		"Name of the claim that stores user's permissions.")
 	flagOIDCRequiredPerms = sharedflags.Set.String("server_oidc_required_perm", "",
 		"Permissions which is required to access kedge.")
+	flagEnableOIDCAuthForDebugEnpoints = sharedflags.Set.Bool("server_enable_oidc_for_debug_endpoints", false,
+		"If true, debug endpoints will be hidden by OIDC Auth with the same configuration as proxy.")
 )
 
 func authorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {

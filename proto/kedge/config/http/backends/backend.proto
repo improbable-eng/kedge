@@ -7,7 +7,7 @@ import "kedge/config/common/resolvers/resolvers.proto";
 
 /// Backend is a pool of HTTP endpoints that are kept open
 message Backend {
-    /// name is the string identifying the bakcend in all other conifgs.
+    /// name is the string identifying the backend in all other conifgs.
     string name = 1  [(validator.field) = {regex: "^[a-z_.]{2,64}$"}];
 
     /// balancer decides which balancing policy to use.
@@ -16,7 +16,7 @@ message Backend {
     /// disable_conntracking turns off the /debug/events tracing and Prometheus monitoring of the pool sie for this backend.
     bool disable_conntracking = 3;
 
-    /// security controls the TLS connection details for the backend (HTTPS). If not present, insecure HTTTP mode is used.
+    /// security controls the TLS connection details for the backend (HTTPS). If not present, insecure HTTP mode is used.
     Security security = 4;
 
     /// interceptors controls what middleware will be available on every call made to this backend.

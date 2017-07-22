@@ -207,7 +207,7 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagsForScheme, "tls")),
-		Handler:      http.HandlerFunc(m),
+		Handler:      m,
 	}, nil
 }
 

@@ -201,7 +201,6 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	m.Handle("/debug/pprof/trace", middlewares.HandlerFunc(pprof.Trace))
 	m.Handle("/debug/traces", middlewares.HandlerFunc(trace.Traces))
 	m.Handle("/debug/events", middlewares.HandlerFunc(trace.Events))
-	m.Use()
 
 	return &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,

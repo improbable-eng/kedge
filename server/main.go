@@ -76,14 +76,14 @@ func main() {
 		grpc.Creds(credentials.NewTLS(tlsConfig)),
 	)
 
-	// HTTPS kedge chain.
+	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
 		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry),
 	)
 
-	// HTTPs kedge chain.
+	// HTTP debug chain.
 	httpDebugChain := chi.Chain(
 		http_ctxtags.Middleware("debug"),
 		http_debug.Middleware(),

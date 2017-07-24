@@ -33,10 +33,13 @@ import (
 )
 
 var (
-	flagBindAddr    = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
-	flagGrpcTlsPort = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
-	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
-	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optinonal pprof (insecure). If 0, no insecure HTTP will be open.")
+	flagBindAddr                = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
+	flagGrpcTlsPort             = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
+	flagHttpTlsPort             = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
+	flagHttpPort                = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")
+	flagDebugHttpAllowedIPs     = sharedflags.Set.StringSlice("server_debug_http_allowed_ips", nil, "Comma delimited list of IPs that are allowed to access debug endpoints in addtion to private IPs.")
+	flagDebugHttpPublicProxyIPs = sharedflags.Set.StringSlice("server_debug_http_public_proxy_ips", nil, "Comma delimited list of IPs that are public proxies (e.g load balancers) which are before kedge. "+
+		"This allows to properly assume remote address to enable 'server_debug_http_allowed_ips' logic")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
@@ -73,12 +76,21 @@ func main() {
 		grpc.Creds(credentials.NewTLS(tlsConfig)),
 	)
 
-	// HTTP kedge.
+	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
 		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry),
 	)
+
+	// HTTP debug chain.
+	httpDebugChain := chi.Chain(
+		http_ctxtags.Middleware("debug"),
+		http_debug.Middleware(),
+		http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain")),
+	)
+	// httpNonAuthDebugChain chain is shares the same base but will not include auth. It is for metrics and _healthz.
+	httpNonAuthDebugChain := httpDebugChain
 
 	authorizer, err := authorizerFromFlags(logEntry)
 	if err != nil {
@@ -93,8 +105,16 @@ func main() {
 	// Bouncer.
 	httpsBouncerServer := httpsBouncerServer(grpcDirectorServer, httpDirectorChain.Handler(httpDirector), logEntry)
 
+	if authorizer != nil && *flagEnableOIDCAuthForDebugEnpoints {
+		httpDebugChain = append(httpDebugChain, http_director.AuthMiddleware(authorizer))
+		logEntry.Info("configured OIDC authorization for HTTP debug server.")
+	}
+
 	// Debug.
-	httpDebugServer := debugServer(logEntry)
+	httpDebugServer, err := debugServer(logEntry, httpDebugChain, httpNonAuthDebugChain)
+	if err != nil {
+		log.WithError(err).Fatal("failed to create debug Server.")
+	}
 
 	errChan := make(chan error)
 	var grpcTlsListener net.Listener
@@ -166,35 +186,28 @@ func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logE
 	}
 }
 
-func debugServer(logEntry *log.Entry) *http.Server {
+func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlewares chi.Middlewares) (*http.Server, error) {
+	m := chi.NewMux()
+	m.Handle("/_healthz", noAuthMiddlewares.HandlerFunc(healthEndpoint))
+	m.Handle("/debug/metrics", noAuthMiddlewares.Handler(prometheus.UninstrumentedHandler()))
+
+	m.Handle("/_version", middlewares.HandlerFunc(versionEndpoint))
+	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
+
+	m.Handle("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))
+	m.Handle("/debug/pprof/cmdline", middlewares.HandlerFunc(pprof.Cmdline))
+	m.Handle("/debug/pprof/profile", middlewares.HandlerFunc(pprof.Profile))
+	m.Handle("/debug/pprof/symbol", middlewares.HandlerFunc(pprof.Symbol))
+	m.Handle("/debug/pprof/trace", middlewares.HandlerFunc(pprof.Trace))
+	m.Handle("/debug/traces", middlewares.HandlerFunc(trace.Traces))
+	m.Handle("/debug/events", middlewares.HandlerFunc(trace.Events))
+
 	return &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagsForScheme, "tls")),
-		Handler: chi.Chain(
-			http_ctxtags.Middleware("debug"),
-			http_debug.Middleware(),
-			http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain")),
-		).Handler(debugMux()),
-	}
-}
-
-func debugMux() *chi.Mux {
-	m := chi.NewMux()
-	// TODO(mwitkow): Add middleware for making these only visible to private IPs.
-	m.Handle("/_healthz", http.HandlerFunc(healthEndpoint))
-	m.Handle("/_version", http.HandlerFunc(versionEndpoint))
-	m.Handle("/debug/metrics", prometheus.UninstrumentedHandler())
-	m.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-
-	m.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	m.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	m.Handle("/debug/traces", http.HandlerFunc(trace.Traces))
-	m.Handle("/debug/events", http.HandlerFunc(trace.Events))
-	return m
+		Handler:      m,
+	}, nil
 }
 
 func buildListenerOrFail(name string, port int) net.Listener {

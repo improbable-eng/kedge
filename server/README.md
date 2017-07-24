@@ -96,6 +96,7 @@ go build
 
 Optionally you can skip client's side cert requirement and perform authorization based on JWT OIDC ID token (in case you are already have 
 some OIDC provider running, that supports filling permissions into ID token claim):
+
 ```bash
 go build 
 ./server \

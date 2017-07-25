@@ -42,17 +42,14 @@ Please see
 
 ## Status
 
-The project is very much **work in progress**. Experimentation is recommended, usage in production rather not. The following features and items are planned:
+The project is still in testing (alpha) state. APIs can change. 
+For status, see [CHANGELOG](CHANGELOG.md)
+
+## Wishlist
+
+The following features and items are planned:
 
 Kedge Service:
- * [x] - gRPC(S) backend definitions and backend pool - SRV discovery and RR LB
- * [x] - gRPC(S) proxying based on routes (service, authority) to defined backends
- * [x] - HTTP(S) backend definitions and backend pool - SRV disovery and RR LB
- * [x] - HTTP(S) proxying based on routes (path, host) to defined backends
- * [x] - integration tests for HTTP, gRPC proxying (backend and routing)
- * [x] - TLS client-certificate verification based off CA chains
- * [x] - support for Forward Proxying and Reverse Proxying in HTTP backends
- * [x] - support for OpenID JWT token authentication on routes (claim matches) - useful for proxying to Kubernetes API Server
  * [ ] - example Kubernetes YAML files (deployment, config maps)
  * [ ] - TLS configuration (CA chains, etc.) for gRPC and HTTP backends 
  * [ ] - "adhoc routes" - support for HTTP Forward Proxying to an arbitrary (but filtered) SRV destination without a backend - calling pods
@@ -60,8 +57,11 @@ Kedge Service:
  * [ ] - support for TLS client certificate authentication on routes (metadata matches)
  * [ ] - support for load balanced CONNECT method proxying for TLS passthrough to backends - if needed
  
-Kedge Client:
- * See [winch](./winch/README.md) 
+Winch (kedge client):
+* [ ] - gRPC forward Proxy.
+* [ ] - add auto-configuration for browser to use our PAC (WPAD)
+* [ ] - support for custom root CA for TLS with kedge
+* [ ] - reading of TLS client certs from ~/.config/kedge
 
 ## License
 

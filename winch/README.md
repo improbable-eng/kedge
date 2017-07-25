@@ -28,16 +28,6 @@ To force an application to dial required URL through winch just set `HTTP_PROXY`
  
 ## Status
 
-* [ ] - forward Proxy to remote Kedges for a CLI command (setting HTTP_PROXY) "kedge_local <cmd>"
-    * [x] - HTTP
-    * [ ] - gRPC
-* [ ] - forward Proxy in daemon mode with an auto-gen [PAC](https://en.wikipedia.org/wiki/Proxy_auto-config) file
-    * [x] - HTTP
-    * [ ] - gRPC
-* [x] - matching logic for "remap something.my_cluster.cluster.local to my_cluster.internalapi.example.com" for finding Kedges on the internet
-* [x] - open ID connect login to get ID token / refresh token
-* [ ] - add auto-configuration for browser to use our PAC (WPAD)
-* [ ] - support for custom root CA for TLS with kedge
-* [ ] - reading of TLS client certs from ~/.config/kedge
+See [CHANGELOG](../CHANGELOG.md)
 
 

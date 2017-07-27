@@ -20,7 +20,7 @@ var (
 		"Path to the optional PEM key for the certificate that the client will use. This is required when kedge is configured with server_tls_client_cert_required=true.")
 	flagTLSRootCAFiles = sharedflags.Set.StringSlice(
 		"client_tls_root_ca_files", []string{},
-		"Paths (comma separated) to custom PEM certificate CA chains used for root trusted CA for server verification.",
+		"Paths (comma separated) to custom PEM certificate CA chains used for root trusted CA for server verification. If nil, root CAs will fetched from host.",
 	)
 	flagTLSInsecureSkipVerify = sharedflags.Set.Bool(
 		"client_insecure", false,
@@ -34,6 +34,7 @@ func buildTLSConfigFromFlags() (*tls.Config, error) {
 	// Add client certs if specified.
 	if *flagTLSClientCert == "" || *flagTLSClientKey == "" {
 		log.Info("Either key or cert for TLS client certificates are not present.")
+		tlsConfig = &tls.Config{}
 	} else {
 		// TlsConfigForServerCerts name is misleading - it Certificates field is used for client as well when used on http.Client
 		var err error
@@ -52,7 +53,7 @@ func buildTLSConfigFromFlags() (*tls.Config, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed reading root CA file %v: %v", path, err)
 			}
-			if ok := tlsConfig.ClientCAs.AppendCertsFromPEM(data); !ok {
+			if ok := tlsConfig.RootCAs.AppendCertsFromPEM(data); !ok {
 				return nil, fmt.Errorf("failed processing root CA file %v", path)
 			}
 		}

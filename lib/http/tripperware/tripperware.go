@@ -20,7 +20,8 @@ func (t *defaultTripper) Clone() RoundTripper {
 }
 
 func Default(config *tls.Config) RoundTripper {
-	transport := http.DefaultTransport.(*http.Transport)
+	// Clone transport before using it. We don't want to modify the default one.
+	transport := &(*http.DefaultTransport.(*http.Transport))
 	transport.TLSClientConfig = config
 	return &defaultTripper{Transport: transport}
 }

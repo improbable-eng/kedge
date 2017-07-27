@@ -57,7 +57,10 @@ func main() {
 	grpc.EnableTracing = *flagGrpcWithTracing
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
-	tlsConfig := buildServerTlsOrFail()
+	tlsConfig, err := buildTLSConfigFromFlags()
+	if err != nil {
+		log.Fatalf("failed building TLS config from flags: %v", err)
+	}
 
 	// GRPC kedge.
 	grpcDirectorServer := grpc.NewServer(

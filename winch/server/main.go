@@ -1,13 +1,15 @@
 package main
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"net/http/pprof"
+	_ "net/http/pprof"
 	"os"
+	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -26,9 +28,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
 	_ "golang.org/x/net/trace" // so /debug/request gets registered.
-	"os/signal"
-	"sync"
-	"context"
 )
 
 var (
@@ -64,6 +63,10 @@ func main() {
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
+	tlsConfig, err := buildTLSConfigFromFlags()
+	if err != nil {
+		log.WithError(err).Fatal("failed building TLS config from flags")
+	}
 
 	log.SetOutput(os.Stdout)
 	logEntry := log.NewEntry(log.StandardLogger())
@@ -96,10 +99,12 @@ func main() {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
 
-	mux.Handle("/", winch.New(kedge_map.RouteMapper(routes.Get()),
-		// TODO(bplotka): Only for debug purposes.
-		&tls.Config{InsecureSkipVerify: true},
-	))
+	mux.Handle("/",
+		winch.New(
+			kedge_map.RouteMapper(routes.Get()),
+			tlsConfig,
+		),
+	)
 	winchServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
@@ -120,7 +125,7 @@ func main() {
 		cleanupWG.Add(1)
 		defer cleanupWG.Done()
 		log.Infof("\nReceived an interrupt, stopping services...\n")
-		ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		err := winchServer.Shutdown(ctx)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to gracefully shutdown server.")

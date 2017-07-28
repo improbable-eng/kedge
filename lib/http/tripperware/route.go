@@ -42,10 +42,6 @@ func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.parent.RoundTrip(copyReq)
 }
 
-func (t *routingTripper) Clone() RoundTripper {
-	return &(*t)
-}
-
-func WrapForRouting(parentTransport RoundTripper) RoundTripper {
-	return &routingTripper{parent: parentTransport.Clone()}
+func WrapForRouting(parentTransport http.RoundTripper) http.RoundTripper {
+	return &routingTripper{parent: parentTransport}
 }

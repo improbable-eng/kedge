@@ -50,10 +50,6 @@ func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	)
 }
 
-func (t *mappingTripper) Clone() RoundTripper {
-	return &(*t)
-}
-
-func WrapForMapping(mapper kedge_map.Mapper, parentTransport RoundTripper) RoundTripper {
-	return &mappingTripper{mapper: mapper, parent: parentTransport.Clone()}
+func WrapForMapping(mapper kedge_map.Mapper, parentTransport http.RoundTripper ) http.RoundTripper  {
+	return &mappingTripper{mapper: mapper, parent: parentTransport}
 }

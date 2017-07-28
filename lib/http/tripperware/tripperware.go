@@ -2,30 +2,35 @@ package tripperware
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 )
-
-type RoundTripper interface {
-	http.RoundTripper
-	Clone() RoundTripper
-}
 
 type defaultTripper struct {
 	*http.Transport
 }
 
-func (t *defaultTripper) Clone() RoundTripper {
-	return &(*t)
-}
-
-func Default(config *tls.Config) RoundTripper {
-	transport := http.DefaultTransport.(*http.Transport)
-	transport.TLSClientConfig = config
+func Default(config *tls.Config) http.RoundTripper {
+	// Clone transport before using it. We don't want to modify the default one.
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       config,
+	}
 	return &defaultTripper{Transport: transport}
 }
 
-func DefaultWithTransport(transport *http.Transport, config *tls.Config) RoundTripper {
+func DefaultWithTransport(transport *http.Transport, config *tls.Config) http.RoundTripper {
 	transport.TLSClientConfig = config
 	return &defaultTripper{Transport: transport}
 }

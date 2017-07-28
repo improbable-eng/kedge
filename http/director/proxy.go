@@ -2,6 +2,7 @@ package director
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"time"
@@ -22,7 +23,18 @@ import (
 )
 
 var (
-	AdhocTransport = &(*(http.DefaultTransport.(*http.Transport))) // shallow copy
+	AdhocTransport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 
 	flagBufferSizeBytes  = sharedflags.Set.Int("http_reverseproxy_buffer_size_bytes", 32*1024, "Size (bytes) of reusable buffer used for copying HTTP reverse proxy responses.")
 	flagBufferCount      = sharedflags.Set.Int("http_reverseproxy_buffer_count", 2*1024, "Maximum number of of reusable buffer used for copying HTTP reverse proxy responses.")
@@ -36,8 +48,7 @@ var (
 //
 // If  Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
 func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser) *Proxy {
-	adhocTripper := &(*AdhocTransport) // shallow copy
-	adhocTripper.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
+	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	p := &Proxy{
 		backendReverseProxy: &httputil.ReverseProxy{
@@ -48,7 +59,7 @@ func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser)
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
 			Director:      func(r *http.Request) {},
-			Transport:     adhocTripper,
+			Transport:     AdhocTransport,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 		},

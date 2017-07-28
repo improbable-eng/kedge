@@ -41,10 +41,6 @@ func (t *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return nil, nil
 }
 
-func (t *testRoundTripper) Clone() RoundTripper {
-	return &(*t)
-}
-
 func urlMustParse(t *testing.T, urlStr string) *url.URL {
 	u, err := url.Parse(urlStr)
 	require.NoError(t, err)

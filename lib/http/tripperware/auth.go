@@ -51,13 +51,9 @@ func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.parent.RoundTrip(req)
 }
 
-func (t *authTripper) Clone() RoundTripper {
-	return &(*t)
-}
-
-func WrapForProxyAuth(parentTransport RoundTripper) RoundTripper {
+func WrapForProxyAuth(parentTransport http.RoundTripper ) http.RoundTripper  {
 	return &authTripper{
-		parent:     parentTransport.Clone(),
+		parent:     parentTransport,
 		authHeader: ProxyAuthHeader,
 		authTag:    ctxtags.TagForProxyAuth,
 		authFromRoute: func(route *kedge_map.Route) (auth.Source, bool) {
@@ -66,9 +62,9 @@ func WrapForProxyAuth(parentTransport RoundTripper) RoundTripper {
 	}
 }
 
-func WrapForBackendAuth(parentTransport RoundTripper) RoundTripper {
+func WrapForBackendAuth(parentTransport http.RoundTripper ) http.RoundTripper  {
 	return &authTripper{
-		parent:     parentTransport.Clone(),
+		parent:     parentTransport,
 		authHeader: authHeader,
 		authTag:    ctxtags.TagForAuth,
 		authFromRoute: func(route *kedge_map.Route) (auth.Source, bool) {

@@ -109,9 +109,10 @@ func (r *regexpRoute) Route(dns string) (*kedge_map.Route, bool, error) {
 		return nil, false, err
 	}
 
-	route := &(*r.baseRoute)
-	route.URL = u
-	return route, true, nil
+	clonedRoute := &kedge_map.Route{}
+	*clonedRoute = *r.baseRoute
+	clonedRoute.URL = u
+	return clonedRoute, true, nil
 }
 
 type directRoute struct {
@@ -137,5 +138,7 @@ func (r directRoute) Route(dns string) (*kedge_map.Route, bool, error) {
 	if r.dns != dns {
 		return nil, false, nil
 	}
-	return &(*r.route), true, nil
+	clonedRoute := &kedge_map.Route{}
+	*clonedRoute = *r.route
+	return clonedRoute, true, nil
 }

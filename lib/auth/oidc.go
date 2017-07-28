@@ -24,7 +24,7 @@ func OIDC(name string, config login.OIDCConfig, path string, callbackSrv *login.
 func OIDCWithCache(name string, cache login.Cache, callbackSrv *login.CallbackServer) (Source, func() error, error) {
 	tokenSource, clearIDTokenFunc, err := login.NewOIDCTokenSource(
 		context.Background(),
-		log.New(os.Stdout, "oidc auth", 0),
+		log.New(os.Stdout, fmt.Sprintf("OIDC Auth %s ", name), 0),
 		login.Config{
 			NonceCheck: false,
 		},

@@ -18,3 +18,4 @@ Winch (kedge client):
 * [x] - HTTP forward Proxy in daemon mode for browsers with an auto-gen [PAC](https://en.wikipedia.org/wiki/Proxy_auto-config) file.
 * [x] - matching logic for "remap something.my_cluster.cluster.local to my_cluster.internalapi.example.com" for finding Kedges on the internet
 * [x] - open ID connect login to get ID token / refresh token
+* [x] - support for custom root CA for TLS with kedge

@@ -11,7 +11,7 @@
 Proxy for gRPC, HTTP (1.1/2) microservices with the aim to make cross-cluster
 microservice communication simple to set up, and secure. All you need for it to work is: TLS client certificates in your service pods, a single L4 load balanced IP address in each cluster, and a `kedge` server behind it.
 
-## The pain of cross-cluster Kubernetes
+## The pain of cross-cluster Kubernetes communication
 
 Kubernetes is great, if you have one cluster. If you want to have twoThis project stems from the frustration of setting up communication between two K8S clusters. This requires a couple of things:
  - cross-cluster networking - usually a complex process of setting up and maintaining IPSec bridges
@@ -60,7 +60,6 @@ Kedge Service:
 Winch (kedge client):
 * [ ] - gRPC forward Proxy.
 * [ ] - add auto-configuration for browser to use our PAC (WPAD)
-* [ ] - support for custom root CA for TLS with kedge
 * [ ] - reading of TLS client certs from ~/.config/kedge
 
 ## License

@@ -9,18 +9,19 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// NewClient constructs new HTTP client that supports proxying by kedge.
+// NOTE: No copy of parentTransport is done, so it will modify parent one.
 func NewClient(mapper kedge_map.Mapper, clientTls *tls.Config, parentTransport *http.Transport) *http.Client {
-	cloneTransport := &(*parentTransport)
 	if clientTls != nil {
-		cloneTransport.TLSClientConfig = clientTls
-		if err := http2.ConfigureTransport(cloneTransport); err != nil {
+		parentTransport.TLSClientConfig = clientTls
+		if err := http2.ConfigureTransport(parentTransport); err != nil {
 			panic(err) // this should never happen, but let's not lose an error.
 		}
 	}
 	return &http.Client{
 		Transport: tripperware.WrapForMapping(mapper,
 			tripperware.WrapForRouting(
-				tripperware.DefaultWithTransport(cloneTransport, clientTls),
+				tripperware.DefaultWithTransport(parentTransport, clientTls),
 			),
 		),
 	}

@@ -30,6 +30,25 @@ It uses a concept of *backends* (see [gRPC](proto/kedge/config/grpc/backends/bac
 
 The inbound requests are directed to *backends* based on *routes* (see [gRPC](proto/kedge/config/grpc/routes/routes.proto), [HTTP](proto/kedge/config/grpc/routes/routes.proto)). These match onto requests based on host, paths (services), headers (metadata). They also specify authorization requirements for the route to be taken.
 
+Kedge can be accessed then: 
+
+### Using native kedge http.Client inside caller library
+
+Following diagram shows POD to POD communication cross-cluster.
+
+![Kedge Cert Routing](./kedge_arch.svg)
+
+### Using Winch (forward proxy)
+
+Following diagram shows the routing done by forward proxy called [winch (client)](winch/README.md). In this example kedge OIDC auth is enabled to support
+corp use cases (per backend access controlled by permissions stored in custom IDToked claim). It can be also switched to just 
+client certificate verification as in the diagram above.
+
+NOTE: Any auth which is required by Service/Pod B needs to configured on winch due to clients blocking sending auth headers via
+ plain HTTP, even over local network (e.g kubectl). 
+
+![Kedge Winch Routing](./kedge_arch_with_winch.svg)
+
 ## Usage
 
 Kedge package is using submodule vendoring. To get vendored modules use:

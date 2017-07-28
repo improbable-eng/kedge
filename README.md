@@ -36,7 +36,7 @@ Kedge can be accessed then:
 
 Following diagram shows POD to POD communication cross-cluster.
 
-![Kedge Cert Routing](./kedge_arch.svg)
+![Kedge Cert Routing](https://github.com/Bplotka/kedge/blob/2c667f46e3683c8073038e76210788e5cfecc5cd/kedge_arch.svg)
 
 ### Using Winch (forward proxy)
 
@@ -47,7 +47,7 @@ client certificate verification as in the diagram above.
 NOTE: Any auth which is required by Service/Pod B needs to configured on winch due to clients blocking sending auth headers via
  plain HTTP, even over local network (e.g kubectl). 
 
-![Kedge Winch Routing](./kedge_arch_with_winch.svg)
+![Kedge Winch Routing](https://github.com/Bplotka/kedge/blob/2c667f46e3683c8073038e76210788e5cfecc5cd/kedge_arch_with_winch.svg)
 
 ## Usage
 

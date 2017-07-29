@@ -11,7 +11,7 @@
 Proxy for gRPC, HTTP (1.1/2) microservices with the aim to make cross-cluster
 microservice communication simple to set up, and secure. All you need for it to work is: TLS client certificates in your service pods, a single L4 load balanced IP address in each cluster, and a `kedge` server behind it.
 
-## The pain of cross-cluster Kubernetes
+## The pain of cross-cluster Kubernetes communication
 
 Kubernetes is great, if you have one cluster. If you want to have twoThis project stems from the frustration of setting up communication between two K8S clusters. This requires a couple of things:
  - cross-cluster networking - usually a complex process of setting up and maintaining IPSec bridges
@@ -30,6 +30,25 @@ It uses a concept of *backends* (see [gRPC](proto/kedge/config/grpc/backends/bac
 
 The inbound requests are directed to *backends* based on *routes* (see [gRPC](proto/kedge/config/grpc/routes/routes.proto), [HTTP](proto/kedge/config/grpc/routes/routes.proto)). These match onto requests based on host, paths (services), headers (metadata). They also specify authorization requirements for the route to be taken.
 
+Kedge can be accessed then: 
+
+### Using native kedge http.Client inside caller library
+
+Following diagram shows POD to POD communication cross-cluster.
+
+![Kedge Cert Routing](./kedge_arch.png)
+
+### Using Winch (forward proxy)
+
+Following diagram shows the routing done by forward proxy called [winch (client)](winch/README.md). In this example kedge OIDC auth is enabled to support
+corp use cases (per backend access controlled by permissions stored in custom IDToked claim). It can be also switched to just 
+client certificate verification as in the diagram above.
+
+NOTE: Any auth which is required by Service/Pod B needs to configured on winch due to clients blocking sending auth headers via
+ plain HTTP, even over local network (e.g kubectl). 
+
+![Kedge Winch Routing](./kedge_arch_with_winch.png)
+
 ## Usage
 
 Kedge package is using submodule vendoring. To get vendored modules use:
@@ -42,17 +61,14 @@ Please see
 
 ## Status
 
-The project is very much **work in progress**. Experimentation is recommended, usage in production rather not. The following features and items are planned:
+The project is still in testing (alpha) state. APIs can change. 
+For status, see [CHANGELOG](CHANGELOG.md)
+
+## Wishlist
+
+The following features and items are planned:
 
 Kedge Service:
- * [x] - gRPC(S) backend definitions and backend pool - SRV discovery and RR LB
- * [x] - gRPC(S) proxying based on routes (service, authority) to defined backends
- * [x] - HTTP(S) backend definitions and backend pool - SRV disovery and RR LB
- * [x] - HTTP(S) proxying based on routes (path, host) to defined backends
- * [x] - integration tests for HTTP, gRPC proxying (backend and routing)
- * [x] - TLS client-certificate verification based off CA chains
- * [x] - support for Forward Proxying and Reverse Proxying in HTTP backends
- * [x] - support for OpenID JWT token authentication on routes (claim matches) - useful for proxying to Kubernetes API Server
  * [ ] - example Kubernetes YAML files (deployment, config maps)
  * [ ] - TLS configuration (CA chains, etc.) for gRPC and HTTP backends 
  * [ ] - "adhoc routes" - support for HTTP Forward Proxying to an arbitrary (but filtered) SRV destination without a backend - calling pods
@@ -60,8 +76,10 @@ Kedge Service:
  * [ ] - support for TLS client certificate authentication on routes (metadata matches)
  * [ ] - support for load balanced CONNECT method proxying for TLS passthrough to backends - if needed
  
-Kedge Client:
- * See [winch](./winch/README.md) 
+Winch (kedge client):
+* [ ] - gRPC forward Proxy.
+* [ ] - add auto-configuration for browser to use our PAC (WPAD)
+* [ ] - reading of TLS client certs from ~/.config/kedge
 
 ## License
 

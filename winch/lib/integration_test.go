@@ -1,5 +1,7 @@
+// Copyright (c) Improbable Worlds Ltd, All Rights Reserved
+
 // Integration tests for winch.
-package winch
+package winch_test
 
 import (
 	"crypto/tls"
@@ -18,7 +20,7 @@ import (
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
-	"github.com/mwitkow/kedge/winch"
+	"github.com/mwitkow/kedge/winch/lib"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -324,7 +326,7 @@ func (s *WinchIntegrationSuite) tlsClientConfigForTest() *tls.Config {
 
 func getTestingCertsPath() string {
 	_, callerPath, _, _ := runtime.Caller(0)
-	return path.Join(path.Dir(callerPath), "..", "misc")
+	return path.Join(path.Dir(callerPath), "../..", "misc")
 }
 
 func urlMustParse(uStr string) *url.URL {

@@ -23,7 +23,7 @@ import (
 	pb_config "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/sharedflags"
-	"github.com/mwitkow/kedge/winch"
+	"github.com/mwitkow/kedge/winch/lib"
 	"github.com/pressly/chi"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"

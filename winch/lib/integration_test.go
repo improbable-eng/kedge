@@ -1,5 +1,5 @@
 // Integration tests for winch.
-package winch_test
+package winch
 
 import (
 	"crypto/tls"

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -33,27 +34,46 @@ import (
 )
 
 var (
-	flagBindAddr                = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
-	flagGrpcTlsPort             = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
-	flagHttpTlsPort             = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
-	flagHttpPort                = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")
-	flagDebugHttpAllowedIPs     = sharedflags.Set.StringSlice("server_debug_http_allowed_ips", nil, "Comma delimited list of IPs that are allowed to access debug endpoints in addtion to private IPs.")
-	flagDebugHttpPublicProxyIPs = sharedflags.Set.StringSlice("server_debug_http_public_proxy_ips", nil, "Comma delimited list of IPs that are public proxies (e.g load balancers) which are before kedge. "+
-		"This allows to properly assume remote address to enable 'server_debug_http_allowed_ips' logic")
+	flagBindAddr    = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
+	flagGrpcTlsPort = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
+	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
+	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
 	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
+
+	flagLogstashAddress = sharedflags.Set.String("logstash_hostport", "", "Host:port of logstash for remote logging. If empty remote logging is disabled.")
 )
 
 func main() {
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
-		log.Fatalf("failed parsing flags: %v", err)
+		log.WithError(err).Fatalf("failed parsing flags")
 	}
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
-		log.Fatalf("failed reading flagz from files: %v", err)
+		log.WithError(err).Fatalf("failed reading flagz from files")
+	}
+
+	if *flagLogstashAddress != "" {
+		conn, err := net.Dial("tcp", *flagLogstashAddress)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to connect to logstash")
+		}
+
+		formatter, err := newLogstashFormatter()
+		if err != nil {
+			log.WithError(err).Fatal("Failed to get hostname for logstash formatter")
+		}
+
+		// TODO(bplotka): logrustash package is bit limited:
+		// - No reconnect logic for writer: if connection will be temporarly down we will error on every log until someone will restart kedge.
+		// - No async log: Again on connection problems we can block whole kedge on logging behaviour which is wrong.
+		// Consider mimick/move to our Improbable remote logging package when these problems will be really painful.
+		hook := logrustash.New(conn, formatter)
+		log.AddHook(hook)
 	}
 	log.SetOutput(os.Stdout)
+
 	grpc.EnableTracing = *flagGrpcWithTracing
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)

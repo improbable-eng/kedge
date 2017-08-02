@@ -1,6 +1,6 @@
 # Kedge & Winch Release Notes
 
-### (not yet released) [v1.0.0-alpha.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.1)
+### [v1.0.0-alpha.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.1)
 Kedge Service:
 * [x] - added optional remote logging to logstash
 

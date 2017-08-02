@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/mwitkow/kedge/lib/sharedflags"
 )
 
 const (
@@ -20,7 +21,13 @@ const (
 	maxMessageBodySize int = 1 << 14
 )
 
-var TimestampFormat string = defaultTimestampFormat
+
+var (
+	TimestampFormat string = defaultTimestampFormat
+	flagLogstashLogTags = sharedflags.Set.StringSlice("logstash_log_tags", []string{"kedge"},
+		"@tags field to inject to while formatting log message for logstash.")
+
+)
 
 func newLogstashFormatter() (*logstashFormatter, error) {
 	hostname, err := os.Hostname()
@@ -61,6 +68,10 @@ func (f *logstashFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		message = fmt.Sprintf("%v: %v", message, dataCopy["error"])
 	}
 	dataCopy["message"] = trimMessage(message)
+
+	if len(*flagLogstashLogTags) > 0 {
+		dataCopy["@tags"] = strings.Join(*flagLogstashLogTags, ", ")
+	}
 
 	// Error is also a candidate for being large
 	if dataCopy[errorKey] != nil {

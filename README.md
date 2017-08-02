@@ -74,6 +74,7 @@ Kedge Service:
  * [ ] - "adhoc routes" - support for HTTP Forward Proxying to an arbitrary (but filtered) SRV destination without a backend - calling pods
  * [ ] - support for K8S auto-discovery of service backends based off metadata
  * [ ] - support for TLS client certificate authentication on routes (metadata matches)
+ * [ ] - similar to above but for Open ID Connect: Support for different OIDC permission per route (group match)
  * [ ] - support for load balanced CONNECT method proxying for TLS passthrough to backends - if needed
  
 Winch (kedge client):

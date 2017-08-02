@@ -1,5 +1,3 @@
-// Copyright (c) Improbable Worlds Ltd, All Rights Reserved
-
 // Integration tests for winch.
 package winch_test
 

@@ -76,8 +76,6 @@ func main() {
 
 	grpc.EnableTracing = *flagGrpcWithTracing
 	logEntry := log.NewEntry(log.StandardLogger())
-	logEntry.Info("TEST LOG")
-	logEntry.Info("TEST LOG2")
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
 	tlsConfig, err := buildTLSConfigFromFlags()
 	if err != nil {

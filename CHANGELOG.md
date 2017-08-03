@@ -4,6 +4,9 @@
 Kedge Service:
 * [x] - add support for specifying whitelist or required permissions in ID Token for OpenID provider. 
 
+Winch (kedge client):
+* [x] - support more auth providers and kinds (bearertoken & gcp from kube/config)
+
 ### [v1.0.0-alpha.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.1)
 Kedge Service:
 * [x] - added optional remote logging to logstash

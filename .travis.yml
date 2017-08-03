@@ -4,6 +4,7 @@ go:
   - 1.8.x
 
 install:
+  - go get k8s.io/kubernetes/pkg/client/unversioned/clientcmd
   - go get -t ./...
 
 script:

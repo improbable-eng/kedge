@@ -22,7 +22,7 @@ RUN echo "StrictHostKeyChecking no" > /etc/ssh/ssh_config
 RUN go get github.com/sirupsen/logrus
 RUN go get k8s.io/client-go/tools/clientcmd
 RUN go get k8s.io/client-go/tools/clientcmd/api
-
+RUN go get k8s.io/kubernetes/pkg/client/unversioned/clientcmd
 
 # Copy local to not clone everything.
 # NOTE: Make sure you have vendor installed using `git submodule update --init --recursive`

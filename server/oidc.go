@@ -16,8 +16,8 @@ var (
 		"Expected OIDC Client ID of the request`s IDToken.")
 	flagOIDCPermsClaim = sharedflags.Set.String("server_oidc_perms_claim", "",
 		"Name of the claim that stores user's permissions.")
-	flagOIDCRequiredPerms = sharedflags.Set.String("server_oidc_required_perm", "",
-		"Permissions which is required to access kedge.")
+	flagOIDCWhiteListPerms = sharedflags.Set.StringSlice("server_oidc_whitelist_perms", []string(nil),
+		"Permissions satisfy Kedge access auth.")
 	flagEnableOIDCAuthForDebugEnpoints = sharedflags.Set.Bool("server_enable_oidc_for_debug_endpoints", false,
 		"If true, debug endpoints will be hidden by OIDC Auth with the same configuration as proxy.")
 )
@@ -35,8 +35,13 @@ func authorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {
 		return nil, errors.New("OIDC flag validation failed. server_oidc_perms_claim flag is missing.")
 	}
 
-	if *flagOIDCRequiredPerms == "" {
-		return nil, errors.New("OIDC flag validation failed. server_oidc_required_perm flag is missing.")
+	if len(*flagOIDCWhiteListPerms) == 0 {
+		return nil, errors.New("OIDC flag validation failed. server_oidc_whitelist_perms flag cannot be empty.")
+	}
+
+	var condition []authorize.Condition
+	for _, permToWhitelist := range *flagOIDCWhiteListPerms {
+		condition = append(condition, authorize.Contains(permToWhitelist))
 	}
 
 	return authorize.New(
@@ -45,7 +50,7 @@ func authorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {
 			Provider:      *flagOIDCProvider,
 			ClientID:      *flagOIDCClientID,
 			PermsClaim:    *flagOIDCPermsClaim,
-			RequiredPerms: *flagOIDCRequiredPerms,
+			PermCondition: authorize.OR(condition...),
 		},
 	)
 }

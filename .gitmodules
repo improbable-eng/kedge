@@ -76,9 +76,9 @@
 [submodule "vendor/github.com/pkg/errors"]
 	path = vendor/github.com/pkg/errors
 	url = https://github.com/pkg/errors
-[submodule "vendor/github.com/Bplotka/oidc"]
-	path = vendor/github.com/Bplotka/oidc
-	url = https://github.com/Bplotka/oidc
 [submodule "vendor/github.com/bshuster-repo/logrus-logstash-hook"]
 	path = vendor/github.com/bshuster-repo/logrus-logstash-hook
 	url = https://github.com/bshuster-repo/logrus-logstash-hook
+[submodule "vendor/github.com/Bplotka/oidc"]
+	path = vendor/github.com/Bplotka/oidc
+	url = https://github.com/Bplotka/oidc

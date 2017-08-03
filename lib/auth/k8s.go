@@ -33,7 +33,7 @@ func K8s(name string, configPath string, userName string) (Source, error) {
 			s, _, err := OIDCWithCache(name, cache, nil)
 			return s, err
 		case "gcp":
-			return gcp(name, userName, info.AuthProvider.Config)
+			return gcp(name, userName, configPath, info.AuthProvider.Config)
 		default:
 			// TODO(bplotka): Add support for more of them.
 			return nil, fmt.Errorf("Not supported k8s Auth provider %v", info.AuthProvider.Name)

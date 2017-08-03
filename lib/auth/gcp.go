@@ -30,7 +30,7 @@ type gcpAuthSource struct {
 	persister   restclient.AuthProviderConfigPersister
 }
 
-func gcp(name string, userName string, gcpConfig map[string]string) (Source, error) {
+func gcp(name string, userName string, configPath string, gcpConfig map[string]string) (Source, error) {
 	var ts oauth2.TokenSource
 	var err error
 	if cmd, useCmd := gcpConfig["cmd-path"]; useCmd {
@@ -53,7 +53,10 @@ func gcp(name string, userName string, gcpConfig map[string]string) (Source, err
 		return nil, err
 	}
 
-	persister := clientcmd.PersisterForUser(clientcmd.NewDefaultClientConfigLoadingRules(), userName)
+	persister := clientcmd.PersisterForUser(
+		&clientcmd.ClientConfigLoadingRules{Precedence: []string{configPath}},
+		userName,
+	)
 	cts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister, ts, gcpConfig)
 	if err != nil {
 		return nil, err

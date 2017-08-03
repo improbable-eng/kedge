@@ -82,3 +82,9 @@
 [submodule "vendor/github.com/Bplotka/oidc"]
 	path = vendor/github.com/Bplotka/oidc
 	url = https://github.com/Bplotka/oidc
+[submodule "vendor/k8s.io/client-go"]
+	path = vendor/k8s.io/client-go
+	url = https://github.com/kubernetes/client-go
+[submodule "vendor/golang.org/x/oauth2"]
+	path = vendor/golang.org/x/oauth2
+	url = https://go.googlesource.com/oauth2

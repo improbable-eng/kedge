@@ -1,5 +1,9 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-alpha.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.2)
+Kedge Service:
+* [x] - add support for specifying whitelist or required permissions in ID Token for OpenID provider. 
+
 ### [v1.0.0-alpha.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.1)
 Kedge Service:
 * [x] - added optional remote logging to logstash

@@ -1,3 +1,5 @@
+// Copyright (c) Improbable Worlds Ltd, All Rights Reserved
+
 package auth
 
 import (
@@ -15,19 +17,42 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	restclient "k8s.io/client-go/rest"
+	cfg "k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
 // Mostly copied from k8s.io/client-go/plugin/pkg/client/auth/gcp/gcp.go file.
+
+// AuthConfigPersister allows a plugin to persist configuration info
+// for just itself.
+type AuthConfigPersister interface {
+	Persist(map[string]string) error
+}
+
+type k8sConfigPersister struct {
+	kubeConfigPath string
+	userName       string
+}
+
+func (p *k8sConfigPersister) Persist(content map[string]string) error {
+	k8sConfig, err := cfg.LoadFromFile(p.kubeConfigPath)
+	if err != nil {
+		return fmt.Errorf("Failed to load k8s config from file %v. Make sure it is there or change"+
+			" permissions. Err: %v", p.kubeConfigPath, err)
+	}
+
+	// TODO(bplotka): Consider changing only stuff from content.
+	k8sConfig.AuthInfos[p.userName].AuthProvider.Config = content
+
+	return cfg.WriteToFile(*k8sConfig, p.kubeConfigPath)
+}
 
 // gcpAuthSource is an auth provider plugin that uses GCP credentials to provide
 // tokens.
 type gcpAuthSource struct {
 	name        string
 	tokenSource oauth2.TokenSource
-	persister   restclient.AuthProviderConfigPersister
+	persister   AuthConfigPersister
 }
 
 func gcp(name string, userName string, configPath string, gcpConfig map[string]string) (Source, error) {
@@ -53,10 +78,10 @@ func gcp(name string, userName string, configPath string, gcpConfig map[string]s
 		return nil, err
 	}
 
-	persister := clientcmd.PersisterForUser(
-		&clientcmd.ClientConfigLoadingRules{Precedence: []string{configPath}},
-		userName,
-	)
+	persister := &k8sConfigPersister{
+		userName:       userName,
+		kubeConfigPath: configPath,
+	}
 	cts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister, ts, gcpConfig)
 	if err != nil {
 		return nil, err
@@ -87,11 +112,11 @@ type cachedTokenSource struct {
 	source      oauth2.TokenSource
 	accessToken string
 	expiry      time.Time
-	persister   restclient.AuthProviderConfigPersister
+	persister   AuthConfigPersister
 	cache       map[string]string
 }
 
-func newCachedTokenSource(accessToken, expiry string, persister restclient.AuthProviderConfigPersister, ts oauth2.TokenSource, cache map[string]string) (*cachedTokenSource, error) {
+func newCachedTokenSource(accessToken, expiry string, persister AuthConfigPersister, ts oauth2.TokenSource, cache map[string]string) (*cachedTokenSource, error) {
 	var expiryTime time.Time
 	if parsedTime, err := time.Parse(time.RFC3339Nano, expiry); err == nil {
 		expiryTime = parsedTime
@@ -237,7 +262,7 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 
 type conditionalTransport struct {
 	oauthTransport *oauth2.Transport
-	persister      restclient.AuthProviderConfigPersister
+	persister      AuthConfigPersister
 }
 
 func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, error) {

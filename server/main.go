@@ -22,13 +22,14 @@ import (
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	http_director "github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/trace" // so /debug/request gets registered.
+	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -82,6 +83,9 @@ func main() {
 		log.Fatalf("failed building TLS config from flags: %v", err)
 	}
 
+	httpDirector := http_director.New(logEntry, httpBackendPool, httpRouter, httpAddresser)
+	grpcDirector := grpc_director.New(grpcBackendPool, grpcRouter)
+
 	// GRPC kedge.
 	grpcDirectorServer := grpc.NewServer(
 		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
@@ -121,7 +125,7 @@ func main() {
 	}
 
 	if authorizer != nil {
-		httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(authorizer))
+		httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(logEntry, authorizer))
 		logEntry.Info("configured OIDC authorization for HTTPS proxy.")
 	}
 
@@ -129,7 +133,7 @@ func main() {
 	httpsBouncerServer := httpsBouncerServer(grpcDirectorServer, httpDirectorChain.Handler(httpDirector), logEntry)
 
 	if authorizer != nil && *flagEnableOIDCAuthForDebugEnpoints {
-		httpDebugChain = append(httpDebugChain, http_director.AuthMiddleware(authorizer))
+		httpDebugChain = append(httpDebugChain, http_director.AuthMiddleware(logEntry, authorizer))
 		logEntry.Info("configured OIDC authorization for HTTP debug server.")
 	}
 

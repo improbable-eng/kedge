@@ -47,10 +47,11 @@ var (
 // sent to. The backends in the Pool have pre-dialed connections and are load balanced.
 //
 // If  Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
-func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser) *Proxy {
+func New(log *logrus.Entry, pool backendpool.Pool, router router.Router, addresser adhoc.Addresser) *Proxy {
 	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	p := &Proxy{
+		log: log,
 		backendReverseProxy: &httputil.ReverseProxy{
 			Director:      func(r *http.Request) {},
 			Transport:     &backendPoolTripper{pool: pool},
@@ -71,6 +72,7 @@ func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser)
 
 // Proxy is a forward/reverse proxy that implements Route+Backend and Adhoc Rules forwarding.
 type Proxy struct {
+	log *logrus.Entry
 	router    router.Router
 	addresser adhoc.Addresser
 
@@ -96,7 +98,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		p.backendReverseProxy.ServeHTTP(resp, normReq)
 		return
 	} else if err != router.ErrRouteNotFound {
-		respondWithError(err, req, resp)
+		respondWithError(p.log, err, req, resp)
 		return
 	}
 	addr, err := p.addresser.Address(req)
@@ -107,7 +109,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		p.adhocReverseProxy.ServeHTTP(resp, normReq)
 		return
 	}
-	respondWithError(err, req, resp)
+	respondWithError(p.log, err, req, resp)
 }
 
 // backendPoolTripper assumes the response has been rewritten by the proxy to have the backend as req.URL.Host
@@ -123,7 +125,7 @@ func (t *backendPoolTripper) RoundTrip(req *http.Request) (*http.Response, error
 	return nil, err
 }
 
-func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
+func respondWithError(log *logrus.Entry, err error, req *http.Request, resp http.ResponseWriter) {
 	status := http.StatusBadGateway
 	if rErr, ok := (err).(*router.Error); ok {
 		status = rErr.StatusCode()
@@ -132,15 +134,16 @@ func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 	resp.Header().Set("x-kedge-error", err.Error())
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)
-	fmt.Fprintf(resp, "%v", err.Error())
+
+	log.WithError(err).Error(resp)
 }
 
-func AuthMiddleware(authorizer authorize.Authorizer) httpwares.Middleware {
+func AuthMiddleware(log *logrus.Entry, authorizer authorize.Authorizer) httpwares.Middleware {
 	return func(nextHandler http.Handler) http.Handler {
 		return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			err := authorize.IsRequestAuthorized(req, authorizer, tripperware.ProxyAuthHeader)
 			if err != nil {
-				respondWithUnauthorized(err, req, resp)
+				respondWithUnauthorized(log, err, req, resp)
 				return
 			}
 			// Request authorized - continue.
@@ -149,11 +152,12 @@ func AuthMiddleware(authorizer authorize.Authorizer) httpwares.Middleware {
 	}
 }
 
-func respondWithUnauthorized(err error, req *http.Request, resp http.ResponseWriter) {
+func respondWithUnauthorized(log *logrus.Entry, err error, req *http.Request, resp http.ResponseWriter) {
 	status := http.StatusUnauthorized
 	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
 	resp.Header().Set("x-kedge-error", err.Error())
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)
-	fmt.Fprintf(resp, "%v", err.Error())
+
+	log.WithError(err).Error(resp)
 }

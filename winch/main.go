@@ -27,7 +27,6 @@ import (
 	"github.com/pressly/chi"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
-	_ "golang.org/x/net/trace" // so /debug/request gets registered.
 )
 
 var (

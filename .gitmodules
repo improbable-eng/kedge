@@ -88,3 +88,6 @@
 [submodule "vendor/golang.org/x/oauth2"]
 	path = vendor/golang.org/x/oauth2
 	url = https://go.googlesource.com/oauth2
+[submodule "vendor/cloud.google.com/go"]
+	path = vendor/cloud.google.com/go
+	url = https://code.googlesource.com/gocloud

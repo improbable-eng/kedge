@@ -24,7 +24,7 @@ RUN mkdir -p /go/bin
 RUN curl https://glide.sh/get | sh
 # Copy local to not clone everything.
 ADD . ${GOPATH}/src/github.com/mwitkow/kedge
-RUN glide install --skip-test
+RUN cd ${GOPATH}/src/github.com/mwitkow/kedge && glide install --skip-test
 
 ARG BUILD_VERSION
 RUN echo "Installing Kedge with version ${BUILD_VERSION}"

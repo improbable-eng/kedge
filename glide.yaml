@@ -69,8 +69,3 @@ import:
   - util/jsonpath
 testImport:
 - package: github.com/go-chi/chi
-- package: github.com/stretchr/testify
-  subpackages:
-  - assert
-  - require
-  - suite

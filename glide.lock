@@ -1,5 +1,5 @@
 hash: 3604eec2bac667b6b4136e4a81bf181bd3f9b4b98fc10b1feabe3faa023daabd
-updated: 2017-08-07T13:03:08.982643311+01:00
+updated: 2017-08-07T15:30:56.326839345+01:00
 imports:
 - name: cloud.google.com/go
   version: fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0
@@ -49,8 +49,11 @@ imports:
   subpackages:
   - jsonpb
   - proto
+  - ptypes
   - ptypes/any
+  - ptypes/duration
   - ptypes/empty
+  - ptypes/timestamp
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/grpc-ecosystem/go-grpc-middleware
@@ -186,7 +189,7 @@ imports:
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 2910a502d2bf9e43193af9d68ca516529614eed3
+  version: 3bd178b88a8180be2df394a1fbb81313916f0e7b
   subpackages:
   - cases
   - internal/tag

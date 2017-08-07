@@ -60,6 +60,7 @@ import:
   - credentials
   - metadata
   - naming
+  - transport
 - package: k8s.io/apimachinery
   subpackages:
   - pkg/util/yaml

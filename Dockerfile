@@ -7,6 +7,7 @@ ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.
 ENV GITBRANCH master
 ENV PATH /usr/local/go/bin:$PATH
 ENV GOPATH=/go
+ENV GOBIN=/go/bin
 
 RUN mkdir /etc/corp-auth
 
@@ -18,6 +19,7 @@ RUN curl -fsSL "${GOLANG_DOWNLOAD_URL}" -o golang.tar.gz \
 
 RUN echo "StrictHostKeyChecking no" > /etc/ssh/ssh_config
 
+ENV PATH ${PATH}:${GOBIN}
 RUN mkdir -p /go/bin
 RUN curl https://glide.sh/get | sh
 # Copy local to not clone everything.

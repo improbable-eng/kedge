@@ -22,12 +22,13 @@ message Route {
 
 /// Simplest routing mechanism using just direct mapping between dns and (proxy) kedge target.
 message DirectRoute {
+    // Key needs to be in host:port format.
     string key = 1 [(validator.field) = {msg_exists : true}];
     string url = 2 [(validator.field) = {msg_exists : true}];
 }
 
 message RegexpRoute {
-    // Regexp RE2 expression that will be applied on given DNS.
+    // Regexp RE2 expression that will be applied on given domain:port
     string exp = 1 [(validator.field) = {msg_exists : true}];
 
     // Kedge URL to be used if we have a match. It can be a string including variable from regexp expression in a form

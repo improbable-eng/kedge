@@ -311,7 +311,7 @@ func (s *HttpProxyingIntegrationSuite) forwardProxyClient(listener net.Listener)
 		if listener == s.proxyListenerPlain {
 			return urlMustParse("http://address_overwritten_in_dialer_anyway"), nil
 		}
-		return nil, errors.New("Golang proxy logic cannot use HTTPS connecitons to proxy. Saad.")
+		return nil, errors.New("Golang proxy logic cannot use HTTPS connections to proxy. Saad.")
 	}
 	return client
 }

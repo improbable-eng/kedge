@@ -49,19 +49,23 @@ func urlMustParse(t *testing.T, urlStr string) *url.URL {
 
 func testMapping(t *testing.T) map[string]*kedge_map.Route {
 	return map[string]*kedge_map.Route{
-		"resource.example.org": {
+		"resource.example.org:83": {
 			URL: urlMustParse(t, "https://some-url1.example.com"),
 			// No auth.
 		},
-		"resource-auth.example.org": {
+		"resource-auth.example.org:83": {
 			URL:         urlMustParse(t, "https://some-url2.example.com"),
 			BackendAuth: auth.Dummy("auth1", "Bearer secret1"),
 		},
-		"resource-proxyauth.example.org": {
+		"resource-auth.example.org:84": {
+			URL:         urlMustParse(t, "https://some-url2-1.example.com"),
+			BackendAuth: auth.Dummy("auth1", "Bearer secret1-1"),
+		},
+		"resource-proxyauth.example.org:83": {
 			URL:       urlMustParse(t, "https://some-url3.example.com"),
 			ProxyAuth: auth.Dummy("proxy-auth2", "Bearer secret2"),
 		},
-		"resource-bothauths.example.org": {
+		"resource-bothauths.example.org:83": {
 			URL:         urlMustParse(t, "https://some-url4.example.com"),
 			BackendAuth: auth.Dummy("auth3", "Bearer secret3"),
 			ProxyAuth:   auth.Dummy("proxy-auth3", "Bearer secret4"),
@@ -70,7 +74,7 @@ func testMapping(t *testing.T) map[string]*kedge_map.Route {
 }
 
 func TestGetRoute(t *testing.T) {
-	r := httptest.NewRequest("GET", "http://resource.example.org", nil)
+	r := httptest.NewRequest("GET", "http://resource.example.org:80", nil)
 
 	_, _, err := getRoute(r.Context())
 	require.Error(t, err)
@@ -91,29 +95,29 @@ func TestGetRoute(t *testing.T) {
 func TestMappingTripper(t *testing.T) {
 	mapping := testMapping(t)
 
-	dnsName := "resource-bothauths.example.org"
+	hostPort := "resource-bothauths.example.org:83"
 	parent := &testRoundTripper{
 		t:             t,
-		expectedURL:   urlMustParse(t, "http://"+dnsName),
-		expectedRoute: mapping[dnsName],
+		expectedURL:   urlMustParse(t, "http://"+hostPort),
+		expectedRoute: mapping[hostPort],
 		// Rest empty.
 	}
-	rt := WrapForMapping(kedge_map.Simple(mapping), parent)
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	rt := WrapForMapping(kedge_map.SimpleHostPort(mapping), parent)
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 
 	rt.RoundTrip(r)
 }
 
 func TestRoutingTripper_NoMappingTripper_Err(t *testing.T) {
-	dnsName := "resource-bothauths.example.org"
+	hostPort := "resource-bothauths.example.org:83"
 	parent := &testRoundTripper{
 		t:                             t,
-		expectedURL:                   urlMustParse(t, "http://"+dnsName),
+		expectedURL:                   urlMustParse(t, "http://"+hostPort),
 		expectedMissingMappingTripper: true,
 		// Rest empty.
 	}
 	rt := WrapForRouting(parent)
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 
 	rt.RoundTrip(r)
 }
@@ -121,15 +125,15 @@ func TestRoutingTripper_NoMappingTripper_Err(t *testing.T) {
 func TestRoutingTripper_OK(t *testing.T) {
 	mapping := testMapping(t)
 
-	dnsName := "resource-bothauths.example.org"
+	hostPort := "resource-bothauths.example.org:83"
 	parent := &testRoundTripper{
 		t:             t,
-		expectedURL:   mapping[dnsName].URL,
-		expectedRoute: mapping[dnsName],
+		expectedURL:   mapping[hostPort].URL,
+		expectedRoute: mapping[hostPort],
 		// Rest empty.
 	}
-	rt := WrapForMapping(kedge_map.Simple(mapping), WrapForRouting(parent))
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	rt := WrapForMapping(kedge_map.SimpleHostPort(mapping), WrapForRouting(parent))
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 
 	rt.RoundTrip(r)
 }
@@ -137,29 +141,29 @@ func TestRoutingTripper_OK(t *testing.T) {
 func TestRoutingTripper_NotKedgeDestination(t *testing.T) {
 	mapping := testMapping(t)
 
-	dnsName := "resource-not-proxy.example.org"
+	hostPort := "resource-not-proxy.example.org:83"
 	parent := &testRoundTripper{
 		t:             t,
-		expectedURL:   urlMustParse(t, "http://"+dnsName),
+		expectedURL:   urlMustParse(t, "http://"+hostPort),
 		expectedRoute: nil,
 		// Rest empty.
 	}
-	rt := WrapForMapping(kedge_map.Simple(mapping), WrapForRouting(parent))
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	rt := WrapForMapping(kedge_map.SimpleHostPort(mapping), WrapForRouting(parent))
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 
 	rt.RoundTrip(r)
 }
 
 func TestAuthTripper_NoMappingTripper_Err(t *testing.T) {
-	dnsName := "resource-bothauths.example.org"
+	hostPort := "resource-bothauths.example.org:83"
 	parent := &testRoundTripper{
 		t:                             t,
-		expectedURL:                   urlMustParse(t, "http://"+dnsName),
+		expectedURL:                   urlMustParse(t, "http://"+hostPort),
 		expectedMissingMappingTripper: true,
 		// Rest empty.
 	}
 	rt := WrapForBackendAuth(parent)
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 
 	rt.RoundTrip(r)
 }
@@ -167,18 +171,18 @@ func TestAuthTripper_NoMappingTripper_Err(t *testing.T) {
 func TestBackendAuthTripper_OK(t *testing.T) {
 	mapping := testMapping(t)
 
-	dnsName := "resource-bothauths.example.org"
-	a, err := mapping[dnsName].BackendAuth.HeaderValue()
+	hostPort := "resource-bothauths.example.org:83"
+	a, err := mapping[hostPort].BackendAuth.HeaderValue()
 	require.NoError(t, err)
 	parent := &testRoundTripper{
 		t:                 t,
-		expectedURL:       urlMustParse(t, "http://"+dnsName),
+		expectedURL:       urlMustParse(t, "http://"+hostPort),
 		expectedAuthValue: a,
-		expectedRoute:     mapping[dnsName],
+		expectedRoute:     mapping[hostPort],
 		// Rest empty.
 	}
-	rt := WrapForMapping(kedge_map.Simple(mapping), WrapForBackendAuth(parent))
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	rt := WrapForMapping(kedge_map.SimpleHostPort(mapping), WrapForBackendAuth(parent))
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 
 	rt.RoundTrip(r)
 }
@@ -186,18 +190,18 @@ func TestBackendAuthTripper_OK(t *testing.T) {
 func TestProxyAuthTripper_OK(t *testing.T) {
 	mapping := testMapping(t)
 
-	dnsName := "resource-bothauths.example.org"
-	a, err := mapping[dnsName].ProxyAuth.HeaderValue()
+	hostPort := "resource-bothauths.example.org:83"
+	a, err := mapping[hostPort].ProxyAuth.HeaderValue()
 	require.NoError(t, err)
 	parent := &testRoundTripper{
 		t:                      t,
-		expectedURL:            urlMustParse(t, "http://"+dnsName),
+		expectedURL:            urlMustParse(t, "http://"+hostPort),
 		expectedProxyAuthValue: a,
-		expectedRoute:          mapping[dnsName],
+		expectedRoute:          mapping[hostPort],
 		// Rest empty.
 	}
-	rt := WrapForMapping(kedge_map.Simple(mapping), WrapForProxyAuth(parent))
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	rt := WrapForMapping(kedge_map.SimpleHostPort(mapping), WrapForProxyAuth(parent))
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 
 	rt.RoundTrip(r)
 }
@@ -205,87 +209,108 @@ func TestProxyAuthTripper_OK(t *testing.T) {
 func TestAllTrippers_OK(t *testing.T) {
 	mapping := testMapping(t)
 
-	dnsName := "resource.example.org"
+	hostPort := "resource.example.org:83"
 	parent := &testRoundTripper{
 		t:             t,
-		expectedURL:   mapping[dnsName].URL,
-		expectedRoute: mapping[dnsName],
+		expectedURL:   mapping[hostPort].URL,
+		expectedRoute: mapping[hostPort],
 		// Rest empty.
 	}
 	rt := WrapForMapping(
-		kedge_map.Simple(mapping),
+		kedge_map.SimpleHostPort(mapping),
 		WrapForRouting(
 			WrapForBackendAuth(
 				WrapForProxyAuth(parent),
 			),
 		),
 	)
-	r := httptest.NewRequest("GET", "http://"+dnsName, nil)
+	r := httptest.NewRequest("GET", "http://"+hostPort, nil)
 	rt.RoundTrip(r)
 
-	dnsName = "resource-auth.example.org"
-	a, err := mapping[dnsName].BackendAuth.HeaderValue()
+	hostPort = "resource-auth.example.org:83"
+	a, err := mapping[hostPort].BackendAuth.HeaderValue()
 	require.NoError(t, err)
 	parent = &testRoundTripper{
 		t:             t,
-		expectedURL:   mapping[dnsName].URL,
+		expectedURL:   mapping[hostPort].URL,
 		expectedAuthValue: a,
-		expectedRoute: mapping[dnsName],
+		expectedRoute: mapping[hostPort],
 		// Rest empty.
 	}
 	rt = WrapForMapping(
-		kedge_map.Simple(mapping),
+		kedge_map.SimpleHostPort(mapping),
 		WrapForRouting(
 			WrapForBackendAuth(
 				WrapForProxyAuth(parent),
 			),
 		),
 	)
-	r = httptest.NewRequest("GET", "http://"+dnsName, nil)
+	r = httptest.NewRequest("GET", "http://"+hostPort, nil)
 	rt.RoundTrip(r)
 
-	dnsName = "resource-proxyauth.example.org"
-	a, err = mapping[dnsName].ProxyAuth.HeaderValue()
+	hostPort = "resource-auth.example.org:84"
+	a, err = mapping[hostPort].BackendAuth.HeaderValue()
 	require.NoError(t, err)
 	parent = &testRoundTripper{
 		t:             t,
-		expectedURL:   mapping[dnsName].URL,
+		expectedURL:   mapping[hostPort].URL,
+		expectedAuthValue: a,
+		expectedRoute: mapping[hostPort],
+		// Rest empty.
+	}
+	rt = WrapForMapping(
+		kedge_map.SimpleHostPort(mapping),
+		WrapForRouting(
+			WrapForBackendAuth(
+				WrapForProxyAuth(parent),
+			),
+		),
+	)
+	r = httptest.NewRequest("GET", "http://"+hostPort, nil)
+	rt.RoundTrip(r)
+
+	hostPort = "resource-proxyauth.example.org:83"
+	a, err = mapping[hostPort].ProxyAuth.HeaderValue()
+	require.NoError(t, err)
+	parent = &testRoundTripper{
+		t:             t,
+		expectedURL:   mapping[hostPort].URL,
 		expectedProxyAuthValue: a,
-		expectedRoute: mapping[dnsName],
+		expectedRoute: mapping[hostPort],
 		// Rest empty.
 	}
 	rt = WrapForMapping(
-		kedge_map.Simple(mapping),
+		kedge_map.SimpleHostPort(mapping),
 		WrapForRouting(
 			WrapForBackendAuth(
 				WrapForProxyAuth(parent),
 			),
 		),
 	)
-	r = httptest.NewRequest("GET", "http://"+dnsName, nil)
+	r = httptest.NewRequest("GET", "http://"+hostPort, nil)
 	rt.RoundTrip(r)
 
-	dnsName = "resource-bothauths.example.org"
-	a, err = mapping[dnsName].BackendAuth.HeaderValue()
+	hostPort = "resource-bothauths.example.org:83"
+	a, err = mapping[hostPort].BackendAuth.HeaderValue()
 	require.NoError(t, err)
-	a2, err := mapping[dnsName].ProxyAuth.HeaderValue()
+	a2, err := mapping[hostPort].ProxyAuth.HeaderValue()
 	require.NoError(t, err)
 	parent = &testRoundTripper{
 		t:             t,
-		expectedURL:   mapping[dnsName].URL,
+		expectedURL:   mapping[hostPort].URL,
 		expectedAuthValue: a,
 		expectedProxyAuthValue: a2,
-		expectedRoute: mapping[dnsName],
+		expectedRoute: mapping[hostPort],
 		// Rest empty.
 	}
 	rt = WrapForMapping(
-		kedge_map.Simple(mapping),
+		kedge_map.SimpleHostPort(mapping),
 		WrapForRouting(
 			WrapForBackendAuth(
 				WrapForProxyAuth(parent),
 			),
 		),
 	)
-	r = httptest.NewRequest("GET", "http://"+dnsName, nil)
+	r = httptest.NewRequest("GET", "http://"+hostPort, nil)
 	rt.RoundTrip(r)
 }

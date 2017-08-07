@@ -16,8 +16,6 @@ type routingTripper struct {
 }
 
 func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	host := getURLHost(req)
-
 	route, ok, err := getRoute(req.Context())
 	if err != nil {
 		return nil, err
@@ -25,7 +23,6 @@ func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !ok {
 		return t.parent.RoundTrip(req)
 	}
-
 	destURL := route.URL
 
 	tags := http_ctxtags.ExtractInbound(req)
@@ -36,9 +33,9 @@ func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	copyUrl := *req.URL
 	copyUrl.Scheme = destURL.Scheme
 	copyUrl.Host = destURL.Host
-	copyReq := req.WithContext(req.Context()) // makes a copy
-	copyReq.URL = &(copyUrl)                  // shallow copy
-	copyReq.Host = host                       // store the original host
+	copyReq := req.WithContext(req.Context()) 	// makes a copy
+	copyReq.URL = &(copyUrl)                  	// shallow copy
+	copyReq.Host = req.URL.Hostname()			// store the original host
 	return t.parent.RoundTrip(copyReq)
 }
 

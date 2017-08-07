@@ -99,12 +99,12 @@ func newRegexp(re *pb.RegexpRoute, route *kedge_map.Route) (kedge_map.RouteGette
 	}, nil
 }
 
-func (r *regexpRoute) Route(dns string) (*kedge_map.Route, bool, error) {
-	if !r.re.MatchString(dns) {
+func (r *regexpRoute) Route(hostPort string) (*kedge_map.Route, bool, error) {
+	if !r.re.MatchString(hostPort) {
 		return nil, false, nil
 	}
 
-	u, err := url.Parse(r.re.ReplaceAllString(dns, r.urlTemplated))
+	u, err := url.Parse(r.re.ReplaceAllString(hostPort, r.urlTemplated))
 	if err != nil {
 		return nil, false, err
 	}
@@ -118,7 +118,7 @@ func (r *regexpRoute) Route(dns string) (*kedge_map.Route, bool, error) {
 type directRoute struct {
 	route *kedge_map.Route
 
-	dns string
+	hostPort string
 }
 
 func newDirect(direct *pb.DirectRoute, route *kedge_map.Route) (kedge_map.RouteGetter, error) {
@@ -129,13 +129,13 @@ func newDirect(direct *pb.DirectRoute, route *kedge_map.Route) (kedge_map.RouteG
 
 	route.URL = parsed
 	return directRoute{
-		route: route,
-		dns:   direct.Key,
+		route:    route,
+		hostPort: direct.Key,
 	}, nil
 }
 
-func (r directRoute) Route(dns string) (*kedge_map.Route, bool, error) {
-	if r.dns != dns {
+func (r directRoute) Route(hostPort string) (*kedge_map.Route, bool, error) {
+	if r.hostPort != hostPort {
 		return nil, false, nil
 	}
 	clonedRoute := &kedge_map.Route{}

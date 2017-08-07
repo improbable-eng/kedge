@@ -14,9 +14,9 @@ var (
 // Mapper is an interface that allows you to direct traffic to different kedges including various auth.
 // These are used by client libraries.
 type Mapper interface {
-	// Map maps a target's DNS name (e.g. myservice.prod.ext.europe-cluster.local) to a Route.
+	// Map maps a target's DNS name and optional port (e.g. myservice.prod.ext.europe-cluster.local and 80) to a Route.
 	// If the targets shouldn't be proxied, ErrNotKedgeDestination should be returned.
-	Map(targetAuthorityDnsName string) (*Route, error)
+	Map(targetAuthorityDnsName string, port string) (*Route, error)
 }
 
 type Route struct {

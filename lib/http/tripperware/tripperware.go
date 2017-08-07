@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -33,12 +32,4 @@ func Default(config *tls.Config) http.RoundTripper {
 func DefaultWithTransport(transport *http.Transport, config *tls.Config) http.RoundTripper {
 	transport.TLSClientConfig = config
 	return &defaultTripper{Transport: transport}
-}
-
-func getURLHost(req *http.Request) string {
-	host := req.URL.Host
-	if strings.Contains(host, ":") {
-		host = host[:strings.LastIndex(host, ":")]
-	}
-	return host
 }

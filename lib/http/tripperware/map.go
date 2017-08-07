@@ -31,9 +31,8 @@ func requestWithRoute(req *http.Request, r *kedge_map.Route) *http.Request {
 }
 
 func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	host := getURLHost(req)
-
-	route, err := t.mapper.Map(host)
+	// Get routing based on request Host and optional port.
+	route, err := t.mapper.Map(req.URL.Hostname(), req.URL.Port())
 	if err == kedge_map.ErrNotKedgeDestination {
 		return t.parent.RoundTrip(
 			// We store nil to ensure that we can catch case when mappingTripper is not in the chain before other trippers
@@ -50,6 +49,6 @@ func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	)
 }
 
-func WrapForMapping(mapper kedge_map.Mapper, parentTransport http.RoundTripper ) http.RoundTripper  {
+func WrapForMapping(mapper kedge_map.Mapper, parentTransport http.RoundTripper) http.RoundTripper {
 	return &mappingTripper{mapper: mapper, parent: parentTransport}
 }

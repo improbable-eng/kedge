@@ -18,15 +18,11 @@ RUN curl -fsSL "${GOLANG_DOWNLOAD_URL}" -o golang.tar.gz \
 
 RUN echo "StrictHostKeyChecking no" > /etc/ssh/ssh_config
 
-# Install not vendored deps if any.
-RUN go get github.com/sirupsen/logrus
-RUN go get k8s.io/client-go/tools/clientcmd
-RUN go get k8s.io/client-go/tools/clientcmd/api
-RUN go get k8s.io/kubernetes/pkg/client/unversioned/clientcmd
-
+RUN mkdir -p /go/bin
+RUN curl https://glide.sh/get | sh
 # Copy local to not clone everything.
-# NOTE: Make sure you have vendor installed using `git submodule update --init --recursive`
 ADD . ${GOPATH}/src/github.com/mwitkow/kedge
+RUN glide install --skip-test
 
 ARG BUILD_VERSION
 RUN echo "Installing Kedge with version ${BUILD_VERSION}"

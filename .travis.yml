@@ -4,7 +4,8 @@ go:
   - 1.8.x
 
 install:
-  - go get -t ./...
+  - curl https://glide.sh/get | sh
+  - glide install
 
 script:
  - ./test_all.sh

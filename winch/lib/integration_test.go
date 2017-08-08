@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/sirupsen/logrus"
 )
 
 func unknownPingbackHandler(id int) http.Handler {
@@ -190,7 +191,11 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	s.routes, err = winch.NewStaticRoutes(winch.NewAuthFactory(s.winchListenerPlain.Addr().String(), m), testConfig, authConfig)
 	require.NoError(s.T(), err, "config must be parsable")
 
-	m.Handle("/", winch.New(kedge_map.RouteMapper(s.routes.Get()), s.tlsClientConfigForTest()))
+	m.Handle("/", winch.New(kedge_map.RouteMapper(
+		s.routes.Get()),
+		s.tlsClientConfigForTest(),
+		logrus.NewEntry(logrus.New())),
+	)
 	s.winch = &http.Server{
 		Handler: m,
 	}

@@ -11,16 +11,16 @@ import (
 
 func TestRegexpRoute(t *testing.T) {
 	r, err := newRegexp(&pb.RegexpRoute{
-		Exp: `(?P<arg1>[a-z0-9-].*)[.](?P<ARG2>[a-z0-9-].*)[.]internal[.]example[.]org`,
+		Exp: `(?P<arg1>[a-z0-9-].*)[.](?P<ARG2>[a-z0-9-].*)[.]internal[.]example[.]org(?P<arg3>|:[0-9].*)`,
 		Url: "${arg1}-${ARG2}",
 	}, &kedge_map.Route{})
 	require.NoError(t, err)
 
-	_, ok, err := r.Route("value1.value2.internal.unknown.org")
+	_, ok, err := r.Route("value1.value2.internal.unknown.org:1234")
 	require.NoError(t, err)
 	assert.False(t, ok)
 
-	route, ok, err := r.Route("value1.value2.internal.example.org")
+	route, ok, err := r.Route("value1.value2.internal.example.org:1234")
 	require.NoError(t, err)
 	require.True(t, ok)
 

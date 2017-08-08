@@ -7,6 +7,7 @@ import (
 	"github.com/mwitkow/kedge/lib/auth"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/mwitkow/kedge/lib/map"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -27,7 +28,7 @@ type authTripper struct {
 func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	route, ok, err := getRoute(req.Context())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "authTripper: Failed to get route from context")
 	}
 	if !ok {
 		return t.parent.RoundTrip(req)
@@ -44,14 +45,14 @@ func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	val, err := authSource.HeaderValue()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "authTripper: Failed to get header value from authSource %s", authSource.Name())
 	}
 
 	req.Header.Set(t.authHeader, val)
 	return t.parent.RoundTrip(req)
 }
 
-func WrapForProxyAuth(parentTransport http.RoundTripper ) http.RoundTripper  {
+func WrapForProxyAuth(parentTransport http.RoundTripper) http.RoundTripper {
 	return &authTripper{
 		parent:     parentTransport,
 		authHeader: ProxyAuthHeader,
@@ -62,7 +63,7 @@ func WrapForProxyAuth(parentTransport http.RoundTripper ) http.RoundTripper  {
 	}
 }
 
-func WrapForBackendAuth(parentTransport http.RoundTripper ) http.RoundTripper  {
+func WrapForBackendAuth(parentTransport http.RoundTripper) http.RoundTripper {
 	return &authTripper{
 		parent:     parentTransport,
 		authHeader: authHeader,

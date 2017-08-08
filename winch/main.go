@@ -102,6 +102,7 @@ func main() {
 		winch.New(
 			kedge_map.RouteMapper(routes.Get()),
 			tlsConfig,
+			logEntry,
 		),
 	)
 	winchServer := &http.Server{

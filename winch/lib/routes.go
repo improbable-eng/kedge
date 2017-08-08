@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/auth"
@@ -104,15 +105,29 @@ func (r *regexpRoute) Route(hostPort string) (*kedge_map.Route, bool, error) {
 		return nil, false, nil
 	}
 
-	u, err := url.Parse(r.re.ReplaceAllString(hostPort, r.urlTemplated))
+	routeURL := strings.TrimSpace(r.urlTemplated)
+	match := r.re.FindStringSubmatch(hostPort)
+	for i, name := range r.re.SubexpNames() {
+		if i == 0 {
+			continue
+		}
+
+		// We care only by named match groups.
+		if name == "" {
+			continue
+		}
+
+		routeURL = strings.Replace(routeURL, fmt.Sprintf("${%s}", name), match[i], -1)
+	}
+
+	u, err := url.Parse(routeURL)
 	if err != nil {
 		return nil, false, err
 	}
 
-	clonedRoute := &kedge_map.Route{}
-	*clonedRoute = *r.baseRoute
+	clonedRoute := *r.baseRoute
 	clonedRoute.URL = u
-	return clonedRoute, true, nil
+	return &clonedRoute, true, nil
 }
 
 type directRoute struct {

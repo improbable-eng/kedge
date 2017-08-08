@@ -34,9 +34,9 @@ func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	copyUrl := *req.URL
 	copyUrl.Scheme = destURL.Scheme
 	copyUrl.Host = destURL.Host
-	copyReq := req.WithContext(req.Context()) 	// makes a copy
-	copyReq.URL = &(copyUrl)                  	// shallow copy
-	copyReq.Host = req.URL.Hostname()			// store the original host
+	copyReq := req.WithContext(req.Context()) // makes a copy
+	copyReq.URL = &(copyUrl)                  // shallow copy
+	copyReq.Host = req.URL.Host               // store the original host:port
 	return t.parent.RoundTrip(copyReq)
 }
 

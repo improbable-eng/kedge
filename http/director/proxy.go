@@ -85,6 +85,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	// note resp needs to implement Flusher, otherwise flush intervals won't work.
 	normReq := proxyreq.NormalizeInboundRequest(req)
+
 	backend, err := p.router.Route(req)
 	tags := http_ctxtags.ExtractInbound(req)
 	tags.Set(http_ctxtags.TagForCallService, "proxy")

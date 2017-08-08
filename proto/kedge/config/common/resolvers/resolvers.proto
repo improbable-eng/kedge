@@ -6,7 +6,10 @@ package kedge.config.common.resolvers;
 message SrvResolver {
     /// dns_name specifies the address to look up using DNS SRV. Needs to be a FQDN.
     /// E.g. "_grpc._tcp.someservice.somenamespace.svc.cluster.local"
-    string dns_name = 2;
+    string dns_name = 1;
+    /// not recommended, but port override allows to ignore port form SRV record and use one defined here.
+    /// Useful when there are multiple services identifed under the same domain.
+    uint32 port_override = 2;
 }
 
 /// KubeResolver uses the Kubernetes Endpoints API to identify the service.

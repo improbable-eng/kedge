@@ -110,7 +110,6 @@ func main() {
 	httpDebugChain := chi.Chain(
 		http_ctxtags.Middleware("debug"),
 		http_debug.Middleware(),
-		http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain")),
 	)
 	// httpNonAuthDebugChain chain is shares the same base but will not include auth. It is for metrics and _healthz.
 	httpNonAuthDebugChain := httpDebugChain
@@ -214,7 +213,9 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	m.Handle("/_healthz", noAuthMiddlewares.HandlerFunc(healthEndpoint))
 	m.Handle("/debug/metrics", noAuthMiddlewares.Handler(prometheus.UninstrumentedHandler()))
 
-	m.Handle("/_version", middlewares.HandlerFunc(versionEndpoint))
+	m.Handle("/_version",
+		// The only one worth to log.
+		chi.Chain(http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain"))).Handler(middlewares.HandlerFunc(versionEndpoint)))
 	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 
 	m.Handle("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))

@@ -2,16 +2,15 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/mwitkow/kedge/http/director/proxyreq"
-	"google.golang.org/grpc/metadata"
-
 	"sync"
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
+	"github.com/mwitkow/kedge/http/director/proxyreq"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -63,7 +62,10 @@ func (r *static) Route(req *http.Request) (backendName string, err error) {
 		if !r.urlMatches(req.URL, route.PathRules) {
 			continue
 		}
-		if !r.hostMatches(req.URL.Host, route.HostMatcher) {
+		if !r.hostMatches(req.URL.Hostname(), route.HostMatcher) {
+			continue
+		}
+		if !r.portMatches(req.URL.Port(), route.PortMatcher) {
 			continue
 		}
 		if !r.headersMatch(req.Header, route.HeaderMatcher) {
@@ -105,6 +107,18 @@ func (r *static) hostMatches(host string, matcher string) bool {
 		return true // no matcher set, match all like a boss!
 	}
 	return host == matcher
+}
+
+func (r *static) portMatches(port string, matcher uint32) bool {
+	if matcher == 0 {
+		return true // no matcher set, match all like a boss!
+	}
+
+	if port == "" {
+		return false // we expect certain port.
+	}
+
+	return port == fmt.Sprintf("%v", matcher)
 }
 
 func (r *static) headersMatch(header http.Header, expectedKv map[string]string) bool {

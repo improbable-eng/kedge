@@ -518,18 +518,6 @@ func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
 }
 
-func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_MatchWithGenericRoute() {
-	req := testRequest("http://nonsecure.ext.example.com:80/some/strict/path", "bearer abc8", testProxyAuthValue)
-	resp, err := s.kedgeClient.Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
-}
-
-func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_SpecialRoute() {
-	req := testRequest("http://nonsecure.ext.withport.example.com:81/some/strict/path", "bearer abc8", testProxyAuthValue)
-	resp, err := s.kedgeClient.Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
-}
-
 func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 	// Restore old resolver.
 	if s.originalSrvResolver != nil {

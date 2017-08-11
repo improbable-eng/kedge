@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -31,6 +30,7 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"github.com/mwitkow/kedge/lib/logstash"
 )
 
 var (
@@ -55,21 +55,15 @@ func main() {
 	}
 
 	if *flagLogstashAddress != "" {
-		conn, err := net.Dial("tcp", *flagLogstashAddress)
-		if err != nil {
-			log.WithError(err).Fatal("Failed to connect to logstash")
-		}
-
-		formatter, err := newLogstashFormatter()
+		formatter, err := logstash.NewFormatter()
 		if err != nil {
 			log.WithError(err).Fatal("Failed to get hostname for logstash formatter")
 		}
 
-		// TODO(bplotka): logrustash package is bit limited:
-		// - No reconnect logic for writer: if connection will be temporarly down we will error on every log until someone will restart kedge.
-		// - No async log: Again on connection problems we can block whole kedge on logging behaviour which is wrong.
-		// Consider mimick/move to our Improbable remote logging package when these problems will be really painful.
-		hook := logrustash.New(conn, formatter)
+		hook, err := logstash.NewHook(*flagLogstashAddress, formatter)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to create new logstash hook")
+		}
 		log.AddHook(hook)
 	}
 	log.SetOutput(os.Stdout)

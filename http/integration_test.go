@@ -87,6 +87,13 @@ var (
 		&pb_route.Route{
 			BackendName: "non_secure",
 			PathRules:   []string{"/some/strict/path"},
+			HostMatcher: "nonsecure.ext.withport.example.com",
+			PortMatcher: 81,
+			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+		},
+		&pb_route.Route{
+			BackendName: "non_secure",
+			PathRules:   []string{"/some/strict/path"},
 			HostMatcher: "nonsecure.ext.example.com",
 			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
 		},
@@ -222,6 +229,8 @@ type HttpProxyingIntegrationSuite struct {
 
 	localBackends map[string]*localBackends
 	authorizer    *testAuthorizer
+
+	kedgeClient *http.Client
 }
 
 func TestBackendPoolIntegrationTestSuite(t *testing.T) {
@@ -282,6 +291,8 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 	go func() {
 		s.proxy.Serve(s.proxyListenerTls)
 	}()
+
+	s.kedgeClient = kedge_http.NewClient(s.mapper, s.tlsConfigForTest(), http.DefaultTransport.(*http.Transport))
 }
 
 func (s *HttpProxyingIntegrationSuite) SetupTest() {
@@ -311,7 +322,7 @@ func (s *HttpProxyingIntegrationSuite) forwardProxyClient(listener net.Listener)
 		if listener == s.proxyListenerPlain {
 			return urlMustParse("http://address_overwritten_in_dialer_anyway"), nil
 		}
-		return nil, errors.New("Golang proxy logic cannot use HTTPS connecitons to proxy. Saad.")
+		return nil, errors.New("Golang proxy logic cannot use HTTPS connections to proxy. Saad.")
 	}
 	return client
 }
@@ -502,9 +513,8 @@ func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToNonSecureBackend() {
 }
 
 func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
-	cl := kedge_http.NewClient(s.mapper, s.tlsConfigForTest(), http.DefaultTransport.(*http.Transport))
 	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "bearer abc8", testProxyAuthValue)
-	resp, err := cl.Do(req)
+	resp, err := s.kedgeClient.Do(req)
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
 }
 

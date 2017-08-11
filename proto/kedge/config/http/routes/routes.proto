@@ -28,6 +28,8 @@ message Route {
     /// proxy_mode controlls what kind of inbound requests this route matches. See
     ProxyMode proxy_mode = 5;
 
+    /// Optional port matcher. If 0 route will ignore port.
+    uint32 port_matcher = 6;
     /// TODO(mwitkow): Add fields that require TLS Client auth, or :authorization keys.
 }
 

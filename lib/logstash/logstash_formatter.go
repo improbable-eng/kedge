@@ -1,4 +1,4 @@
-package main
+package logstash
 
 import (
 	"encoding/json"
@@ -27,7 +27,7 @@ var (
 		"@tags field to inject to while formatting log message for logstash.")
 )
 
-func newLogstashFormatter() (*logstashFormatter, error) {
+func NewFormatter() (*logstashFormatter, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err

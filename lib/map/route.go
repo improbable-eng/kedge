@@ -1,7 +1,9 @@
 package kedge_map
 
+import "fmt"
+
 type RouteGetter interface {
-	Route(dns string) (*Route, bool, error)
+	Route(hostPort string) (*Route, bool, error)
 }
 
 type routeMapper struct {
@@ -15,9 +17,13 @@ func RouteMapper(r []RouteGetter) *routeMapper {
 	}
 }
 
-func (m *routeMapper) Map(targetAuthorityDnsName string) (*Route, error) {
+func (m *routeMapper) Map(targetDnsName string, targetPort string) (*Route, error) {
+	hostPort := targetDnsName
+	if targetPort != "" {
+		hostPort = fmt.Sprintf("%s:%s", targetDnsName, targetPort)
+	}
 	for _, route := range m.routes {
-		r, ok, err := route.Route(targetAuthorityDnsName)
+		r, ok, err := route.Route(hostPort)
 		if err != nil {
 			return nil, err
 		}

@@ -18,6 +18,8 @@ type suffixMapper struct {
 // For example: given a matchPattern of *.*.clusters.local, and a URL of `myservice.mynamespace.svc.us1.prod.clusters.local`
 // and a suffixMapper of `.clusters.example.com`, it will return a kedge url of `us1.prod.clusters.example.com`.
 //
+// NOTE: It does not care about port.
+//
 // Scheme needs to be `http` or `https`
 func Suffix(matchPattern string, suffix string, scheme string) (Mapper, error) {
 	if !strings.HasPrefix(suffix, ".") {
@@ -36,7 +38,7 @@ func Suffix(matchPattern string, suffix string, scheme string) (Mapper, error) {
 	}, nil
 }
 
-func (s *suffixMapper) Map(targetAuthorityDnsName string) (*Route, error) {
+func (s *suffixMapper) Map(targetAuthorityDnsName string, _ string) (*Route, error) {
 	reverseTargetParts := reverse(strings.Split(targetAuthorityDnsName, "."))
 	if len(reverseTargetParts) < len(s.reverseMatchParts) {
 		return nil, ErrNotKedgeDestination // target is shorter than the match, definitely no point.

@@ -14,6 +14,6 @@ func Single(kedgeUrl *url.URL) Mapper {
 	return &single{kedgeUrl: kedgeUrl}
 }
 
-func (s *single) Map(targetAuthorityDnsName string) (*Route, error) {
+func (s *single) Map(_ string, _ string) (*Route, error) {
 	return &Route{URL: s.kedgeUrl}, nil
 }

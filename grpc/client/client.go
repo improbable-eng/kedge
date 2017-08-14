@@ -15,7 +15,8 @@ import (
 // For secure kedging (with a mapper value starting with https://) clientTls option needs to be set, and needs to point
 // to a tls.Config that has client side certificates configured.
 func DialThroughKedge(ctx context.Context, targetAuthority string, clientTls *tls.Config, mapper kedge_map.Mapper, grpcOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
-	kedgeUrl, err := mapper.Map(targetAuthority)
+	// No need for port matching here. TODO: Add when required.
+	kedgeUrl, err := mapper.Map(targetAuthority, "")
 	if err != nil {
 		return nil, err
 	}

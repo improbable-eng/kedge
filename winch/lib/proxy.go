@@ -6,12 +6,14 @@ import (
 	"net/http/httputil"
 	"time"
 
+	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/lib/http/tripperware"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -24,7 +26,7 @@ type winchMapper interface {
 	kedge_map.Mapper
 }
 
-func New(mapper winchMapper, config *tls.Config) *Proxy {
+func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry) *Proxy {
 	// Prepare chain of trippers for winch logic. (The last wrapped will be first in the chain of tripperwares)
 	// 5) Last, default transport for communication with our kedges.
 	// 4) Kedge auth tipper - injects auth for kedge based on route.
@@ -45,6 +47,7 @@ func New(mapper winchMapper, config *tls.Config) *Proxy {
 			Transport:     parentTransport,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
+			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "winch.ReverseProxy")),
 		},
 	}
 }

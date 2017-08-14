@@ -5,6 +5,7 @@ import (
 
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
+	"github.com/pkg/errors"
 )
 
 // routingTripper is a piece of tripperware that dials certain destinations (indicated by a route stored in request's context) through a remote proxy (kedge).
@@ -16,16 +17,13 @@ type routingTripper struct {
 }
 
 func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	host := getURLHost(req)
-
 	route, ok, err := getRoute(req.Context())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "routingTripper: Failed to get route from context")
 	}
 	if !ok {
 		return t.parent.RoundTrip(req)
 	}
-
 	destURL := route.URL
 
 	tags := http_ctxtags.ExtractInbound(req)
@@ -38,7 +36,7 @@ func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	copyUrl.Host = destURL.Host
 	copyReq := req.WithContext(req.Context()) // makes a copy
 	copyReq.URL = &(copyUrl)                  // shallow copy
-	copyReq.Host = host                       // store the original host
+	copyReq.Host = req.URL.Host               // store the original host (+ optional :port)
 	return t.parent.RoundTrip(copyReq)
 }
 

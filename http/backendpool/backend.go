@@ -85,7 +85,7 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 		DialContext:         dialFunc,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: http.DefaultMaxIdleConnsPerHost, // We can possible increase that?
-		MaxIdleConns:        4,                             // Was 4
+		MaxIdleConns:        4,
 		// TODO(mwitkow): add idle conn configuration.
 	}
 	// We want there to be h2 on outbound SSL connections, this mangles tlsConfig

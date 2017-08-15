@@ -38,7 +38,7 @@ Following diagram shows POD to POD communication cross-cluster.
 
 ![Kedge Cert Routing](./kedge_arch.png)
 
-### Using Winch (forward proxy)
+### Using Winch (local proxy to kedges)
 
 Following diagram shows the routing done by forward proxy called [winch (client)](winch/README.md). In this example kedge OIDC auth is enabled to support
 corp use cases (per backend access controlled by permissions stored in custom IDToked claim). It can be also switched to just 
@@ -51,9 +51,7 @@ NOTE: Any auth which is required by Service/Pod B needs to configured on winch d
 
 ## Usage
 
-Kedge package is using submodule vendoring. To get vendored modules use:
-
-`git submodule update --init --recursive`
+Kedge package is using [glide](https://github.com/Masterminds/glide) for vendoring.
 
 Please see 
 * the [server](server/README.md) for an actual guide.

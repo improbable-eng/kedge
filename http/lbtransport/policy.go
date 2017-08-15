@@ -146,10 +146,10 @@ func tryDial(ctx context.Context, target *Target) bool {
 		dialTimeout = deadline.Sub(time.Now())
 	}
 	// Try to do quick dial to check if the target is listening.
-	conn, err := net.DialTimeout("tcp", target.DialAddr, dialTimeout)
+	_, err := net.DialTimeout("tcp", target.DialAddr, dialTimeout)
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	// Don't close connection by purpose. It will be reused anyway by this request.
 	return true
 }

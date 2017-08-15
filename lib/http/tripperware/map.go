@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/mwitkow/go-httpwares/tags"
+	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/pkg/errors"
 )
@@ -34,6 +36,8 @@ func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Get routing based on request Host and optional port.
 	route, err := t.mapper.Map(req.URL.Hostname(), req.URL.Port())
 	if err == kedge_map.ErrNotKedgeDestination {
+		tags := http_ctxtags.ExtractInbound(req)
+		tags.Set(ctxtags.TagForProxyDestURL, "not-kedge-destination")
 		return t.parent.RoundTrip(
 			// We store nil to ensure that we can catch case when mappingTripper is not in the chain before other trippers
 			// that requires stored route.

@@ -82,7 +82,6 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if _, ok := resp.(http.Flusher); !ok {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
 	}
-
 	// note resp needs to implement Flusher, otherwise flush intervals won't work.
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	backend, err := p.router.Route(req)
@@ -90,7 +89,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	tags.Set(http_ctxtags.TagForCallService, "proxy")
 	if err == nil {
 		resp.Header().Set("x-kedge-backend-name", backend)
-		tags.Set(ctxtags.TagsForProxyBackend, backend)
+		tags.Set(ctxtags.TagForProxyBackend, backend)
 		tags.Set(http_ctxtags.TagForHandlerName, backend)
 		normReq.URL.Host = backend
 		p.backendReverseProxy.ServeHTTP(resp, normReq)

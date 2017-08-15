@@ -4,16 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"google.golang.org/grpc/naming"
-)
-
-var (
-	// MaximumRefreshInterval decides the maximum sleep time between SRV Lookups, otherwise controlled by TTL of records.
-	MaximumRefreshInterval = 5 * time.Second
-	// ExpirationMargin, the margin before the TTL expiration on which we should re-resolve.
-	ExpirationMargin = 50 * time.Millisecond
 )
 
 type tripper struct {

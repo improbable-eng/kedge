@@ -46,6 +46,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/http/client"
+	"log"
+	"os"
 )
 
 const (
@@ -157,8 +159,13 @@ func buildAndStartServer(t *testing.T, config *tls.Config) (net.Listener, *http.
 	if config != nil {
 		listener = tls.NewListener(listener, config)
 	}
+	prefix := "nonsecure backend: "
+	if config != nil {
+		prefix = "secure backend: "
+	}
 	server := &http.Server{
 		Handler: unknownPingbackHandler(listener.Addr().String()),
+		ErrorLog: log.New(os.Stderr, prefix, 0),
 	}
 	go func() {
 		server.Serve(listener)
@@ -374,22 +381,23 @@ func testRequest(url string, backendSecret string, proxySecret string) *http.Req
 	}
 	return req
 }
-func (s *HttpProxyingIntegrationSuite) TestSuccessOverForwardProxy_DialUsingAddresser() {
-	// Pick a port of any non secure backend.
-	addr := s.localBackends["_http._tcp.nonsecure.backends.test.local"].targets()[0].DialAddr
-	port := addr[strings.LastIndex(addr, ":")+1:]
-	req := testRequest(fmt.Sprintf("http://127-0-0-1.pods.test.local:%s/some/strict/path", port), "bearer abc1", testProxyAuthValue)
-	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc1", err)
-	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
-}
 
-func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToNonSecure_OverPlain() {
-	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "bearer abc2", testProxyAuthValue)
-	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc2", err)
-	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
-}
+//func (s *HttpProxyingIntegrationSuite) TestSuccessOverForwardProxy_DialUsingAddresser() {
+//	// Pick a port of any non secure backend.
+//	addr := s.localBackends["_http._tcp.nonsecure.backends.test.local"].targets()[0].DialAddr
+//	port := addr[strings.LastIndex(addr, ":")+1:]
+//	req := testRequest(fmt.Sprintf("http://127-0-0-1.pods.test.local:%s/some/strict/path", port), "bearer abc1", testProxyAuthValue)
+//	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc1", err)
+//	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToNonSecure_OverPlain() {
+//	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "bearer abc2", testProxyAuthValue)
+//	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc2", err)
+//	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
+//}
 
 func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToSecure_OverPlain() {
 	req := testRequest("http://secure.ext.example.com/some/strict/path", "bearer abc3", testProxyAuthValue)
@@ -397,126 +405,138 @@ func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToSecure_Over
 	s.assertSuccessfulPingback(req, resp, "bearer abc3", err)
 	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
 }
+//
+//func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToNonSecure_OverTls() {
+//	req := testRequest("https://nonsecure.ext.example.com/some/strict/path", "bearer abc4", testProxyAuthValue)
+//	resp, err := s.reverseProxyClient(s.proxyListenerTls).Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc4", err)
+//	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToSecure_OverTls() {
+//	req := testRequest("https://secure.ext.example.com/some/strict/path", "bearer abc5", testProxyAuthValue)
+//	resp, err := s.reverseProxyClient(s.proxyListenerTls).Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc5", err)
+//	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestSuccessOverForwardProxy_ToNonSecure_OverPlain() {
+//	req := testRequest("http://nonsecure.backends.test.local/some/strict/path", "bearer abc6", testProxyAuthValue)
+//	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc6", err)
+//	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestSuccessOverForwardProxy_ToSecure_OverPlain() {
+//	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", testProxyAuthValue)
+//	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc7", err)
+//	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_ToForwardSecure_OverPlain() {
+//	req := testRequest("http://secure.backends.test.local/some/strict/path", "", testProxyAuthValue)
+//	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+//	require.NoError(s.T(), err, "dialing should not fail")
+//	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
+//	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_ToReverseNonSecure_OverPlain() {
+//	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "", testProxyAuthValue)
+//	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//	require.NoError(s.T(), err, "dialing should not fail")
+//	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
+//	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_NoAuthForProxy() {
+//	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "")
+//	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//	require.NoError(s.T(), err, "dialing should not fail")
+//	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
+//	assert.Equal(s.T(), "Unauthenticated. No Proxy-Authorization header.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_AuthForProxyNotABearer() {
+//	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "wrong_auth_token")
+//	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//	require.NoError(s.T(), err, "dialing should not fail")
+//	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
+//	assert.Equal(s.T(), "Unauthenticated. Proxy-Authorization header does not have Bearer format.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_WrongAuthForProxy() {
+//	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "Bearer wrong_auth_token")
+//	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//	require.NoError(s.T(), err, "dialing should not fail")
+//	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
+//	assert.Equal(s.T(), "Unauthenticated", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_NonSecureWithBadPath() {
+//	req := testRequest("http://nonsecure.ext.example.com/other_path", "", testProxyAuthValue)
+//	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+//	require.NoError(s.T(), err, "dialing should not fail")
+//	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
+//	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToSecureBackend() {
+//	backendResponse := make(map[string]int)
+//	for i := 0; i < secureBackendCount*10; i++ {
+//		req := testRequest("http://secure.backends.test.local/some/strict/path", fmt.Sprintf("bearer abc%d", i), testProxyAuthValue)
+//		resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
+//		s.assertSuccessfulPingback(req, resp, fmt.Sprintf("bearer abc%d", i), err)
+//		addr := resp.Header.Get("x-test-backend-addr")
+//		if _, ok := backendResponse[addr]; ok {
+//			backendResponse[addr] += 1
+//		} else {
+//			backendResponse[addr] = 1
+//		}
+//	}
+//	assert.Len(s.T(), backendResponse, secureBackendCount, "requests should hit all backends")
+//	for addr, value := range backendResponse {
+//		assert.Equal(s.T(), 10, value, "backend %v should have received the same amount of requests", addr)
+//	}
+//}
 
-func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToNonSecure_OverTls() {
-	req := testRequest("https://nonsecure.ext.example.com/some/strict/path", "bearer abc4", testProxyAuthValue)
-	resp, err := s.reverseProxyClient(s.proxyListenerTls).Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc4", err)
-	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestSuccessOverReverseProxy_ToSecure_OverTls() {
-	req := testRequest("https://secure.ext.example.com/some/strict/path", "bearer abc5", testProxyAuthValue)
-	resp, err := s.reverseProxyClient(s.proxyListenerTls).Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc5", err)
-	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestSuccessOverForwardProxy_ToNonSecure_OverPlain() {
-	req := testRequest("http://nonsecure.backends.test.local/some/strict/path", "bearer abc6", testProxyAuthValue)
-	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc6", err)
-	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "1.1", "non secure backends are dialed over HTTP/1.1")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestSuccessOverForwardProxy_ToSecure_OverPlain() {
-	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", testProxyAuthValue)
-	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc7", err)
-	assert.Equal(s.T(), resp.Header.Get("x-test-req-proto"), "2.0", "secure backends are dialed over HTTP2")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_ToForwardSecure_OverPlain() {
-	req := testRequest("http://secure.backends.test.local/some/strict/path", "", testProxyAuthValue)
-	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
-	require.NoError(s.T(), err, "dialing should not fail")
-	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_ToReverseNonSecure_OverPlain() {
-	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "", testProxyAuthValue)
-	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-	require.NoError(s.T(), err, "dialing should not fail")
-	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_NoAuthForProxy() {
-	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "")
-	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-	require.NoError(s.T(), err, "dialing should not fail")
-	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "Unauthenticated. No Proxy-Authorization header.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_AuthForProxyNotABearer() {
-	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "wrong_auth_token")
-	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-	require.NoError(s.T(), err, "dialing should not fail")
-	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "Unauthenticated. Proxy-Authorization header does not have Bearer format.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_WrongAuthForProxy() {
-	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "Bearer wrong_auth_token")
-	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-	require.NoError(s.T(), err, "dialing should not fail")
-	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "Unauthenticated", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_NonSecureWithBadPath() {
-	req := testRequest("http://nonsecure.ext.example.com/other_path", "", testProxyAuthValue)
-	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
-	require.NoError(s.T(), err, "dialing should not fail")
-	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
-	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
-}
-
-func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToSecureBackend() {
-	backendResponse := make(map[string]int)
-	for i := 0; i < secureBackendCount*10; i++ {
-		req := testRequest("http://secure.backends.test.local/some/strict/path", fmt.Sprintf("bearer abc%d", i), testProxyAuthValue)
-		resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
-		s.assertSuccessfulPingback(req, resp, fmt.Sprintf("bearer abc%d", i), err)
-		addr := resp.Header.Get("x-test-backend-addr")
-		if _, ok := backendResponse[addr]; ok {
-			backendResponse[addr] += 1
-		} else {
-			backendResponse[addr] = 1
-		}
-	}
-	assert.Len(s.T(), backendResponse, secureBackendCount, "requests should hit all backends")
-	for addr, value := range backendResponse {
-		assert.Equal(s.T(), 10, value, "backend %v should have received the same amount of requests", addr)
-	}
-}
-
-func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToNonSecureBackend() {
-	backendResponse := make(map[string]int)
-	for i := 0; i < nonSecureBackendCount*10; i++ {
-		req := testRequest("http://nonsecure.ext.example.com/some/strict/path", fmt.Sprintf("bearer abc%d", i), testProxyAuthValue)
-		resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
-		s.assertSuccessfulPingback(req, resp, fmt.Sprintf("bearer abc%d", i), err)
-		addr := resp.Header.Get("x-test-backend-addr")
-		if _, ok := backendResponse[addr]; ok {
-			backendResponse[addr] += 1
-		} else {
-			backendResponse[addr] = 1
-		}
-	}
-	assert.Len(s.T(), backendResponse, nonSecureBackendCount, "requests should hit all backends")
-	for addr, value := range backendResponse {
-		assert.Equal(s.T(), 10, value, "backend %v should have received the same amount of requests", addr)
-	}
-}
-
-func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
-	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "bearer abc8", testProxyAuthValue)
-	resp, err := s.kedgeClient.Do(req)
-	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
-}
+//func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToNonSecureBackend() {
+//	backendResponse := make(map[string]int)
+//	for i := 0; i < nonSecureBackendCount*10; i++ {
+//		req := testRequest("http://nonsecure.ext.example.com/some/strict/path", fmt.Sprintf("bearer abc%d", i), testProxyAuthValue)
+//		resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+//		s.assertSuccessfulPingback(req, resp, fmt.Sprintf("bearer abc%d", i), err)
+//		addr := resp.Header.Get("x-test-backend-addr")
+//		if _, ok := backendResponse[addr]; ok {
+//			backendResponse[addr] += 1
+//		} else {
+//			backendResponse[addr] = 1
+//		}
+//	}
+//	assert.Len(s.T(), backendResponse, nonSecureBackendCount, "requests should hit all backends")
+//	for addr, value := range backendResponse {
+//		assert.Equal(s.T(), 10, value, "backend %v should have received the same amount of requests", addr)
+//	}
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
+//	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "bearer abc8", testProxyAuthValue)
+//	resp, err := s.kedgeClient.Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_MatchWithGenericRoute() {
+//	req := testRequest("http://nonsecure.ext.example.com:80/some/strict/path", "bearer abc8", testProxyAuthValue)
+//	resp, err := s.kedgeClient.Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+//}
+//
+//func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_SpecialRoute() {
+//	req := testRequest("http://nonsecure.ext.withport.example.com:81/some/strict/path", "bearer abc8", testProxyAuthValue)
+//	resp, err := s.kedgeClient.Do(req)
+//	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+//}
 
 func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 	// Restore old resolver.

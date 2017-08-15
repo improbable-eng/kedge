@@ -1,11 +1,5 @@
 package: github.com/mwitkow/kedge
 import:
-- package: github.com/Bplotka/oidc
-  subpackages:
-  - authorize
-  - login
-  - login/diskcache
-  - login/k8scache
 - package: github.com/bshuster-repo/logrus-logstash-hook
 - package: github.com/golang/glog
 - package: github.com/golang/protobuf
@@ -68,5 +62,6 @@ import:
   subpackages:
   - tools/clientcmd
   - util/jsonpath
+- package: github.com/Bplotka/oidc
 testImport:
 - package: github.com/go-chi/chi

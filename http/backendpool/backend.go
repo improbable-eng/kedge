@@ -1,9 +1,7 @@
 package backendpool
 
 import (
-	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,11 +13,13 @@ import (
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	"github.com/mwitkow/kedge/http/lbtransport"
 	"github.com/mwitkow/kedge/lib/resolvers"
+	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
 )
 
 var (
+	// Top DialContext func with decreased Dial Timeout in comparison to DefaultDialer.
 	ParentDialFunc = (&net.Dialer{
 		Timeout:   1 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -31,13 +31,16 @@ var (
 )
 
 type backend struct {
-	mu        sync.RWMutex
+	mu sync.RWMutex
+
 	transport *http.Transport
 	tripper   http.RoundTripper
 	config    *pb.Backend
 	closed    bool
 }
 
+// Tripper returns tripper that should be used for this (and only this backend).
+// It usually contains LoadBalancing logic inside.
 func (b *backend) Tripper() http.RoundTripper {
 	b.mu.RLock()
 	t := b.tripper
@@ -48,7 +51,9 @@ func (b *backend) Tripper() http.RoundTripper {
 	return t
 }
 
+// Close is used when backend is removed from configuration dynamically.
 func (b *backend) Close() error {
+	panic("back close")
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.closed = true
@@ -59,24 +64,36 @@ func (b *backend) Close() error {
 	return nil
 }
 
+// newBackend creates backend from given configuration.
 func newBackend(cnf *pb.Backend) (*backend, error) {
 	b := &backend{}
 	target, resolver, err := chooseNamingResolver(cnf)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to construct resolver for backend %s", cnf.Name)
 	}
+
+	dialFunc := ParentDialFunc
+	if !cnf.DisableConntracking {
+		dialFunc = conntrack.NewDialContextFunc(
+			conntrack.DialWithName("http_backend_"+cnf.Name),
+			conntrack.DialWithDialContextFunc(dialFunc),
+			conntrack.DialWithTracing(),
+		)
+	}
+
 	scheme, tlsConfig := buildTls(cnf)
 	b.transport = &http.Transport{
-		DialContext:         chooseDialFuncOpt(cnf),
+		DialContext:         dialFunc,
 		TLSClientConfig:     tlsConfig,
-		MaxIdleConnsPerHost: 2,
-		MaxIdleConns:        4,
+		MaxIdleConnsPerHost: http.DefaultMaxIdleConnsPerHost, // We can possible increase that?
+		MaxIdleConns:        4,                             // Was 4
 		// TODO(mwitkow): add idle conn configuration.
 	}
 	// We want there to be h2 on outbound SSL connections, this mangles tlsConfig
 	if err := http2.ConfigureTransport(b.transport); err != nil {
 		return nil, err
 	}
+
 	b.tripper, err = lbtransport.New(target, b.transport, resolver, chooseBalancerPolicy(cnf))
 	if err != nil {
 		return nil, err
@@ -86,23 +103,12 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	return b, nil
 }
 
-func chooseDialFuncOpt(cnf *pb.Backend) func(ctx context.Context, network, addr string) (net.Conn, error) {
-	dialFunc := ParentDialFunc
-	if !cnf.DisableConntracking {
-		dialFunc = conntrack.NewDialContextFunc(
-			conntrack.DialWithName("http_backend_"+cnf.Name),
-			conntrack.DialWithDialContextFunc(dialFunc),
-			conntrack.DialWithTracing(),
-		)
-	}
-	return dialFunc
-}
-
 func buildTls(cnf *pb.Backend) (scheme string, tlsConfig *tls.Config) {
 	if sec := cnf.GetSecurity(); sec != nil {
 		tlsConfig = &tls.Config{InsecureSkipVerify: true}
 		if !sec.InsecureSkipVerify {
 			// TODO(mwitkow): add configuration TlsConfig fetching by name here.
+			panic("Not implemented") // Ugly but this matters.
 		}
 		return "https", tlsConfig
 	} else {
@@ -134,7 +140,7 @@ func chooseBalancerPolicy(cnf *pb.Backend) lbtransport.LBPolicy {
 	}
 }
 
-// schemeTripper rewrites the request's proto scheme to enforce the backend properties
+// SchemeTripper rewrites the request's proto scheme to enforce the backend properties.
 type schemeTripper struct {
 	expectedScheme string
 	parent         http.RoundTripper

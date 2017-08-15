@@ -12,15 +12,14 @@ type defaultTripper struct {
 }
 
 func Default(config *tls.Config) http.RoundTripper {
-	// Clone transport before using it. We don't want to modify the default one.
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
+			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
-			DualStack: true,
+			DualStack: false,
 		}).DialContext,
-		MaxIdleConns:          100,
+		MaxIdleConns:          4,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,

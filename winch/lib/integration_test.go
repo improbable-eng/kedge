@@ -287,24 +287,6 @@ func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute3_AuthError
 	s.assertBadGatewayPingback(req, resp, err)
 }
 
-func (s *WinchIntegrationSuite) TestXConcurrentCallsKedgeThroughWinch_RegexpRoute_ValidAuth() {
-	cl := s.forwardProxyClient()
-	const calls = 1000
-	wg := &sync.WaitGroup{}
-	for i := 0; i < calls; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			req := &http.Request{Method: "GET", URL: urlMustParse("http://service1.ab1-prod.internal.example.com/some/strict/path")}
-			resp, err := cl.Do(req)
-			s.assertSuccessfulPingback(req, resp, err, 2)
-			s.Assert().Equal("user:password", resp.Header.Get("x-test-auth-value"))
-			s.Assert().Equal("", resp.Header.Get("x-test-proxy-auth-value"))
-		}()
-	}
-	wg.Wait()
-}
-
 // Client that will proxy through winch.
 func (s *WinchIntegrationSuite) forwardProxyClient() *http.Client {
 	return &http.Client{

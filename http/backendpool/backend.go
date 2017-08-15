@@ -53,7 +53,6 @@ func (b *backend) Tripper() http.RoundTripper {
 
 // Close is used when backend is removed from configuration dynamically.
 func (b *backend) Close() error {
-	panic("back close")
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.closed = true

@@ -143,6 +143,7 @@ func unknownPingbackHandler(serverAddr string) http.Handler {
 		resp.Header().Set("x-test-auth-value", req.Header.Get("Authorization"))
 		resp.Header().Set("x-test-proxy-auth-value", req.Header.Get("Proxy-Authorization"))
 		resp.WriteHeader(http.StatusAccepted) // accepted to make sure stuff is slightly different.
+		resp.Write([]byte("TEST"))
 	})
 }
 
@@ -368,6 +369,12 @@ func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Reques
 	assert.Equal(s.T(), req.URL.Host, resp.Header.Get("x-test-req-host"), "host seen on backend must match requested host")
 	assert.Equal(s.T(), authValue, resp.Header.Get("x-test-auth-value"))
 	assert.Empty(s.T(), resp.Header.Get("x-test-proxy-auth-value")) // Proxy value should be cut down.
+
+	s.Require().NotNil(resp.Body, "Body should not be empty")
+	b, err := ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on a read all body")
+	defer resp.Body.Close()
+	s.Assert().Equal("TEST", string(b))
 }
 
 func testRequest(url string, backendSecret string, proxySecret string) *http.Request {

@@ -13,9 +13,18 @@ var (
 	testFailBlacklistDuration = 2 * time.Second
 )
 
-func TestRoundRobinPolicy_PickWithGlobalBlacklists(t *testing.T) {
-	req := httptest.NewRequest("GET", "http://127.0.0.1/x", nil)
+func assertTargetsPickedInOrder(t *testing.T, picker LBPolicyPicker, testTargets []*Target, expectedTargets... *Target) {
+	req := httptest.NewRequest("GET", "http://does-not-matter", nil)
 
+	// Picking serially should give targets in exact order.
+	for _, expected := range expectedTargets {
+		target, err := picker.Pick(req, testTargets)
+		require.NoError(t, err)
+		assert.Equal(t, expected, target)
+	}
+}
+
+func TestRoundRobinPolicy_PickWithGlobalBlacklists(t *testing.T) {
 	now := time.Now()
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: testFailBlacklistDuration,
@@ -37,102 +46,59 @@ func TestRoundRobinPolicy_PickWithGlobalBlacklists(t *testing.T) {
 		},
 	}
 
-	// Test Global blacklist.
-	picker := rr.Picker()
-	// Picking serially should give targets in exact order.
-	target, err := picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[0], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
+	picker1 := rr.Picker()
+	assertTargetsPickedInOrder(t, picker1, testTargets, testTargets[1], testTargets[2], testTargets[0], testTargets[1])
 
 	rr.atomicCounter = 0
-	picker.ExcludeTarget(testTargets[0])
-
-	// To test global blacklist we need to spawn another picker!
-	picker = rr.Picker()
-
-	// With target nr 0 in Global blacklist, even new picker should give targets in exact order without that failing without the first one.
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
-
+	picker1.ExcludeTarget(testTargets[0])
 	assert.True(t, rr.isTargetBlacklisted(testTargets[0]))
 
+	// To test global blacklist we need to spawn another picker.
+	picker2 := rr.Picker()
+
+	// With target number 0 in Global blacklist new picker should give targets in exact order without that failing one.
+	assertTargetsPickedInOrder(t, picker2, testTargets, testTargets[1], testTargets[2], testTargets[1])
+
 	rr.atomicCounter = 0
-	picker.ExcludeTarget(testTargets[1])
-
-	// To test global blacklist we need to spawn another picker!
-	picker = rr.Picker()
-
-	// With target nr 1 excluded, picking serially should give us the last working target.
-	// Time not passed so even that we can dial to target nr 0 it should stay in blacklist.
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
-
+	picker2.ExcludeTarget(testTargets[1])
 	assert.True(t, rr.isTargetBlacklisted(testTargets[0]))
 	assert.True(t, rr.isTargetBlacklisted(testTargets[1]))
 
-	picker.ExcludeTarget(testTargets[2])
-	// To test global blacklist we need to spawn another picker!
-	picker = rr.Picker()
+	// To test global blacklist we need to spawn another picker.
+	picker3 := rr.Picker()
 
-	_, err = picker.Pick(req, testTargets)
-	require.Error(t, err, "all targets should be in blacklist")
+	// With target number 1 excluded as well, picking serially should give us the last working target.
+	// Time not passed so nothing is included from last blacklist.
+	assertTargetsPickedInOrder(t, picker3, testTargets, testTargets[2], testTargets[2], testTargets[2])
 
+	picker3.ExcludeTarget(testTargets[2])
 	assert.True(t, rr.isTargetBlacklisted(testTargets[0]))
 	assert.True(t, rr.isTargetBlacklisted(testTargets[1]))
 	assert.True(t, rr.isTargetBlacklisted(testTargets[2]))
+
+	// To test global blacklist we need to spawn another picker.
+	picker4 := rr.Picker()
+
+	req := httptest.NewRequest("GET", "http://does-not-matter", nil)
+	_, err := picker4.Pick(req, testTargets)
+	require.Error(t, err, "all targets should be in blacklist")
 
 	rr.atomicCounter = 0
 	// Let's imagine time passed, so all blacklisted guys should be fine now.
 	rr.timeNow = func() time.Time {
 		return now.Add(testFailBlacklistDuration).Add(10 * time.Millisecond)
 	}
-	picker.ExcludeTarget(testTargets[2])
+	picker4.ExcludeTarget(testTargets[2])
+	assert.True(t, rr.isTargetBlacklisted(testTargets[2]))
 
 	// To test global blacklist we need to spawn another picker!
-	picker = rr.Picker()
+	picker5 := rr.Picker()
 
-	// Still target nr 2 is excluded, but rest should be removed from blacklist and included in pick.
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[0], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
+	// Still target number 2 is excluded, but rest should be removed from blacklist and included in pick.
+	assertTargetsPickedInOrder(t, picker5, testTargets, testTargets[1], testTargets[0], testTargets[1])
 }
 
 func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
-	req := httptest.NewRequest("GET", "http://127.0.0.1/x", nil)
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: 0 * time.Millisecond, // No global blacklist!
 		blacklistedTargets:       make(map[Target]time.Time),
@@ -151,66 +117,34 @@ func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
 		},
 	}
 
-	picker := rr.Picker()
-
-	// Picking serially should give targets in exact order.
-	target, err := picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[0], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
+	picker1 := rr.Picker()
+	assertTargetsPickedInOrder(t, picker1, testTargets, testTargets[1], testTargets[2], testTargets[0], testTargets[1])
 
 	rr.atomicCounter = 0
-	picker.ExcludeTarget(testTargets[0])
+	picker1.ExcludeTarget(testTargets[0])
+	assert.True(t, picker1.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[0]))
 
-	// With target nr 0 only in local blacklist, even new picker should give targets in exact order without that failing without the first one.
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
 
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
-
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[1], target)
-
-	assert.True(t, picker.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[0]))
+	// With target number 0 in local blacklist new picker should give targets in exact order without that failing one.
+	assertTargetsPickedInOrder(t, picker1, testTargets, testTargets[1], testTargets[2], testTargets[1])
 
 	rr.atomicCounter = 0
-	picker.ExcludeTarget(testTargets[1])
+	picker1.ExcludeTarget(testTargets[1])
+	assert.True(t, picker1.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[0]))
+	assert.True(t, picker1.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[1]))
 
-	// With target nr 1 excluded, picking serially should give us the last working target.
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
+	// With target number 1 excluded as well, picking serially should give us the last working target.
+	// Time not passed so nothing is included from last blacklist.
+	assertTargetsPickedInOrder(t, picker1, testTargets, testTargets[2], testTargets[2], testTargets[2])
 
-	target, err = picker.Pick(req, testTargets)
-	require.NoError(t, err)
-	assert.Equal(t, testTargets[2], target)
+	picker1.ExcludeTarget(testTargets[2])
+	assert.True(t, picker1.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[0]))
+	assert.True(t, picker1.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[1]))
+	assert.True(t, picker1.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[2]))
 
-	assert.True(t, picker.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[0]))
-	assert.True(t, picker.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[1]))
-
-	picker.ExcludeTarget(testTargets[2])
-
-	_, err = picker.Pick(req, testTargets)
+	req := httptest.NewRequest("GET", "http://does-not-matter", nil)
+	_, err := picker1.Pick(req, testTargets)
 	require.Error(t, err, "all targets should be in blacklist")
-
-	assert.True(t, picker.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[0]))
-	assert.True(t, picker.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[1]))
-	assert.True(t, picker.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[2]))
 }
 
 func TestRoundRobinPolicy_CleanupBlacklist(t *testing.T) {

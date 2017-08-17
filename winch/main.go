@@ -32,8 +32,8 @@ import (
 var (
 	flagHttpPort = sharedflags.Set.Int("server_http_port", 8070, "TCP port to listen on for HTTP1.1/REST calls.")
 
-	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
-	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
+	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 15*time.Second, "HTTP server config, max write duration.")
+	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 15*time.Second, "HTTP server config, max read duration.")
 	flagMapperConfig        = protoflagz.DynProto3(sharedflags.Set,
 		"server_mapper_config",
 		&pb_config.MapperConfig{},
@@ -44,6 +44,7 @@ var (
 		&pb_config.AuthConfig{},
 		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
 		WithFileFlag("../../misc/winch_auth.json").WithValidator(validateMapper)
+	flagLogLevel = sharedflags.Set.String("log_level", "info", "Log level")
 )
 
 func validateMapper(msg proto.Message) error {
@@ -68,6 +69,13 @@ func main() {
 	}
 
 	log.SetOutput(os.Stdout)
+
+	lvl, err := log.ParseLevel(*flagLogLevel)
+	if err != nil {
+		log.WithError(err).Fatal("Cannot parse log level: %s", *flagLogLevel)
+	}
+
+	log.SetLevel(lvl)
 	logEntry := log.NewEntry(log.StandardLogger())
 
 	var httpPlainListener net.Listener
@@ -112,7 +120,7 @@ func main() {
 		Handler: chi.Chain(
 			http_ctxtags.Middleware("winch"),
 			http_debug.Middleware(),
-			http_logrus.Middleware(logEntry),
+			http_logrus.Middleware(logEntry, http_logrus.WithLevels(winchCodeToLevel)),
 		).Handler(mux),
 	}
 
@@ -152,4 +160,16 @@ func buildListenerOrFail(name string, port int) net.Listener {
 		conntrack.TrackWithTcpKeepAlive(20*time.Second),
 		conntrack.TrackWithTracing(),
 	)
+}
+
+func winchCodeToLevel(httpStatusCode int) log.Level {
+	if httpStatusCode < 400 || httpStatusCode == http.StatusNotFound {
+		return log.DebugLevel
+	} else if httpStatusCode < 500 {
+		return log.WarnLevel
+	} else if httpStatusCode < 600 {
+		return log.ErrorLevel
+	} else {
+		return log.ErrorLevel
+	}
 }

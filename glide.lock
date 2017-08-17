@@ -1,5 +1,5 @@
-hash: 3604eec2bac667b6b4136e4a81bf181bd3f9b4b98fc10b1feabe3faa023daabd
-updated: 2017-08-07T15:30:56.326839345+01:00
+hash: b04c33a5fb619f5e53dc167b2d4d39c1bedcec87cad4f5a79dda716720280383
+updated: 2017-08-15T14:56:20.205598143+01:00
 imports:
 - name: cloud.google.com/go
   version: fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0
@@ -10,7 +10,7 @@ imports:
   subpackages:
   - quantile
 - name: github.com/Bplotka/oidc
-  version: 9897ac56cc83394469cfb53e791a95adfcd75178
+  version: ffd69540d1a1c458e4edd9b0b055ffcefe05a50e
   subpackages:
   - authorize
   - login
@@ -147,6 +147,8 @@ imports:
   version: 7b3d51468778ed0c53045edd7015b5a21f902d53
 - name: github.com/sirupsen/logrus
   version: 181d419aa9e2223811b824e8f0b4af96f9ba9302
+  subpackages:
+  - hooks/test
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: github.com/stretchr/objx

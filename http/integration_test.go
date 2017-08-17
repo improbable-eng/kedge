@@ -46,6 +46,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/http/client"
+	"log"
+	"os"
 )
 
 const (
@@ -141,6 +143,7 @@ func unknownPingbackHandler(serverAddr string) http.Handler {
 		resp.Header().Set("x-test-auth-value", req.Header.Get("Authorization"))
 		resp.Header().Set("x-test-proxy-auth-value", req.Header.Get("Proxy-Authorization"))
 		resp.WriteHeader(http.StatusAccepted) // accepted to make sure stuff is slightly different.
+		resp.Write([]byte("TEST"))
 	})
 }
 
@@ -157,8 +160,13 @@ func buildAndStartServer(t *testing.T, config *tls.Config) (net.Listener, *http.
 	if config != nil {
 		listener = tls.NewListener(listener, config)
 	}
+	prefix := "nonsecure backend: "
+	if config != nil {
+		prefix = "secure backend: "
+	}
 	server := &http.Server{
 		Handler: unknownPingbackHandler(listener.Addr().String()),
+		ErrorLog: log.New(os.Stderr, prefix, 0),
 	}
 	go func() {
 		server.Serve(listener)
@@ -361,6 +369,12 @@ func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Reques
 	assert.Equal(s.T(), req.URL.Host, resp.Header.Get("x-test-req-host"), "host seen on backend must match requested host")
 	assert.Equal(s.T(), authValue, resp.Header.Get("x-test-auth-value"))
 	assert.Empty(s.T(), resp.Header.Get("x-test-proxy-auth-value")) // Proxy value should be cut down.
+
+	s.Require().NotNil(resp.Body, "Body should not be empty")
+	b, err := ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on a read all body")
+	defer resp.Body.Close()
+	s.Assert().Equal("TEST", string(b))
 }
 
 func testRequest(url string, backendSecret string, proxySecret string) *http.Request {
@@ -374,6 +388,7 @@ func testRequest(url string, backendSecret string, proxySecret string) *http.Req
 	}
 	return req
 }
+
 func (s *HttpProxyingIntegrationSuite) TestSuccessOverForwardProxy_DialUsingAddresser() {
 	// Pick a port of any non secure backend.
 	addr := s.localBackends["_http._tcp.nonsecure.backends.test.local"].targets()[0].DialAddr
@@ -514,6 +529,18 @@ func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToNonSecureBackend() {
 
 func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
 	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "bearer abc8", testProxyAuthValue)
+	resp, err := s.kedgeClient.Do(req)
+	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+}
+
+func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_MatchWithGenericRoute() {
+	req := testRequest("http://nonsecure.ext.example.com:80/some/strict/path", "bearer abc8", testProxyAuthValue)
+	resp, err := s.kedgeClient.Do(req)
+	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+}
+
+func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_SpecialRoute() {
+	req := testRequest("http://nonsecure.ext.withport.example.com:81/some/strict/path", "bearer abc8", testProxyAuthValue)
 	resp, err := s.kedgeClient.Do(req)
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
 }

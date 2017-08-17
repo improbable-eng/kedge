@@ -2,6 +2,7 @@ package tripperware
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/lib/auth"
@@ -22,6 +23,7 @@ type authTripper struct {
 
 	authHeader    string
 	authTag       string
+	authTimeTag   string
 	authFromRoute func(route *kedge_map.Route) (auth.Source, bool)
 }
 
@@ -43,7 +45,9 @@ func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	tags := http_ctxtags.ExtractInbound(req)
 	tags.Set(t.authTag, authSource.Name())
 
+	now := time.Now()
 	val, err := authSource.HeaderValue()
+	tags.Set(t.authTimeTag, time.Since(now).String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "authTripper: Failed to get header value from authSource %s", authSource.Name())
 	}
@@ -54,9 +58,10 @@ func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func WrapForProxyAuth(parentTransport http.RoundTripper) http.RoundTripper {
 	return &authTripper{
-		parent:     parentTransport,
-		authHeader: ProxyAuthHeader,
-		authTag:    ctxtags.TagForProxyAuth,
+		parent:      parentTransport,
+		authHeader:  ProxyAuthHeader,
+		authTag:     ctxtags.TagForProxyAuth,
+		authTimeTag: ctxtags.TagForProxyAuthTime,
 		authFromRoute: func(route *kedge_map.Route) (auth.Source, bool) {
 			return route.ProxyAuth, route.ProxyAuth != nil
 		},
@@ -65,9 +70,10 @@ func WrapForProxyAuth(parentTransport http.RoundTripper) http.RoundTripper {
 
 func WrapForBackendAuth(parentTransport http.RoundTripper) http.RoundTripper {
 	return &authTripper{
-		parent:     parentTransport,
-		authHeader: authHeader,
-		authTag:    ctxtags.TagForAuth,
+		parent:      parentTransport,
+		authHeader:  authHeader,
+		authTag:     ctxtags.TagForAuth,
+		authTimeTag: ctxtags.TagForBackendAuthTime,
 		authFromRoute: func(route *kedge_map.Route) (auth.Source, bool) {
 			return route.BackendAuth, route.BackendAuth != nil
 		},

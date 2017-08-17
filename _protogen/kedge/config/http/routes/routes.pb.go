@@ -63,8 +63,9 @@ type Route struct {
 	// / If none are present, the route skips metadata checks.
 	HeaderMatcher map[string]string `protobuf:"bytes,4,rep,name=header_matcher,json=headerMatcher" json:"header_matcher,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// / proxy_mode controlls what kind of inbound requests this route matches. See
-	ProxyMode   ProxyMode `protobuf:"varint,5,opt,name=proxy_mode,json=proxyMode,enum=kedge.config.http.routes.ProxyMode" json:"proxy_mode,omitempty"`
-	PortMatcher uint32    `protobuf:"varint,6,opt,name=port_matcher,json=portMatcher" json:"port_matcher,omitempty"`
+	ProxyMode ProxyMode `protobuf:"varint,5,opt,name=proxy_mode,json=proxyMode,enum=kedge.config.http.routes.ProxyMode" json:"proxy_mode,omitempty"`
+	// / Optional port matcher. If 0 route will ignore port.
+	PortMatcher uint32 `protobuf:"varint,6,opt,name=port_matcher,json=portMatcher" json:"port_matcher,omitempty"`
 }
 
 func (m *Route) Reset()                    { *m = Route{} }

@@ -1,9 +1,7 @@
 package lbtransport
 
 import (
-	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -19,10 +17,17 @@ var (
 		"Timeout for trial dialing if enabled.")
 )
 
-// LBPolicy decides which target to pick for a given call.
 type LBPolicy interface {
+	// Picker returns PolicyPicker that is suitable to be used within single request.
+	Picker() LBPolicyPicker
+}
+
+// LBPolicyPicker decides which target to pick for a given call. Should be short-living.
+type LBPolicyPicker interface {
 	// Pick decides on which target to use for the request out of the provided ones.
 	Pick(req *http.Request, currentTargets []*Target) (*Target, error)
+	// ExcludeHost excludes the given target for a short time. It is useful to report no connection (even temporary).
+	ExcludeTarget(*Target)
 }
 
 // Target represents the canonical address of a backend.
@@ -31,9 +36,9 @@ type Target struct {
 }
 
 // roundRobinPolicy picks target using round robin behaviour.
-// It also dials to the chosen target to check if it is accessible. That handles the situation when DNS
-// resolution contains invalid targets. If the target is not accessible, it blacklists it for defined period of time called
-// "blacklist backoff".
+// It does NOT dial to the chosen target to check if it is accessible, instead it exposes ExcludeTarget method that allows to report
+// connection troubles. That handles the situation when DNS resolution contains invalid targets. In  that case, it
+// blacklists it for defined period of time called "blacklist backoff".
 type roundRobinPolicy struct {
 	blacklistBackoffDuration time.Duration
 	blacklistMu              sync.Mutex
@@ -42,9 +47,7 @@ type roundRobinPolicy struct {
 	atomicCounter uint64
 
 	dialTimeout time.Duration
-	tryDialFunc func(ctx context.Context, target *Target) bool
-
-	timeNow func() time.Time
+	timeNow     func() time.Time
 }
 
 func RoundRobinPolicyFromFlags() LBPolicy {
@@ -57,8 +60,7 @@ func RoundRobinPolicy(backoffDuration time.Duration, dialTimeout time.Duration) 
 		blacklistedTargets:       make(map[Target]time.Time),
 		dialTimeout:              dialTimeout,
 
-		tryDialFunc: tryDial,
-		timeNow:     time.Now,
+		timeNow: time.Now,
 	}
 
 	go func() {
@@ -108,48 +110,52 @@ func (rr *roundRobinPolicy) blacklistTarget(target *Target) {
 	rr.blacklistedTargets[*target] = rr.timeNow()
 }
 
-func (rr *roundRobinPolicy) isTrialDialingDisabled() bool {
+func (rr *roundRobinPolicy) isBlacklistDisabled() bool {
 	return rr.blacklistBackoffDuration == (0 * time.Microsecond)
 }
 
-func (rr *roundRobinPolicy) Pick(r *http.Request, currentTargets []*Target) (*Target, error) {
+func (rr *roundRobinPolicy) Picker() LBPolicyPicker {
+	return &roundRobinPolicyPicker{
+		base:           rr,
+		localBlacklist: make(map[Target]struct{}),
+	}
+}
+
+type roundRobinPolicyPicker struct {
+	base *roundRobinPolicy
+
+	// To make sure we only retry for valid targets.
+	localBlacklist map[Target]struct{}
+}
+
+func (rr *roundRobinPolicyPicker) isTargetLocallyBlacklisted(target *Target) bool {
+	_, ok := rr.localBlacklist[*target]
+	return ok
+}
+
+func (rr *roundRobinPolicyPicker) Pick(r *http.Request, currentTargets []*Target) (*Target, error) {
 	for range currentTargets {
 		count := uint64(len(currentTargets))
-		id := atomic.AddUint64(&(rr.atomicCounter), 1)
+		id := atomic.AddUint64(&(rr.base.atomicCounter), 1)
 		targetId := int(id % count)
 		target := currentTargets[targetId]
 
-		if rr.isTrialDialingDisabled() {
-			return currentTargets[targetId], nil
+		if rr.isTargetLocallyBlacklisted(target) {
+			// That target is blacklisted in local blacklist. Check another target.
+			continue
 		}
 
-		if rr.isTargetBlacklisted(target) {
+		if !rr.base.isBlacklistDisabled() && rr.base.isTargetBlacklisted(target) {
 			// That target is blacklisted. Check another one.
 			continue
 		}
 
-		// Target not blacklisted before, try it first.
-		dialCtx, cancel := context.WithTimeout(r.Context(), rr.dialTimeout)
-		if rr.tryDialFunc(dialCtx, target) {
-			cancel()
-			return currentTargets[targetId], nil
-		}
-		cancel()
-		rr.blacklistTarget(target)
+		return currentTargets[targetId], nil
 	}
 	return nil, fmt.Errorf("All targets %d are failing, try later.", len(currentTargets))
 }
 
-func tryDial(ctx context.Context, target *Target) bool {
-	var dialTimeout time.Duration
-	if deadline, ok := ctx.Deadline(); ok {
-		dialTimeout = deadline.Sub(time.Now())
-	}
-	// Try to do quick dial to check if the target is listening.
-	conn, err := net.DialTimeout("tcp", target.DialAddr, dialTimeout)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
+func (rr *roundRobinPolicyPicker) ExcludeTarget(target *Target) {
+	rr.base.blacklistTarget(target)
+	rr.localBlacklist[*target] = struct{}{}
 }

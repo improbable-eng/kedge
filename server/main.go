@@ -197,7 +197,7 @@ func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logE
 	return &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagsForScheme, "tls")),
+		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
 		Handler:      http.HandlerFunc(httpBouncerHandler),
 	}
 }
@@ -209,7 +209,7 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 
 	m.Handle("/_version",
 		// The only one worth to log.
-		chi.Chain(http_logrus.Middleware(logEntry.WithField(ctxtags.TagsForScheme, "plain"))).Handler(middlewares.HandlerFunc(versionEndpoint)))
+		chi.Chain(http_logrus.Middleware(logEntry.WithField(ctxtags.TagForScheme, "plain"))).Handler(middlewares.HandlerFunc(versionEndpoint)))
 	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 
 	m.Handle("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))
@@ -223,7 +223,7 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	return &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagsForScheme, "tls")),
+		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
 		Handler:      m,
 	}, nil
 }

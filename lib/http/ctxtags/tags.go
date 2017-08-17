@@ -11,8 +11,15 @@ const (
 
 	// TagForProxyAdhoc is used in kedge proxy to specify adhoc rule used in request.
 	TagForProxyAdhoc = "http.proxy.adhoc"
-	// TagsForProxyBackend is used in kedge proxy to specify backend used in request.
-	TagsForProxyBackend = "http.proxy.backend"
-	// TagsForScheme specifies which scheme request is using. It is specified by each server.
-	TagsForScheme = "http.scheme"
+	// TagForProxyBackend is used in kedge proxy to specify backend used in request.
+	TagForProxyBackend = "http.proxy.backend"
+	// TagForScheme specifies which scheme request is using. It is specified by each server.
+	TagForScheme = "http.scheme"
+
+	// TagForProxyAuthTime specifies time that took to put valid proxy auth in Headers.
+	// It can sometimes take time in case of full OIDC login.
+	TagForProxyAuthTime = "http.proxy.auth.time"
+	// TagForBackendAuthTime specifies time that took to put valid backend auth in Headers.
+	// It can sometimes take time in case of full OIDC login.
+	TagForBackendAuthTime = "http.auth.time"
 )

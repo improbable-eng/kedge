@@ -1,19 +1,13 @@
 package lbtransport
 
 import (
-	"fmt"
+	"net"
 	"net/http"
 	"sync"
-	"time"
 
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
-)
-
-var (
-	// MaximumRefreshInterval decides the maximum sleep time between SRV Lookups, otherwise controlled by TTL of records.
-	MaximumRefreshInterval = 5 * time.Second
-	// ExpirationMargin, the margin before the TTL expiration on which we should re-resolve.
-	ExpirationMargin = 50 * time.Millisecond
 )
 
 type tripper struct {
@@ -27,6 +21,22 @@ type tripper struct {
 	currentTargets []*Target
 	close          chan struct{}
 	mu             sync.RWMutex
+}
+
+var (
+	failedDialsCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "kedge",
+			Subsystem: "http_lbtransport",
+			Name:      "failed_dials",
+			Help:      "Total number of failed dials that are in resolver and should blacklist the target.",
+		},
+		[]string{"resolve_addr", "target"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(failedDialsCounter)
 }
 
 // New creates a new load-balanced Round Tripper for a single backend.
@@ -94,22 +104,47 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	//	return nil, fmt.Errorf("lb: request Host '%v' doesn't match Target destination '%v'", r.Host, s.targetName)
 	//}
 	s.mu.RLock()
-	targetRef := s.currentTargets
+	targetsRef := s.currentTargets
 	lastResolvErr := s.lastResolveError
 	s.mu.RUnlock()
-	if len(targetRef) == 0 {
-		return nil, fmt.Errorf("lb: no targets available, last resolve err: %v", lastResolvErr)
+	if len(targetsRef) == 0 {
+		return nil, errors.Wrap(lastResolvErr, "lb: no targets available")
 	}
 
-	target, err := s.policy.Pick(r, targetRef)
-	if err != nil {
-		return nil, fmt.Errorf("lb: failed choosing target: %v", err)
-	}
+	picker := s.policy.Picker()
+	for {
+		target, err := picker.Pick(r, targetsRef)
+		if err != nil {
+			return nil, errors.Wrap(err, "lb: failed choosing target")
+		}
 
-	// Override the host for downstream Tripper, usually http.DefaultTransport.
-	// http.Default transport uses `URL.Host` for Dial(<host>) and relevant connection pooling.
-	// We override it to make sure it enters the appropriate dial method and hte appropriate connection pool.
-	// See http.connectMethodKey.
-	r.URL.Host = target.DialAddr
-	return s.parent.RoundTrip(r)
+		// Override the host for downstream Tripper, usually http.DefaultTransport.
+		// http.Default transport uses `URL.Host` for Dial(<host>) and relevant connection pooling.
+		// We override it to make sure it enters the appropriate dial method and the appropriate connection pool.
+		// See http.connectMethodKey.
+		r.URL.Host = target.DialAddr
+		resp, err := s.parent.RoundTrip(r)
+		if err == nil {
+			return resp, nil
+		}
+
+		if !isDialError(err) {
+			return resp, err
+		}
+
+		failedDialsCounter.WithLabelValues(s.targetName, target.DialAddr).Inc()
+
+		// Retry without this target.
+		// NOTE: We need to trust picker that it blacklist the targets well.
+		picker.ExcludeTarget(target)
+	}
+}
+
+func isDialError(err error) bool {
+	if opErr, ok := err.(*net.OpError); ok {
+		if opErr.Op == "dial" {
+			return true
+		}
+	}
+	return false
 }

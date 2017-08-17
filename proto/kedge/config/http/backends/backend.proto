@@ -19,9 +19,10 @@ message Backend {
     /// security controls the TLS connection details for the backend (HTTPS). If not present, insecure HTTP mode is used.
     Security security = 4;
 
+    // TODO(Bplotka): Uncomment when it will be implemented.
     /// interceptors controls what middleware will be available on every call made to this backend.
     /// These will be executed in order from left to right.
-    repeated Middleware middlewares = 5;
+    //repeated Middleware middlewares = 5;
 
     oneof resolver {
         common.resolvers.SrvResolver srv = 10;
@@ -35,6 +36,8 @@ enum Balancer {
     ROUND_ROBIN = 0;
 }
 
+
+// TODO(bplotka): Implemment that. Not really supported now.
 message Middleware {
     message Retry {
         /// retry_count specifies how many times to retry.
@@ -44,7 +47,7 @@ message Middleware {
     }
 
     oneof Middleware {
-        Retry prometheus = 1;
+        Retry retry = 1;
     }
 }
 

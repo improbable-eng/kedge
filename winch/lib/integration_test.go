@@ -6,9 +6,11 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"runtime"
 	"strconv"
@@ -19,10 +21,10 @@ import (
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/winch/lib"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/sirupsen/logrus"
 )
 
 func unknownPingbackHandler(id int) http.Handler {
@@ -34,6 +36,7 @@ func unknownPingbackHandler(id int) http.Handler {
 		resp.Header().Set("x-test-auth-value", req.Header.Get("Authorization"))
 		resp.Header().Set("x-test-proxy-auth-value", req.Header.Get("Proxy-Authorization"))
 		resp.WriteHeader(http.StatusAccepted) // accepted to make sure stuff is slightly different.
+		resp.Write([]byte("TEST"))
 	})
 }
 
@@ -50,7 +53,8 @@ func buildAndStartServer(t *testing.T, config *tls.Config, index int) (net.Liste
 	}
 	server := &http.Server{
 		// TODO(bplotka): Mimic OIDC support when added on kedge.
-		Handler: unknownPingbackHandler(index),
+		Handler:  unknownPingbackHandler(index),
+		ErrorLog: log.New(os.Stderr, fmt.Sprintf("kedge %d ", index), 0),
 	}
 	go func() {
 		server.Serve(listener)
@@ -212,11 +216,17 @@ func (s *WinchIntegrationSuite) TearDownSuite() {
 }
 
 func (s *WinchIntegrationSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, err error, kedgeID int) {
-	require.NoError(s.T(), err, "no error on a call to a winch")
-	assert.Empty(s.T(), resp.Header.Get("x-kedge-error"))
-	require.Equal(s.T(), http.StatusAccepted, resp.StatusCode)
-	assert.Equal(s.T(), req.URL.Path, resp.Header.Get("x-test-req-url"), "path seen on kedge must match requested path")
-	assert.Equal(s.T(), strconv.Itoa(kedgeID), resp.Header.Get("x-test-kedge-id"), "expected kedge must respond to our request")
+	s.Require().NoError(err, "no error on a call to a winch")
+	s.Assert().Empty(resp.Header.Get("x-kedge-error"))
+	s.Require().Equal(http.StatusAccepted, resp.StatusCode)
+	s.Assert().Equal(req.URL.Path, resp.Header.Get("x-test-req-url"), "path seen on kedge must match requested path")
+	s.Assert().Equal(strconv.Itoa(kedgeID), resp.Header.Get("x-test-kedge-id"), "expected kedge must respond to our request")
+
+	s.Require().NotNil(resp.Body, "Body should not be empty")
+	b, err := ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on a readall body")
+	defer resp.Body.Close()
+	s.Assert().Equal("TEST", string(b))
 }
 
 func (s *WinchIntegrationSuite) assertBadGatewayPingback(req *http.Request, resp *http.Response, err error) {
@@ -227,7 +237,7 @@ func (s *WinchIntegrationSuite) assertBadGatewayPingback(req *http.Request, resp
 	assert.Empty(s.T(), resp.Header.Get("x-test-kedge-id"))
 }
 
-func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_NoRout() {
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_NoRoute() {
 	req := &http.Request{Method: "GET", URL: urlMustParse("http://resourceXXX.ext.example.com/some/strict/path")}
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertBadGatewayPingback(req, resp, err)

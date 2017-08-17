@@ -170,6 +170,7 @@ func _Route_OneofSizer(msg proto.Message) (n int) {
 
 // / Simplest routing mechanism using just direct mapping between dns and (proxy) kedge target.
 type DirectRoute struct {
+	// Key needs to be in host:port format.
 	Key string `protobuf:"bytes,1,opt,name=key" json:"key,omitempty"`
 	Url string `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
 }
@@ -194,7 +195,7 @@ func (m *DirectRoute) GetUrl() string {
 }
 
 type RegexpRoute struct {
-	// Regexp RE2 expression that will be applied on given DNS.
+	// Regexp RE2 expression that will be applied on given domain:port
 	Exp string `protobuf:"bytes,1,opt,name=exp" json:"exp,omitempty"`
 	// Kedge URL to be used if we have a match. It can be a string including variable from regexp expression in a form
 	// of bash-like variable. E.g

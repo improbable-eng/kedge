@@ -26,7 +26,7 @@ message Backend {
 
     oneof resolver {
         common.resolvers.SrvResolver srv = 10;
-        common.resolvers.KubeResolver k8s = 11;
+        common.resolvers.K8sResolver k8s = 11;
     }
 }
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Bplotka/go-k8sresolver"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -23,6 +24,7 @@ import (
 	"github.com/mwitkow/grpc-proxy/proxy"
 	http_director "github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
+	"github.com/mwitkow/kedge/lib/logstash"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,7 +32,6 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"github.com/mwitkow/kedge/lib/logstash"
 )
 
 var (
@@ -47,6 +48,9 @@ var (
 )
 
 func main() {
+	sharedflags.Set.AddFlagSet(k8sresolver.FlagSet)
+
+	log.SetOutput(os.Stdout)
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
 		log.WithError(err).Fatalf("failed parsing flags")
 	}
@@ -66,7 +70,6 @@ func main() {
 		}
 		log.AddHook(hook)
 	}
-	log.SetOutput(os.Stdout)
 
 	grpc.EnableTracing = *flagGrpcWithTracing
 	logEntry := log.NewEntry(log.StandardLogger())

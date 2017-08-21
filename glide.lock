@@ -1,5 +1,5 @@
-hash: b04c33a5fb619f5e53dc167b2d4d39c1bedcec87cad4f5a79dda716720280383
-updated: 2017-08-15T14:56:20.205598143+01:00
+hash: e6d65143281575c3ecc034f86e67e4d7b5472924e46b7d1325a3dc2e49599267
+updated: 2017-08-21T17:25:42.789409625+01:00
 imports:
 - name: cloud.google.com/go
   version: fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0
@@ -9,6 +9,16 @@ imports:
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
   subpackages:
   - quantile
+- name: github.com/Bplotka/go-k8sresolver
+  version: 1ae1f28dcfd130453770d1ea8e29a19697238938
+- name: github.com/Bplotka/go-tokenauth
+  version: 88e9f6c7b19fa0ce19ab63476904e01417b53485
+  subpackages:
+  - http
+  - sources/direct
+  - sources/k8s
+  - sources/oauth2
+  - sources/oidc
 - name: github.com/Bplotka/oidc
   version: ffd69540d1a1c458e4edd9b0b055ffcefe05a50e
   subpackages:
@@ -16,6 +26,7 @@ imports:
   - login
   - login/diskcache
   - login/k8scache
+  - xerrors
 - name: github.com/bshuster-repo/logrus-logstash-hook
   version: 41029b88e98c8b459ff27040389b69a4db2a8d07
 - name: github.com/davecgh/go-spew

@@ -124,7 +124,6 @@ func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	if s := cnf.GetSrv(); s != nil {
 		return resolvers.NewSrvFromConfig(s)
 	} else if k := cnf.GetK8S(); k != nil {
-		// TODO(mwitkow): Deal with HTTP URLs to resolver for K8s. It sets a target==kubernetes://. This may not work.
 		return resolvers.NewK8sFromConfig(k)
 	}
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)

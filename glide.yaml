@@ -63,5 +63,6 @@ import:
   - tools/clientcmd
   - util/jsonpath
 - package: github.com/Bplotka/oidc
+- package: github.com/Bplotka/go-k8sresolver
 testImport:
 - package: github.com/go-chi/chi

@@ -45,6 +45,10 @@ var (
 	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 
 	flagLogstashAddress = sharedflags.Set.String("logstash_hostport", "", "Host:port of logstash for remote logging. If empty remote logging is disabled.")
+
+	flagLogTestBackendpoolResolution = sharedflags.Set.Bool("log_backend_resolution_on_startup", false, "With this option "+
+		"kedge will parse configuration, fill static backendpool, perform test resolution and print the resolved addresses."+
+		"Useful for debugging backend routings.")
 )
 
 func main() {
@@ -56,6 +60,12 @@ func main() {
 	}
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
 		log.WithError(err).Fatalf("failed reading flagz from files")
+	}
+
+	if *flagLogTestBackendpoolResolution {
+		log.SetLevel(log.DebugLevel)
+		testLogBackendpool(log.StandardLogger())
+		log.SetLevel(log.InfoLevel)
 	}
 
 	if *flagLogstashAddress != "" {

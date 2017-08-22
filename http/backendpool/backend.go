@@ -1,6 +1,7 @@
 package backendpool
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"github.com/mwitkow/kedge/http/lbtransport"
 	"github.com/mwitkow/kedge/lib/resolvers"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
 )
@@ -33,6 +35,8 @@ var (
 type backend struct {
 	mu sync.RWMutex
 
+	target    string
+	resolver  naming.Resolver
 	transport *http.Transport
 	tripper   http.RoundTripper
 	config    *pb.Backend
@@ -70,6 +74,8 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to construct resolver for backend %s", cnf.Name)
 	}
+	b.target = target
+	b.resolver = resolver
 
 	dialFunc := ParentDialFunc
 	if !cnf.DisableConntracking {
@@ -100,6 +106,56 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	b.tripper = buildTripperMiddlewareChain(cnf, b.tripper)
 	b.tripper = &schemeTripper{expectedScheme: scheme, parent: b.tripper}
 	return b, nil
+}
+
+func (b *backend) LogTestResolution(logger logrus.FieldLogger) {
+	logger = logger.WithField("target", b.target)
+
+	// Mimick run-time resolution to check if the target makes sense.
+	watcher, err := b.resolver.Resolve(b.target)
+	if err != nil {
+		logger.WithError(err).Error("Creating watcher failed.")
+		return
+	}
+
+	var updates []*naming.Update
+	ctx, cancel := context.WithCancel(context.TODO())
+	go func() {
+		for ctx.Err() == nil {
+			u, err := watcher.Next()
+			if err != nil {
+				if ctx.Err() != nil {
+					cancel()
+					return
+				}
+				logger.WithError(err).Error("Getting update failed.")
+				continue
+			}
+
+			updates = append(updates, u...)
+		}
+
+	}()
+
+	// Watch for next 2 seconds and try to reconstruct state.
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+	}
+	cancel()
+	watcher.Close()
+
+	addresses := map[string]struct{}{}
+	for _, u := range updates {
+		if u.Op == naming.Add {
+			addresses[u.Addr] = struct{}{}
+		}
+		if u.Op == naming.Delete {
+			delete(addresses, u.Addr)
+		}
+	}
+
+	logger.Infof("Resolved Addresses: %v", addresses)
 }
 
 func buildTls(cnf *pb.Backend) (scheme string, tlsConfig *tls.Config) {

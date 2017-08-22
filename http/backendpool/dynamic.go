@@ -2,9 +2,8 @@ package backendpool
 
 import (
 	"hash/fnv"
-	"sync"
-
 	"net/http"
+	"sync"
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 )

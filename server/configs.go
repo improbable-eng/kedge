@@ -52,7 +52,7 @@ func generalValidator(msg proto.Message) error {
 	return nil
 }
 
-func directorConfigReload(oldValue proto.Message, newValue proto.Message) {
+func directorConfigReload(_ proto.Message, newValue proto.Message) {
 	newConfig := newValue.(*pb_config.DirectorConfig)
 
 	// The gRPC and HTTP fields are guaranteed to be there because of validation.
@@ -61,7 +61,7 @@ func directorConfigReload(oldValue proto.Message, newValue proto.Message) {
 	httpAddresser.Update(newConfig.GetHttp().AdhocRules)
 }
 
-func backendConfigReloaded(oldValue proto.Message, newValue proto.Message) {
+func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 	newConfig := newValue.(*pb_config.BackendPoolConfig)
 
 	// The gRPC and HTTP fields are guaranteed to be there because of validation.

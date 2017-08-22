@@ -25,7 +25,7 @@ type Hook struct {
 	hostPort  string
 	conn      io.Writer
 	buffer    chan *logrus.Entry
-	errLogger *logrus.Logger
+	errLogger *logrus.Entry
 	formatter logrus.Formatter
 }
 
@@ -42,7 +42,7 @@ func NewHook(hostPort string, formatter logrus.Formatter) (*Hook, error) {
 	}
 
 	// We ignore error because we will try to reconnect inside Fire() if there is no connection.
-	errLogger := logrus.New()
+	errLogger := logrus.New().WithField("system", "logstash")
 	hook := &Hook{
 		hostPort:  hostPort,
 		conn:      NewReconnectingWriter(dial, errLogger),

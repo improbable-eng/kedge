@@ -10,7 +10,7 @@ imports:
   subpackages:
   - quantile
 - name: github.com/Bplotka/go-k8sresolver
-  version: 95602b9a7f8caeddbfef0a1e76416213c8f6a654
+  version: d730d5e1031d6e59d1b544bb83887b99f80cefeb
 - name: github.com/Bplotka/go-tokenauth
   version: 88e9f6c7b19fa0ce19ab63476904e01417b53485
   subpackages:

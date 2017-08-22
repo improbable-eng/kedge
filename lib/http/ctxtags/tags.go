@@ -22,4 +22,7 @@ const (
 	// TagForBackendAuthTime specifies time that took to put valid backend auth in Headers.
 	// It can sometimes take time in case of full OIDC login.
 	TagForBackendAuthTime = "http.auth.time"
+
+	// TagForBackendTarget specifies the target name used to resolve in lbtransport.
+	TagForBackendTarget = "http.backend.target"
 )

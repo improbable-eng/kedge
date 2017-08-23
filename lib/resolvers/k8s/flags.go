@@ -31,8 +31,7 @@ var (
 
 	// Different kinds of auth are supported. Currently supported with flags:
 	// - specifying file with token
-	// - specifying user (access) for kube config auth section to be reused (see
-	// https://github.com/Bplotka/go-tokenauth/blob/88e9f6c7b19fa0ce19ab63476904e01417b53485/sources/k8s/k8s.go)
+	// - specifying user (access) for kube config auth section to be reused
 	fTokenAuthPath = sharedflags.Set.String("k8sresolver_token_file", defaultSAToken,
 		"Path to service account token to be used. This auth method has priority 2.")
 	fKubeConfigAuthUser = sharedflags.Set.String("k8sresolver_kubeconfig_user", "",

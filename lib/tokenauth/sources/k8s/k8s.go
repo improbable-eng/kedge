@@ -2,12 +2,12 @@ package k8sauth
 
 import (
 	"github.com/mwitkow/kedge/lib/tokenauth"
-	"github.com/Bplotka/go-tokenauth/sources/direct"
-	"github.com/Bplotka/go-tokenauth/sources/oauth2"
-	"github.com/Bplotka/go-tokenauth/sources/oidc"
 	"github.com/Bplotka/oidc/login/k8scache"
 	"github.com/pkg/errors"
 	cfg "k8s.io/client-go/tools/clientcmd"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/oidc"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/oauth2"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
 )
 
 // New constructs appropriate tokenAuth Source to the given AuthInfo from kube config referenced by user.

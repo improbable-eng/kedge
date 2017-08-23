@@ -1,5 +1,5 @@
-hash: e6d65143281575c3ecc034f86e67e4d7b5472924e46b7d1325a3dc2e49599267
-updated: 2017-08-21T17:25:42.789409625+01:00
+hash: f4ae0280c4e03e3cf46f9b15f839c8ba24afa0bdcca553bd2bee45305079f044
+updated: 2017-08-23T09:01:14.689534372+01:00
 imports:
 - name: cloud.google.com/go
   version: fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0
@@ -144,8 +144,6 @@ imports:
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
-- name: github.com/sercand/kuberesolver
-  version: 7b3d51468778ed0c53045edd7015b5a21f902d53
 - name: github.com/sirupsen/logrus
   version: 181d419aa9e2223811b824e8f0b4af96f9ba9302
   subpackages:

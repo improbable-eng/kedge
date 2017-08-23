@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/Bplotka/go-tokenauth/sources/oidc"
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/tokenauth"
 	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
 	"github.com/mwitkow/kedge/lib/tokenauth/sources/k8s"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/oidc"
 )
 
 var NoAuth tokenauth.Source = nil

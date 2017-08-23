@@ -17,10 +17,10 @@ type ReconnectingWriter struct {
 	underlyingConn net.Conn
 	dial           dialFunc
 	backoff        *backoff.Backoff
-	errLogger      *logrus.Entry
+	errLogger      logrus.FieldLogger
 }
 
-func NewReconnectingWriter(dial dialFunc, errLogger *logrus.Entry) *ReconnectingWriter {
+func NewReconnectingWriter(dial dialFunc, errLogger logrus.FieldLogger) *ReconnectingWriter {
 	return &ReconnectingWriter{
 		dial:      dial,
 		errLogger: errLogger,

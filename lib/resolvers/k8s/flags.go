@@ -55,7 +55,7 @@ func NewFromFlags(logger logrus.FieldLogger) (naming.Resolver, error) {
 		return nil, errors.Wrapf(err, "k8sresolver: k8sresolver_kubeapi_url flag needs to be valid URL. Value %s ", k8sURL)
 	}
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: *fInsecureSkipVerify,
 	}
 	if !*fInsecureSkipVerify {
 		ca, err := ioutil.ReadFile(*fKubeAPIRootCAPath)

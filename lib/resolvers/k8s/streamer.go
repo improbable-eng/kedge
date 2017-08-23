@@ -73,7 +73,8 @@ func (w *streamWatcher) watch(ctx context.Context) {
 		}
 		w.logger.Debug("Started new Watch Enpoints stream.")
 
-		err = w.proxyEvents(ctx, stream)
+		err = w.proxyEvents(ctx, json.NewDecoder(stream))
+		stream.Close()
 		if ctx.Err() != nil {
 			return
 		}
@@ -86,10 +87,7 @@ func (w *streamWatcher) watch(ctx context.Context) {
 
 // proxyEvents is blocking method that gets events in loop and on success proxies to eventsCh.
 // It ends only when context is cancelled and/or stream is broken.
-func (w *streamWatcher) proxyEvents(ctx context.Context, stream io.ReadCloser) error {
-	defer stream.Close()
-
-	decoder := json.NewDecoder(stream)
+func (w *streamWatcher) proxyEvents(ctx context.Context, decoder *json.Decoder) error {
 	connectionErrCh := make(chan error)
 	go func() {
 		defer close(connectionErrCh)

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jpillora/backoff"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -54,10 +53,6 @@ func (m *endpointClientMock) StartChangeStream(ctx context.Context, t targetEntr
 	return m.connMock, nil
 }
 
-func (m *endpointClientMock) StartSingleUnary(ctx context.Context, t targetEntry, resourceVersion int) (io.ReadCloser, error) {
-	return nil, errors.New("Not implemented")
-}
-
 func TestStreamWatcher(t *testing.T) {
 	bytesCh := make(chan []byte)
 	errCh := make(chan error)
@@ -67,7 +62,7 @@ func TestStreamWatcher(t *testing.T) {
 	connMock := &readerCloserMock{
 		Ctx:     ctx,
 		BytesCh: bytesCh,
-		ErrCh: errCh,
+		ErrCh:   errCh,
 	}
 
 	testTarget := targetEntry{
@@ -129,10 +124,10 @@ func TestStreamWatcher(t *testing.T) {
 	errCh <- io.EOF
 	// Just expect reconnect.
 	select {
-		case <-eventsCh:
-			t.Error("No event was expected")
-		// Not really nice to use time in tests, but should be enough for now.
-		case <-time.After(200 * time.Millisecond):
+	case <-eventsCh:
+		t.Error("No event was expected")
+	// Not really nice to use time in tests, but should be enough for now.
+	case <-time.After(200 * time.Millisecond):
 	}
 
 	// This error should recreate stream

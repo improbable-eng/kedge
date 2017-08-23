@@ -11,7 +11,6 @@ import (
 
 type endpointClient interface {
 	StartChangeStream(ctx context.Context, t targetEntry, resourceVersion int) (io.ReadCloser, error)
-	StartSingleUnary(ctx context.Context, t targetEntry, resourceVersion int) (io.ReadCloser, error)
 }
 
 type client struct {
@@ -37,21 +36,7 @@ func (c *client) StartChangeStream(ctx context.Context, t targetEntry, resourceV
 	return c.startGET(ctx, epWatchURL)
 }
 
-// StartSingleUnary starts HTTP GET request to fetch full single endpoint.
-func (c *client) StartSingleUnary(ctx context.Context, t targetEntry, resourceVersion int) (io.ReadCloser, error) {
-	epListURL := fmt.Sprintf("%s/api/v1/namespaces/%s/endpoints/%s",
-		c.k8sURL,
-		t.namespace,
-		t.service,
-	)
-
-	if resourceVersion != 0 {
-		epListURL = fmt.Sprintf("%s?resourceVersion=%d", epListURL, resourceVersion)
-	}
-
-	return c.startGET(ctx, epListURL)
-}
-
+// NOTE: It is caller responsibility to read body through and close it.
 func (c *client) startGET(ctx context.Context, url string) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

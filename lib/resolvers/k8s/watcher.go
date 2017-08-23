@@ -14,8 +14,10 @@ import (
 
 var (
 	watchRetryBackoff = &backoff.Backoff{
-		Min: 20 * time.Millisecond,
-		Max: 3 * time.Second,
+		Min:    20 * time.Millisecond,
+		Jitter: true,
+		Factor: 2,
+		Max:    3 * time.Second,
 	}
 )
 
@@ -47,7 +49,7 @@ func startNewWatcher(logger logrus.FieldLogger, target targetEntry, epClient end
 		lastUpdates: make(map[string]struct{}),
 	}
 
-	go startWatchingEndpointsChanges(ctx, logger, target, epClient, w.watchChange, watchRetryBackoff, 0)
+	startWatchingEndpointsChanges(ctx, logger, target, epClient, w.watchChange, watchRetryBackoff, 0)
 	return w
 }
 

@@ -9,9 +9,10 @@ import (
 	"github.com/Bplotka/oidc/login/diskcache"
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/tokenauth"
-	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
 	"github.com/mwitkow/kedge/lib/tokenauth/sources/k8s"
 	"github.com/mwitkow/kedge/lib/tokenauth/sources/oidc"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/test"
+	"github.com/pkg/errors"
 )
 
 var NoAuth tokenauth.Source = nil
@@ -69,10 +70,15 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 		f.mux.HandleFunc(fmt.Sprintf("/winch/cleartoken/%s", configSource.Name), oidcClearTokenHandler(clearIDTokenFunc))
 
 	case *pb.AuthSource_Dummy:
-		source = directauth.New(
-			configSource.Name,
-			s.Dummy.Value,
-		)
+		testSource := &testauth.Source{
+			NameValue:  configSource.Name,
+			TokenValue: s.Dummy.Value,
+		}
+		if s.Dummy.Value == "" {
+			// Let's trigger error on that.
+			testSource.Err = errors.New("Error dummy auth source. No TokenValue specified")
+		}
+		source = testSource
 	default:
 		return nil, fmt.Errorf("source %v not supported.", reflect.TypeOf(s))
 	}

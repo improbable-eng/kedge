@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/pkg/errors"
 )
 
 func TestReconnectingWriter_WriteDoesNotReturnUntilWriteIsSuccessful(t *testing.T) {

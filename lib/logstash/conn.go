@@ -4,9 +4,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type dialFunc func() (net.Conn, error)
@@ -17,10 +17,10 @@ type ReconnectingWriter struct {
 	underlyingConn net.Conn
 	dial           dialFunc
 	backoff        *backoff.Backoff
-	errLogger      *logrus.Logger
+	errLogger      logrus.FieldLogger
 }
 
-func NewReconnectingWriter(dial dialFunc, errLogger *logrus.Logger) *ReconnectingWriter {
+func NewReconnectingWriter(dial dialFunc, errLogger logrus.FieldLogger) *ReconnectingWriter {
 	return &ReconnectingWriter{
 		dial:      dial,
 		errLogger: errLogger,

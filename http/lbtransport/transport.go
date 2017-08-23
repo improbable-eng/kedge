@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/mwitkow/go-httpwares/tags"
+	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
@@ -99,23 +101,22 @@ func (s *tripper) Close() error {
 }
 
 func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	// TODO(mwitkow): Fixup this target name matching. Can we even do it??
-	//if r.URL.Host != s.targetName {
-	//	return nil, fmt.Errorf("lb: request Host '%v' doesn't match Target destination '%v'", r.Host, s.targetName)
-	//}
+	tags := http_ctxtags.ExtractInbound(r)
+	tags.Set(ctxtags.TagForBackendAuthTime, s.targetName)
+
 	s.mu.RLock()
 	targetsRef := s.currentTargets
 	lastResolvErr := s.lastResolveError
 	s.mu.RUnlock()
 	if len(targetsRef) == 0 {
-		return nil, errors.Wrap(lastResolvErr, "lb: no targets available")
+		return nil, errors.Wrapf(lastResolvErr, "lb: no resolution available for %s", s.targetName)
 	}
 
 	picker := s.policy.Picker()
 	for {
 		target, err := picker.Pick(r, targetsRef)
 		if err != nil {
-			return nil, errors.Wrap(err, "lb: failed choosing target")
+			return nil, errors.Wrapf(err, "lb: failed choosing valid target for %s", s.targetName)
 		}
 
 		// Override the host for downstream Tripper, usually http.DefaultTransport.

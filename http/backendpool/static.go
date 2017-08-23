@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	"github.com/sirupsen/logrus"
 )
 
 // static is a Pool with a static configuration.
@@ -14,7 +15,7 @@ type static struct {
 }
 
 // NewStatic creates a backend pool that has static configuration.
-func NewStatic(backends []*pb.Backend) (Pool, error) {
+func NewStatic(backends []*pb.Backend) (*static, error) {
 	s := &static{backends: make(map[string]*backend)}
 	for _, beCnf := range backends {
 		be, err := newBackend(beCnf)
@@ -32,4 +33,10 @@ func (s *static) Tripper(backendName string) (http.RoundTripper, error) {
 		return nil, ErrUnknownBackend
 	}
 	return be.Tripper(), nil
+}
+
+func (s *static) LogTestResolution(logger logrus.FieldLogger) {
+	for k, backend := range s.backends {
+		backend.LogTestResolution(logger.WithField("backend", k))
+	}
 }

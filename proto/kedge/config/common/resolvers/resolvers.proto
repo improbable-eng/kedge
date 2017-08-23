@@ -12,14 +12,11 @@ message SrvResolver {
     uint32 port_override = 2;
 }
 
-/// KubeResolver uses the Kubernetes Endpoints API to identify the service.
-/// It requires the job to run inside a K8S pod and uses the pod's credentails to fetch the service information.
-message KubeResolver {
-    /// namespace is the k8s namespace to use.
-    /// If unset, it deafults to 'deafult'.
-    string namespace = 1;
-    /// service_name is the k8s service name to use.
-    string service_name = 2;
-    /// port_name is the name of the port to bind in the service.
-    string port_name = 3;
+/// K8sResolver uses the Kubernetes Endpoints API to identify the service.
+/// It watched Endpoint API for changes using the pod's credentails to fetch the service information.
+message K8sResolver {
+    // Common kube DNS name with optional port: "<service><|.namespace>(.whatever suffix)<|:port_name|:value number>"
+    // to resolve by this resolver using endpoints API.
+    // e.g ":backend1.namespace1:http_port1"
+    string dns_port_name = 1;
 }

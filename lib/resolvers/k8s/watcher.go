@@ -134,7 +134,7 @@ type address struct {
 
 type port struct {
 	Name string `json:"name"`
-	Port int    `json:"value"`
+	Port int    `json:"port"`
 }
 
 func subsetToAddresses(t targetEntry, sub subset) ([]string, error) {

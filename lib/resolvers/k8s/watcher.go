@@ -8,8 +8,8 @@ import (
 
 	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc/naming"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/naming"
 )
 
 var (
@@ -72,7 +72,7 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 		return []*naming.Update(nil), w.ctx.Err()
 	case r := <-w.watchChange:
 		if r.err != nil {
-			return []*naming.Update(nil), r.err
+			return []*naming.Update(nil), errors.Wrap(r.err, "error on reading event stream")
 		}
 		event = *r.ep
 	}
@@ -81,7 +81,7 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	for _, subset := range event.Object.Subsets {
 		updatedAddresses, err := subsetToAddresses(w.target, subset)
 		if err != nil {
-			return []*naming.Update(nil), err
+			return []*naming.Update(nil), errors.Wrap(err, "failed to convert k8s endpoint subset to update Addr")
 		}
 
 		for _, address := range updatedAddresses {

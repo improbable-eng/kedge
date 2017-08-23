@@ -127,13 +127,18 @@ func (w *streamWatcher) proxyEvents(ctx context.Context, stream io.ReadCloser) e
 			case added, modified, deleted, failed:
 				rv, err := strconv.Atoi(got.Object.Metadata.ResourceVersion)
 				if err != nil {
-					w.eventsCh <- watchResult{
-						ep:  &got,
-						err: err,
+					if got.Object.Metadata.ResourceVersion != "" {
+						w.eventsCh <- watchResult{
+							ep:  &got,
+							err: err,
+						}
+						continue
 					}
-					continue
+					w.logger.WithError(err).Error("ResourceVersion is empty for even type %s. Retrying with last SeenResourceVersion + 1", got.Type)
+					w.lastSeenResourceVersion += 1
+				} else {
+					w.lastSeenResourceVersion = rv
 				}
-				w.lastSeenResourceVersion = rv
 				w.eventsCh <- watchResult{
 					ep: &got,
 				}

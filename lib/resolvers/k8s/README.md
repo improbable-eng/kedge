@@ -15,8 +15,6 @@ Still todo:
  
 ## Usage 
 
-See [example](example/main.go) 
-
 ```go
 resolver, err := k8sresolver.NewFromFlags(nil)
 if err != nil {

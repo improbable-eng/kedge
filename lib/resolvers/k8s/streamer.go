@@ -134,7 +134,7 @@ func (w *streamWatcher) proxyEvents(ctx context.Context, stream io.ReadCloser) e
 						}
 						continue
 					}
-					w.logger.WithError(err).Error("ResourceVersion is empty for even type %s. Retrying with last SeenResourceVersion + 1", got.Type)
+					w.logger.WithError(err).Error("ResourceVersion is empty for event type %s. Retrying with lastSeenResourceVersion + 1", got.Type)
 					w.lastSeenResourceVersion += 1
 				} else {
 					w.lastSeenResourceVersion = rv

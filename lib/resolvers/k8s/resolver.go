@@ -14,8 +14,6 @@ import (
 	"github.com/mwitkow/kedge/lib/tokenauth/http"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/naming"
 	"google.golang.org/grpc/naming"
 )
 

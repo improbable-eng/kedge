@@ -2,19 +2,19 @@
 
 ### [v1.0.0-alpha.3](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.3)
 Kedge Service:
-* [x] - fixed remove logging
+* [x] - fixed remote logging
 * [x] - moved to glide as vendoring tool
 * [x] - added support for specifying port for director routes
 * [x] - added support for overwriting port on SRV lookup
 * [x] - implemented fully equipped k8sresolver (basing on k8s endpoints API)
 * [x] - updated OIDC library with patch
-* [x] - improved debuggability, passed proper logger with corresponded tags everywhere.
-* [x] - removed Trial dialing in favor of better error handling.
+* [x] - improved debuggability, passed proper logger with corresponded tags everywhere
+* [x] - removed Trial dialing in favor of better error handling
 
 Winch (kedge client):
 * [x] - various improvements for passing auth as well as addition for new auth types
 * [x] - added port matching on winch
-* [x] - various fixes for templating.
+* [x] - various fixes for templating
 
 ### [v1.0.0-alpha.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.2)
 Kedge Service:

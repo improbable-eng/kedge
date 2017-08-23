@@ -37,7 +37,6 @@ import:
 - package: github.com/prometheus/client_golang
   subpackages:
   - prometheus
-- package: github.com/sercand/kuberesolver
 - package: github.com/sirupsen/logrus
 - package: github.com/spf13/pflag
 - package: golang.org/x/net

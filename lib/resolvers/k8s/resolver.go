@@ -9,10 +9,13 @@ import (
 	"strconv"
 	"strings"
 
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	"github.com/mwitkow/kedge/lib/tokenauth"
 	"github.com/mwitkow/kedge/lib/tokenauth/http"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/naming"
 	"google.golang.org/grpc/naming"
 )
 
@@ -29,6 +32,15 @@ const (
 type resolver struct {
 	logger logrus.FieldLogger
 	cl     *client
+}
+
+func NewFromConfig(conf *pb.K8SResolver) (target string, name naming.Resolver, err error) {
+	logger := logrus.New().WithField("target", conf.GetDnsPortName())
+	resolver, err := NewFromFlags(logger)
+	if err != nil {
+		return "", nil, err
+	}
+	return conf.GetDnsPortName(), resolver, nil
 }
 
 // New returns a new Kubernetes resolver with HTTP client (based on given tokenauth Source and tlsConfig) to be used against kube-apiserver.

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Bplotka/go-k8sresolver"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -52,8 +51,6 @@ var (
 )
 
 func main() {
-	sharedflags.Set.AddFlagSet(k8sresolver.FlagSet)
-
 	log.SetOutput(os.Stdout)
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
 		log.WithError(err).Fatalf("failed parsing flags")

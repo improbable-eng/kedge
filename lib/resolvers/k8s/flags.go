@@ -9,44 +9,40 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/k8s"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
 	"google.golang.org/grpc/naming"
-	"github.com/mwitkow/kedge/lib/tokenauth"
-	"github.com/mwitkow/kedge/lib/tokenauth/sources/k8s"
-	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
 )
 
 var (
-	// FlagSet contains all the required flags for NewFromFlags to be working. Just use pflag.AddFlagSet in your setup if
-	// you are willing to use it.
 	// NOTE: Default values for all flags are designed for running within k8s pod.
-	FlagSet = pflag.NewFlagSet("k8sresolver", pflag.ExitOnError)
-
 	defaultKubeURL = fmt.Sprintf("https://%s", net.JoinHostPort(os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")))
-	fKubeAPIURL    = FlagSet.String("k8sresolver_kubeapi_url", defaultKubeURL,
+	fKubeAPIURL    = sharedflags.Set.String("k8sresolver_kubeapi_url", defaultKubeURL,
 		"TCP address to Kube API server in a form of 'http(s)://host:value'. If empty it will be fetched from env variables:"+
 			"KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT")
-	fInsecureSkipVerify = FlagSet.Bool("k8sresolver_tls_insecure", false, "If enabled, no server verification will be "+
+	fInsecureSkipVerify = sharedflags.Set.Bool("k8sresolver_tls_insecure", false, "If enabled, no server verification will be "+
 		"performed on client side. Not recommended.")
-	fKubeAPIRootCAPath = FlagSet.String("k8sresolver_ca_file", defaultSACACert, "Path to service account CA file. "+
+	fKubeAPIRootCAPath = sharedflags.Set.String("k8sresolver_ca_file", defaultSACACert, "Path to service account CA file. "+
 		"Required if kubeapi_tls_insecure = false.")
 
 	// Different kinds of auth are supported. Currently supported with flags:
 	// - specifying file with token
 	// - specifying user (access) for kube config auth section to be reused (see
 	// https://github.com/Bplotka/go-tokenauth/blob/88e9f6c7b19fa0ce19ab63476904e01417b53485/sources/k8s/k8s.go)
-	fTokenAuthPath = FlagSet.String("k8sresolver_token_file", defaultSAToken,
+	fTokenAuthPath = sharedflags.Set.String("k8sresolver_token_file", defaultSAToken,
 		"Path to service account token to be used. This auth method has priority 2.")
-	fKubeConfigAuthUser = FlagSet.String("k8sresolver_kubeconfig_user", "",
+	fKubeConfigAuthUser = sharedflags.Set.String("k8sresolver_kubeconfig_user", "",
 		"If user is specified resolver will try to fetch api auth method directly from kubeconfig. "+
 			"This auth method has priority 1.")
-	fKubeConfigAuthPath = FlagSet.String("k8sresolver_kubeconfig_path", "", "Kube config path. "+
+	fKubeConfigAuthPath = sharedflags.Set.String("k8sresolver_kubeconfig_path", "", "Kube config path. "+
 		"Only used when k8sresolver_kubeconfig_user is specified. If empty it will try default path.")
 )
 
-// NewFromFlags creates resolver from flag from k8sresolver.FlagSet.
+// NewFromFlags creates resolver from flag from k8sresolver.sharedflags.Set.
 func NewFromFlags(logger logrus.FieldLogger) (naming.Resolver, error) {
 	k8sURL := *fKubeAPIURL
 	if k8sURL == "" || k8sURL == "https://:" {

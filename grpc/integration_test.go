@@ -1,37 +1,31 @@
 package grpc_integration
 
 import (
-	"net"
-
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
+	"io/ioutil"
+	"net"
+	"net/url"
 	"path"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"io/ioutil"
-
-	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/improbable-eng/go-srvlb/srv"
+	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb_res "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
 	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/routes"
-
-	"fmt"
-
-	"strings"
-
-	"net/url"
-
 	"github.com/mwitkow/kedge/grpc/backendpool"
 	"github.com/mwitkow/kedge/grpc/client"
 	"github.com/mwitkow/kedge/grpc/director"
 	"github.com/mwitkow/kedge/grpc/director/router"
 	"github.com/mwitkow/kedge/lib/map"
-	"github.com/mwitkow/kedge/lib/resolvers"
+	"github.com/mwitkow/kedge/lib/resolvers/srv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -195,8 +189,8 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	s.proxyListener, err = net.Listen("tcp", "localhost:0")
 	require.NoError(s.T(), err, "must be able to allocate a port for proxyListener")
 	// Make ourselves the resolver for SRV for our backends. See Lookup function.
-	s.originalSrvResolver = resolvers.ParentSrvResolver
-	resolvers.ParentSrvResolver = s
+	s.originalSrvResolver = srvresolver.ParentSrvResolver
+	srvresolver.ParentSrvResolver = s
 	s.buildBackends()
 
 	s.pool, err = backendpool.NewStatic(backendConfigs)
@@ -309,7 +303,7 @@ func (s *BackendPoolIntegrationTestSuite) TearDownSuite() {
 	s.pool.Close()
 	// Restore old resolver.
 	if s.originalSrvResolver != nil {
-		resolvers.ParentSrvResolver = s.originalSrvResolver
+		srvresolver.ParentSrvResolver = s.originalSrvResolver
 	}
 	time.Sleep(10 * time.Millisecond)
 	if s.proxy != nil {

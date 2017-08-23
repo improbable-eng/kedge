@@ -1,4 +1,4 @@
-package resolvers
+package srvresolver
 
 import (
 	"time"
@@ -16,7 +16,7 @@ var (
 	ParentSrvResolver = srv.NewGoResolver(5 * time.Second)
 )
 
-func NewSrvFromConfig(conf *pb.SrvResolver) (target string, namer naming.Resolver, err error) {
+func NewFromConfig(conf *pb.SrvResolver) (target string, namer naming.Resolver, err error) {
 	parent := ParentSrvResolver
 	if conf.PortOverride != 0 {
 		parent = newPortOverrideSRVResolver(conf.PortOverride, parent)

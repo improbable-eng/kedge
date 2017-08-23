@@ -13,7 +13,8 @@ import (
 	"github.com/mwitkow/go-httpwares"
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	"github.com/mwitkow/kedge/http/lbtransport"
-	"github.com/mwitkow/kedge/lib/resolvers"
+	"github.com/mwitkow/kedge/lib/resolvers/k8s"
+	"github.com/mwitkow/kedge/lib/resolvers/srv"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
@@ -178,9 +179,9 @@ func buildTripperMiddlewareChain(cnf *pb.Backend, parent http.RoundTripper) http
 
 func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	if s := cnf.GetSrv(); s != nil {
-		return resolvers.NewSrvFromConfig(s)
+		return srvresolver.NewFromConfig(s)
 	} else if k := cnf.GetK8S(); k != nil {
-		return resolvers.NewK8sFromConfig(k)
+		return k8sresolver.NewFromConfig(k)
 	}
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)
 }

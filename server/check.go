@@ -7,7 +7,7 @@ import (
 )
 
 func testLogBackendpool(logger logrus.FieldLogger) {
-	logger.Warn("Flag check_backendpool_and_exit specified. Performing test resolution and exiting!")
+	logger.Warn("Flag check_backendpool_and_exit specified. Performing test resolution.")
 	cfg := flagConfigBackendpool.Get().(*pb_config.BackendPoolConfig)
 	b, err := backendpool.NewStatic(cfg.GetHttp().GetBackends())
 	if err != nil {

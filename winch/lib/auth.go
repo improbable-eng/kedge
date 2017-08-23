@@ -8,38 +8,42 @@ import (
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
-	"github.com/mwitkow/kedge/lib/auth"
+	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/k8s"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/oidc"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/test"
+	"github.com/pkg/errors"
 )
 
-var NoAuth auth.Source = nil
+var NoAuth tokenauth.Source = nil
 
 type AuthFactory struct {
 	listenAddress string
 	mux           *http.ServeMux
-	sources       map[string]auth.Source
+	sources       map[string]tokenauth.Source
 }
 
 func NewAuthFactory(listenAddress string, mux *http.ServeMux) *AuthFactory {
 	return &AuthFactory{
-		sources:       map[string]auth.Source{},
+		sources:       map[string]tokenauth.Source{},
 		listenAddress: listenAddress,
 		mux:           mux,
 	}
 }
 
-func (f *AuthFactory) Get(configSource *pb.AuthSource) (auth.Source, error) {
+func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error) {
 	// Reuse if already constructed.
 	if s, ok := f.sources[configSource.Name]; ok {
 		return s, nil
 	}
 
 	// Lazy construction.
-	var source auth.Source
+	var source tokenauth.Source
 	var err error
 
 	switch s := configSource.GetType().(type) {
 	case *pb.AuthSource_Kube:
-		source, err = auth.K8s(configSource.Name, s.Kube.Path, s.Kube.User)
+		source, err = k8sauth.New(configSource.Name, s.Kube.Path, s.Kube.User)
 	case *pb.AuthSource_Oidc:
 		var callbackSrv *login.CallbackServer
 		if s.Oidc.LoginCallbackPath != "" {
@@ -57,7 +61,7 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (auth.Source, error) {
 		)
 
 		var clearIDTokenFunc func() error
-		source, clearIDTokenFunc, err = auth.OIDCWithCache(
+		source, clearIDTokenFunc, err = oidcauth.NewWithCache(
 			configSource.Name,
 			cache,
 			callbackSrv,
@@ -66,10 +70,15 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (auth.Source, error) {
 		f.mux.HandleFunc(fmt.Sprintf("/winch/cleartoken/%s", configSource.Name), oidcClearTokenHandler(clearIDTokenFunc))
 
 	case *pb.AuthSource_Dummy:
-		source = auth.Dummy(
-			configSource.Name,
-			s.Dummy.Value,
-		)
+		testSource := &testauth.Source{
+			NameValue:  configSource.Name,
+			TokenValue: s.Dummy.Value,
+		}
+		if s.Dummy.Value == "" {
+			// Let's trigger error on that.
+			testSource.Err = errors.New("Error dummy auth source. No TokenValue specified")
+		}
+		source = testSource
 	default:
 		return nil, fmt.Errorf("source %v not supported.", reflect.TypeOf(s))
 	}

@@ -4,11 +4,11 @@ import (
 	"errors"
 	"net/url"
 
-	"github.com/mwitkow/kedge/lib/auth"
+	"github.com/mwitkow/kedge/lib/tokenauth"
 )
 
 var (
-	ErrNotKedgeDestination   = errors.New("not a kedge destination")
+	ErrNotKedgeDestination = errors.New("not a kedge destination")
 )
 
 // Mapper is an interface that allows you to direct traffic to different kedges including various auth.
@@ -26,7 +26,7 @@ type Route struct {
 
 	// BackendAuth represents optional auth for end application. Sometimes it is required to be injected here, because of common
 	// restriction blocking auth headers in plain HTTP requests (even when communication locally with local forward proxy).
-	BackendAuth auth.Source
+	BackendAuth tokenauth.Source
 	// ProxyAuth represents optional auth for kedge.
-	ProxyAuth auth.Source
+	ProxyAuth tokenauth.Source
 }

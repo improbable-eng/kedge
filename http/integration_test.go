@@ -20,9 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"runtime"
 	"strings"
@@ -37,17 +39,15 @@ import (
 	pb_be "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	pb_route "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
 	"github.com/mwitkow/kedge/http/backendpool"
+	"github.com/mwitkow/kedge/http/client"
 	"github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/http/director/adhoc"
 	"github.com/mwitkow/kedge/http/director/router"
-	"github.com/mwitkow/kedge/lib/resolvers"
+	"github.com/mwitkow/kedge/lib/map"
+	"github.com/mwitkow/kedge/lib/resolvers/srv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/mwitkow/kedge/lib/map"
-	"github.com/mwitkow/kedge/http/client"
-	"log"
-	"os"
 )
 
 const (
@@ -165,7 +165,7 @@ func buildAndStartServer(t *testing.T, config *tls.Config) (net.Listener, *http.
 		prefix = "secure backend: "
 	}
 	server := &http.Server{
-		Handler: unknownPingbackHandler(listener.Addr().String()),
+		Handler:  unknownPingbackHandler(listener.Addr().String()),
 		ErrorLog: log.New(os.Stderr, prefix, 0),
 	}
 	go func() {
@@ -270,8 +270,8 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 	s.proxyListenerTls = tls.NewListener(s.proxyListenerTls, proxyTlsConfig)
 
 	// Make ourselves the resolver for SRV for our backends. See Lookup function.
-	s.originalSrvResolver = resolvers.ParentSrvResolver
-	resolvers.ParentSrvResolver = s
+	s.originalSrvResolver = srvresolver.ParentSrvResolver
+	srvresolver.ParentSrvResolver = s
 	// Make ourselves the A resolver for backends for the Addresser.
 	s.originalAResolver = adhoc.DefaultALookup
 	adhoc.DefaultALookup = s.LookupAddr
@@ -548,7 +548,7 @@ func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_SpecialRoute(
 func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 	// Restore old resolver.
 	if s.originalSrvResolver != nil {
-		resolvers.ParentSrvResolver = s.originalSrvResolver
+		srvresolver.ParentSrvResolver = s.originalSrvResolver
 	}
 	if s.originalAResolver != nil {
 		adhoc.DefaultALookup = s.originalAResolver

@@ -1,13 +1,14 @@
 package tripperware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
-	"github.com/mwitkow/kedge/lib/auth"
 	"github.com/mwitkow/kedge/lib/map"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,20 +56,20 @@ func testMapping(t *testing.T) map[string]*kedge_map.Route {
 		},
 		"resource-auth.example.org:83": {
 			URL:         urlMustParse(t, "https://some-url2.example.com"),
-			BackendAuth: auth.Dummy("auth1", "Bearer secret1"),
+			BackendAuth: directauth.New("auth1", "secret1"),
 		},
 		"resource-auth.example.org:84": {
 			URL:         urlMustParse(t, "https://some-url2-1.example.com"),
-			BackendAuth: auth.Dummy("auth1", "Bearer secret1-1"),
+			BackendAuth: directauth.New("auth1", "secret1-1"),
 		},
 		"resource-proxyauth.example.org:83": {
 			URL:       urlMustParse(t, "https://some-url3.example.com"),
-			ProxyAuth: auth.Dummy("proxy-auth2", "Bearer secret2"),
+			ProxyAuth: directauth.New("proxy-auth2", "secret2"),
 		},
 		"resource-bothauths.example.org:83": {
 			URL:         urlMustParse(t, "https://some-url4.example.com"),
-			BackendAuth: auth.Dummy("auth3", "Bearer secret3"),
-			ProxyAuth:   auth.Dummy("proxy-auth3", "Bearer secret4"),
+			BackendAuth: directauth.New("auth3", "secret3"),
+			ProxyAuth:   directauth.New("proxy-auth3", "secret4"),
 		},
 	}
 }
@@ -172,12 +173,12 @@ func TestBackendAuthTripper_OK(t *testing.T) {
 	mapping := testMapping(t)
 
 	hostPort := "resource-bothauths.example.org:83"
-	a, err := mapping[hostPort].BackendAuth.HeaderValue()
+	a, err := mapping[hostPort].BackendAuth.Token(context.TODO())
 	require.NoError(t, err)
 	parent := &testRoundTripper{
 		t:                 t,
 		expectedURL:       urlMustParse(t, "http://"+hostPort),
-		expectedAuthValue: a,
+		expectedAuthValue: "Bearer " + a,
 		expectedRoute:     mapping[hostPort],
 		// Rest empty.
 	}
@@ -191,12 +192,12 @@ func TestProxyAuthTripper_OK(t *testing.T) {
 	mapping := testMapping(t)
 
 	hostPort := "resource-bothauths.example.org:83"
-	a, err := mapping[hostPort].ProxyAuth.HeaderValue()
+	a, err := mapping[hostPort].ProxyAuth.Token(context.TODO())
 	require.NoError(t, err)
 	parent := &testRoundTripper{
 		t:                      t,
 		expectedURL:            urlMustParse(t, "http://"+hostPort),
-		expectedProxyAuthValue: a,
+		expectedProxyAuthValue: "Bearer " + a,
 		expectedRoute:          mapping[hostPort],
 		// Rest empty.
 	}
@@ -228,13 +229,13 @@ func TestAllTrippers_OK(t *testing.T) {
 	rt.RoundTrip(r)
 
 	hostPort = "resource-auth.example.org:83"
-	a, err := mapping[hostPort].BackendAuth.HeaderValue()
+	a, err := mapping[hostPort].BackendAuth.Token(context.TODO())
 	require.NoError(t, err)
 	parent = &testRoundTripper{
-		t:             t,
-		expectedURL:   mapping[hostPort].URL,
-		expectedAuthValue: a,
-		expectedRoute: mapping[hostPort],
+		t:                 t,
+		expectedURL:       mapping[hostPort].URL,
+		expectedAuthValue: "Bearer " + a,
+		expectedRoute:     mapping[hostPort],
 		// Rest empty.
 	}
 	rt = WrapForMapping(
@@ -249,13 +250,13 @@ func TestAllTrippers_OK(t *testing.T) {
 	rt.RoundTrip(r)
 
 	hostPort = "resource-auth.example.org:84"
-	a, err = mapping[hostPort].BackendAuth.HeaderValue()
+	a, err = mapping[hostPort].BackendAuth.Token(context.TODO())
 	require.NoError(t, err)
 	parent = &testRoundTripper{
-		t:             t,
-		expectedURL:   mapping[hostPort].URL,
-		expectedAuthValue: a,
-		expectedRoute: mapping[hostPort],
+		t:                 t,
+		expectedURL:       mapping[hostPort].URL,
+		expectedAuthValue: "Bearer " + a,
+		expectedRoute:     mapping[hostPort],
 		// Rest empty.
 	}
 	rt = WrapForMapping(
@@ -270,13 +271,13 @@ func TestAllTrippers_OK(t *testing.T) {
 	rt.RoundTrip(r)
 
 	hostPort = "resource-proxyauth.example.org:83"
-	a, err = mapping[hostPort].ProxyAuth.HeaderValue()
+	a, err = mapping[hostPort].ProxyAuth.Token(context.TODO())
 	require.NoError(t, err)
 	parent = &testRoundTripper{
-		t:             t,
-		expectedURL:   mapping[hostPort].URL,
-		expectedProxyAuthValue: a,
-		expectedRoute: mapping[hostPort],
+		t:                      t,
+		expectedURL:            mapping[hostPort].URL,
+		expectedProxyAuthValue: "Bearer " + a,
+		expectedRoute:          mapping[hostPort],
 		// Rest empty.
 	}
 	rt = WrapForMapping(
@@ -291,16 +292,16 @@ func TestAllTrippers_OK(t *testing.T) {
 	rt.RoundTrip(r)
 
 	hostPort = "resource-bothauths.example.org:83"
-	a, err = mapping[hostPort].BackendAuth.HeaderValue()
+	a, err = mapping[hostPort].BackendAuth.Token(context.TODO())
 	require.NoError(t, err)
-	a2, err := mapping[hostPort].ProxyAuth.HeaderValue()
+	a2, err := mapping[hostPort].ProxyAuth.Token(context.TODO())
 	require.NoError(t, err)
 	parent = &testRoundTripper{
-		t:             t,
-		expectedURL:   mapping[hostPort].URL,
-		expectedAuthValue: a,
-		expectedProxyAuthValue: a2,
-		expectedRoute: mapping[hostPort],
+		t:                      t,
+		expectedURL:            mapping[hostPort].URL,
+		expectedAuthValue:      "Bearer " + a,
+		expectedProxyAuthValue: "Bearer " + a2,
+		expectedRoute:          mapping[hostPort],
 		// Rest empty.
 	}
 	rt = WrapForMapping(

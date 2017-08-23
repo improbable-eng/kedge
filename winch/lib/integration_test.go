@@ -160,7 +160,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				Name: "access1",
 				Type: &pb.AuthSource_Dummy{
 					Dummy: &pb.DummyAccess{
-						Value: "Bearer test-token",
+						Value: "test-token",
 					},
 				},
 			},
@@ -176,7 +176,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				Name: "proxy-access1",
 				Type: &pb.AuthSource_Dummy{
 					Dummy: &pb.DummyAccess{
-						Value: "Bearer proxy-test-token",
+						Value: "proxy-test-token",
 					},
 				},
 			},
@@ -184,7 +184,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				Name: "error-access",
 				Type: &pb.AuthSource_Dummy{
 					Dummy: &pb.DummyAccess{
-						Value: "", // No value will trigger error on HeaderValue() (inside auth tripper)
+						Value: "", // No value will trigger error on Token() (inside auth tripper)
 					},
 				},
 			},
@@ -266,7 +266,7 @@ func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute_ValidAuth(
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertSuccessfulPingback(req, resp, err, 2)
 
-	s.Assert().Equal("user:password", resp.Header.Get("x-test-auth-value"))
+	s.Assert().Equal("Bearer user:password", resp.Header.Get("x-test-auth-value"))
 	s.Assert().Equal("", resp.Header.Get("x-test-proxy-auth-value"))
 }
 
@@ -276,7 +276,7 @@ func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_RegexpRoute_OverwriteA
 	req.Header.Set("Authorization", "bearer test-secret")
 	resp, err := s.forwardProxyClient().Do(req)
 	s.assertSuccessfulPingback(req, resp, err, 2)
-	s.Assert().Equal("user:password", resp.Header.Get("x-test-auth-value"))
+	s.Assert().Equal("Bearer user:password", resp.Header.Get("x-test-auth-value"))
 	s.Assert().Equal("", resp.Header.Get("x-test-proxy-auth-value"))
 }
 

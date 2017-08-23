@@ -5,16 +5,16 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
-	"github.com/mwitkow/kedge/lib/resolvers"
+	"github.com/mwitkow/kedge/lib/resolvers/k8s"
+	"github.com/mwitkow/kedge/lib/resolvers/srv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -140,9 +140,9 @@ func chooseInterceptors(cnf *pb.Backend) []grpc.DialOption {
 
 func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	if s := cnf.GetSrv(); s != nil {
-		return resolvers.NewSrvFromConfig(s)
+		return srvresolver.NewFromConfig(s)
 	} else if k := cnf.GetK8S(); k != nil {
-		return resolvers.NewK8sFromConfig(k)
+		return k8sresolver.NewFromConfig(k)
 	}
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)
 }

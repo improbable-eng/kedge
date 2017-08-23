@@ -1,4 +1,4 @@
-package resolvers
+package srvresolver
 
 import (
 	"testing"

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
-	"github.com/mwitkow/kedge/lib/auth"
 	"github.com/mwitkow/kedge/lib/map"
+	"github.com/mwitkow/kedge/lib/tokenauth"
 )
 
 type StaticRoutes struct {
@@ -61,7 +61,7 @@ func (r *StaticRoutes) Get() []kedge_map.RouteGetter {
 	return r.routes
 }
 
-func routeAuth(f *AuthFactory, authConfig *pb.AuthConfig, authName string) (auth.Source, error) {
+func routeAuth(f *AuthFactory, authConfig *pb.AuthConfig, authName string) (tokenauth.Source, error) {
 	if authName == "" {
 		return NoAuth, nil
 	}

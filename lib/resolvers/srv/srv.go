@@ -1,4 +1,4 @@
-package resolvers
+package srv
 
 import (
 	"time"

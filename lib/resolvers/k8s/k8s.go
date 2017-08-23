@@ -1,4 +1,4 @@
-package resolvers
+package k8sresolver
 
 import (
 	"github.com/Bplotka/go-k8sresolver"

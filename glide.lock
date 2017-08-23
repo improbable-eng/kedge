@@ -9,16 +9,6 @@ imports:
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
   subpackages:
   - quantile
-- name: github.com/Bplotka/go-k8sresolver
-  version: d730d5e1031d6e59d1b544bb83887b99f80cefeb
-- name: github.com/Bplotka/go-tokenauth
-  version: 88e9f6c7b19fa0ce19ab63476904e01417b53485
-  subpackages:
-  - http
-  - sources/direct
-  - sources/k8s
-  - sources/oauth2
-  - sources/oidc
 - name: github.com/Bplotka/oidc
   version: ffd69540d1a1c458e4edd9b0b055ffcefe05a50e
   subpackages:

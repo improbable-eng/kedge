@@ -71,8 +71,6 @@ func (w *streamWatcher) watch(ctx context.Context) {
 			// cannot connect.
 			continue
 		}
-		w.logger.Debug("Started new Watch Enpoints stream.")
-
 		err = w.proxyEvents(ctx, json.NewDecoder(stream))
 		stream.Close()
 		if ctx.Err() != nil {

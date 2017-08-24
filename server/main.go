@@ -107,7 +107,7 @@ func main() {
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
 		http_debug.Middleware(),
-		http_logrus.Middleware(logEntry),
+		http_logrus.Middleware(logEntry, http_logrus.WithLevels(kedgeCodeToLevel)),
 	)
 
 	// HTTP debug chain.
@@ -219,7 +219,8 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 
 	m.Handle("/_version",
 		// The only one worth to log.
-		chi.Chain(http_logrus.Middleware(logEntry.WithField(ctxtags.TagForScheme, "plain"))).Handler(middlewares.HandlerFunc(versionEndpoint)))
+		chi.Chain(http_logrus.Middleware(logEntry.WithField(ctxtags.TagForScheme, "plain"), http_logrus.WithLevels(kedgeCodeToLevel))).
+			Handler(middlewares.HandlerFunc(versionEndpoint)))
 	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 
 	m.Handle("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))
@@ -255,4 +256,13 @@ func healthEndpoint(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(http.StatusOK)
 	fmt.Fprintf(resp, "kedge isok")
+}
+
+func kedgeCodeToLevel(httpStatusCode int) log.Level {
+	if httpStatusCode < 400 || httpStatusCode == http.StatusNotFound {
+		return log.DebugLevel
+	} else if httpStatusCode < 500 {
+		return log.WarnLevel
+	}
+	return log.ErrorLevel
 }

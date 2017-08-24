@@ -131,6 +131,7 @@ func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 	resp.Header().Set("x-kedge-error", err.Error())
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)
+	fmt.Fprintf(resp, "%v", err.Error())
 }
 
 func AuthMiddleware(authorizer authorize.Authorizer) httpwares.Middleware {

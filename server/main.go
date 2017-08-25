@@ -21,6 +21,7 @@ import (
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	http_director "github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/mwitkow/kedge/lib/logstash"
@@ -59,12 +60,6 @@ func main() {
 		log.WithError(err).Fatalf("failed reading flagz from files")
 	}
 
-	if *flagLogTestBackendpoolResolution {
-		log.SetLevel(log.DebugLevel)
-		testLogBackendpool(log.StandardLogger())
-		log.SetLevel(log.InfoLevel)
-	}
-
 	if *flagLogstashAddress != "" {
 		formatter, err := logstash.NewFormatter()
 		if err != nil {
@@ -78,6 +73,12 @@ func main() {
 		log.AddHook(hook)
 	}
 
+	if *flagLogTestBackendpoolResolution {
+		log.SetLevel(log.DebugLevel)
+		testLogBackendpool(log.StandardLogger())
+		log.SetLevel(log.InfoLevel)
+	}
+
 	grpc.EnableTracing = *flagGrpcWithTracing
 	logEntry := log.NewEntry(log.StandardLogger())
 	grpc_logrus.ReplaceGrpcLogger(logEntry)
@@ -85,6 +86,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed building TLS config from flags: %v", err)
 	}
+
+	httpDirector := http_director.New(httpBackendPool, httpRouter, httpAddresser, logEntry)
+	grpcDirector := grpc_director.New(grpcBackendPool, grpcRouter)
 
 	// GRPC kedge.
 	grpcDirectorServer := grpc.NewServer(

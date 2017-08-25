@@ -10,6 +10,7 @@ import (
 	"github.com/Bplotka/oidc/authorize"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-httpwares"
+	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/adhoc"
@@ -47,7 +48,7 @@ var (
 // sent to. The backends in the Pool have pre-dialed connections and are load balanced.
 //
 // If  Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
-func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser) *Proxy {
+func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
 	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	p := &Proxy{
@@ -56,12 +57,14 @@ func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser)
 			Transport:     &backendPoolTripper{pool: pool},
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
+			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "backend reverseProxy")),
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
 			Director:      func(r *http.Request) {},
 			Transport:     AdhocTransport,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
+			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "adhoc reverseProxy")),
 		},
 		router:    router,
 		addresser: addresser,
@@ -116,10 +119,10 @@ type backendPoolTripper struct {
 
 func (t *backendPoolTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	tripper, err := t.pool.Tripper(req.URL.Host)
-	if err == nil {
-		return tripper.RoundTrip(req)
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	return tripper.RoundTrip(req)
 }
 
 func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {

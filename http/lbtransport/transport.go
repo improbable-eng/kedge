@@ -1,10 +1,13 @@
 package lbtransport
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/jpillora/backoff"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/pkg/errors"
@@ -16,13 +19,12 @@ type tripper struct {
 	targetName string
 
 	parent           http.RoundTripper
-	watcher          naming.Watcher
 	policy           LBPolicy
 	lastResolveError error
 
 	currentTargets []*Target
-	close          chan struct{}
 	mu             sync.RWMutex
+	cancel         context.CancelFunc
 }
 
 var (
@@ -47,56 +49,80 @@ func init() {
 // doesn't match the targetAddr.
 //
 // For resolving backend addresses it uses a grpc.naming.Resolver, allowing for generic use.
-func New(targetAddr string, parent http.RoundTripper, resolver naming.Resolver, policy LBPolicy) (*tripper, error) {
+func New(ctx context.Context, targetAddr string, parent http.RoundTripper, resolver naming.Resolver, policy LBPolicy) (*tripper, error) {
+	innerCtx, cancel := context.WithCancel(ctx)
 	s := &tripper{
 		targetName:     targetAddr,
 		parent:         parent,
 		policy:         policy,
 		currentTargets: []*Target{},
+		cancel:         cancel,
 	}
-	watcher, err := resolver.Resolve(targetAddr)
-	if err != nil {
-		return nil, err
-	}
-	s.watcher = watcher
-	go s.run()
+
+	go s.run(innerCtx, resolver, targetAddr)
 	return s, nil
 }
 
-func (s *tripper) run() {
-	for {
-		updates, err := s.watcher.Next() // blocking call until new updates are there
+var (
+	resolveRetryBackoff = &backoff.Backoff{
+		Min:    50 * time.Millisecond,
+		Jitter: true,
+		Factor: 2,
+		Max:    2 * time.Second,
+	}
+)
+
+func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr string) {
+	var lastNextError error
+
+	for ctx.Err() == nil {
+		watcher, err := resolver.Resolve(targetAddr)
 		if err != nil {
 			s.mu.Lock()
 			s.currentTargets = []*Target{}
-			s.lastResolveError = err
-			s.mu.Unlock()
-			return // watcher.Next errors are irrecoverable.
-		}
-		s.mu.RLock()
-		targets := s.currentTargets
-		s.mu.RUnlock()
-		for _, u := range updates {
-			if u.Op == naming.Add {
-				targets = append(targets, &Target{DialAddr: u.Addr})
-			} else if u.Op == naming.Delete {
-				kept := []*Target{}
-				for _, t := range targets {
-					if u.Addr != t.DialAddr {
-						kept = append(kept, t)
-					}
-				}
-				targets = kept
+			// Don't loose lastNextError if there.
+			if lastNextError != nil {
+				err = errors.Wrap(lastNextError, err.Error())
 			}
+			s.lastResolveError = errors.Wrapf(err, "Failed to Resolver target %s. Retrying with backoff.", targetAddr)
+			s.mu.Unlock()
+			time.Sleep(resolveRetryBackoff.Duration())
+			continue
 		}
-		s.mu.Lock()
-		s.currentTargets = targets
-		s.mu.Unlock()
+
+		localCurrentTargets := []*Target{}
+		// Starting getting Next updates. On Error we will retry.
+		for ctx.Err() == nil {
+			updates, err := watcher.Next() // blocking call until new updates are there
+			if err != nil {
+				lastNextError = err
+				break // watcher.Errors are unrecoverable, so try to Resolve again from the beginning.
+			}
+
+			for _, u := range updates {
+				if u.Op == naming.Add {
+					localCurrentTargets = append(localCurrentTargets, &Target{DialAddr: u.Addr})
+				} else if u.Op == naming.Delete {
+					kept := []*Target{}
+					for _, t := range localCurrentTargets {
+						if u.Addr != t.DialAddr {
+							kept = append(kept, t)
+						}
+					}
+					localCurrentTargets = kept
+				}
+			}
+			s.mu.Lock()
+			s.currentTargets = localCurrentTargets
+			s.mu.Unlock()
+		}
+		watcher.Close()
 	}
 }
 
+// Close is only used in test. For proper closing we wait for context cancellation from parent context.
 func (s *tripper) Close() error {
-	s.watcher.Close()
+	s.cancel()
 	return nil
 }
 

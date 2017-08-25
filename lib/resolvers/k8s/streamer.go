@@ -4,42 +4,37 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"strconv"
-	"time"
 
-	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
-type streamWatcher struct {
-	logger                  logrus.FieldLogger
-	target                  targetEntry
-	epClient                endpointClient
-	eventsCh                chan<- watchResult
-	retryBackoff            *backoff.Backoff
-	lastSeenResourceVersion int
-}
-
+// startWatchingEndpointsChanges starts a stream that in go routine reads from connection for every change event.
+// Since watcher.Next() errors are assumed irrecoverable, it is a caller responsibility to re-resolve on EOF, error event etc.
+// We read connection from separate go routine because read is blocking with no timeout/cancel logic.
 func startWatchingEndpointsChanges(
 	ctx context.Context,
-	logger logrus.FieldLogger,
 	target targetEntry,
 	epClient endpointClient,
 	eventsCh chan<- watchResult,
-	retryBackoff *backoff.Backoff,
-	lastSeenResourceVersion int,
-) *streamWatcher {
-	w := &streamWatcher{
-		logger:                  logger,
-		target:                  target,
-		epClient:                epClient,
-		eventsCh:                eventsCh,
-		retryBackoff:            retryBackoff,
-		lastSeenResourceVersion: lastSeenResourceVersion,
+) error {
+	stream, err := epClient.StartChangeStream(ctx, target)
+	if err != nil {
+		return errors.Wrapf(err, "k8sresolver stream: Failed to do start stream for target %s", target)
 	}
-	go w.watch(ctx)
-	return w
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			stream.Close()
+		}
+	}()
+
+	go func() {
+		proxyAllEvents(ctx, json.NewDecoder(stream), eventsCh)
+		stream.Close()
+	}()
+
+	return nil
 }
 
 type eventType string
@@ -57,102 +52,51 @@ type event struct {
 	Object endpoints `json:"object"`
 }
 
-// watch starts a stream and reads connection for every change event. If connection is broken (and ctx is still valid)
-// it retries the stream. We read connection from separate go routine because read is blocking with no timeout/cancel logic.
-func (w *streamWatcher) watch(ctx context.Context) {
-	// Retry stream loop.
+// proxyAllEvents gets events in loop and proxies to eventsCh. If event include some error it always returns, because
+// watchers.Next errors are meant to irrecoverable.
+func proxyAllEvents(ctx context.Context, decoder *json.Decoder, eventsCh chan<- watchResult) {
 	for ctx.Err() == nil {
-		stream, err := w.epClient.StartChangeStream(ctx, w.target, w.lastSeenResourceVersion)
-		if err != nil {
-			w.logger.WithError(err).Error("k8sresolver stream: Failed to do start stream")
-			time.Sleep(w.retryBackoff.Duration())
-
-			// TODO(bplotka): On X retry on failed, consider returning failed to Next() via watchResult that we
-			// cannot connect.
-			continue
-		}
-		err = w.proxyEvents(ctx, json.NewDecoder(stream))
-		stream.Close()
-		if ctx.Err() != nil {
-			return
-		}
-
-		if err != nil {
-			w.logger.WithError(err).Error("k8sresolver stream: Error on read and proxy Events. Retrying")
-		}
-	}
-}
-
-// proxyEvents is blocking method that gets events in loop and on success proxies to eventsCh.
-// It ends only when context is cancelled and/or stream is broken.
-func (w *streamWatcher) proxyEvents(ctx context.Context, decoder *json.Decoder) error {
-	connectionErrCh := make(chan error)
-	go func() {
-		defer close(connectionErrCh)
-
-		for {
-			var got event
-
-			// Blocking read.
-			if err := decoder.Decode(&got); err != nil {
-				if ctx.Err() != nil {
-					// Stopping state.
-					return
-				}
-				switch err {
-				case io.EOF:
-					// Watch closed normally - weird.
-					connectionErrCh <- errors.Wrap(err, "EOF during watch stream event decoding")
-					return
-				case io.ErrUnexpectedEOF:
-					connectionErrCh <- errors.Wrap(err, "Unexpected EOF during watch stream event decoding")
-					return
-				default:
-
-				}
-				// This is odd case. We return error as well as recreate stream.
-				err := errors.Wrap(err, "Unable to decode an event from the watch stream")
-				connectionErrCh <- err
-				w.eventsCh <- watchResult{
-					err: errors.Wrap(err, "Unable to decode an event from the watch stream"),
-				}
+		var eventErr error
+		var got event
+		// Blocking read.
+		if err := decoder.Decode(&got); err != nil {
+			if ctx.Err() != nil {
+				// Stopping state.
 				return
 			}
-
-			switch got.Type {
-			case added, modified, deleted, failed:
-				rv, err := strconv.Atoi(got.Object.Metadata.ResourceVersion)
-				if err != nil {
-					if got.Object.Metadata.ResourceVersion != "" {
-						w.eventsCh <- watchResult{
-							ep:  &got,
-							err: err,
-						}
-						continue
-					}
-					w.logger.WithError(err).Error("ResourceVersion is empty for event type %s. Retrying with lastSeenResourceVersion + 1", got.Type)
-					w.lastSeenResourceVersion += 1
-				} else {
-					w.lastSeenResourceVersion = rv
-				}
-				w.eventsCh <- watchResult{
-					ep: &got,
-				}
+			switch err {
+			case io.EOF:
+				// Watch closed normally - weird.
+				eventErr = errors.Wrap(err, "EOF during watch stream event decoding")
+			case io.ErrUnexpectedEOF:
+				eventErr = errors.Wrap(err, "Unexpected EOF during watch stream event decoding")
 			default:
-				w.eventsCh <- watchResult{
-					err: errors.Errorf("Got invalid watch event type: %v", got.Type),
-				}
+				eventErr = errors.Wrap(err, "Unable to decode an event from the watch stream")
 			}
 		}
 
-	}()
+		if eventErr == nil {
+			switch got.Type {
+			case added, modified, deleted:
+			// All is fine.
+			case failed:
+				eventErr = errors.Errorf("%s: %s. Code: %d",
+					got.Object.Status,
+					got.Object.Message,
+					got.Object.Code,
+				)
+			default:
+				eventErr = errors.Errorf("Got invalid watch event type: %v", got.Type)
+			}
+		}
 
-	// Wait until context is done or connection ends.
-	select {
-	case <-ctx.Done():
-		// Stopping state.
-		return ctx.Err()
-	case err := <-connectionErrCh:
-		return err
+		eventsCh <- watchResult{
+			ep:  &got,
+			err: eventErr,
+		}
+		if eventErr != nil {
+			// Error is irrecoverable for watcher.Next(). Return here.
+			return
+		}
 	}
 }

@@ -36,31 +36,32 @@ var (
 type backend struct {
 	mu sync.RWMutex
 
+	ctx    context.Context // life-time context.
+	cancel context.CancelFunc
+
 	target    string
 	resolver  naming.Resolver
 	transport *http.Transport
 	tripper   http.RoundTripper
 	config    *pb.Backend
-	closed    bool
 }
 
 // Tripper returns tripper that should be used for this (and only this backend).
 // It usually contains LoadBalancing logic inside.
 func (b *backend) Tripper() http.RoundTripper {
-	b.mu.RLock()
-	t := b.tripper
-	if b.closed {
-		t = closedTripper
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.ctx.Err() != nil {
+		return closedTripper
 	}
-	b.mu.RUnlock()
-	return t
+	return b.tripper
 }
 
 // Close is used when backend is removed from configuration dynamically.
 func (b *backend) Close() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.closed = true
+	b.cancel()
 	if b.transport != nil {
 		b.transport.CloseIdleConnections()
 	}
@@ -71,6 +72,8 @@ func (b *backend) Close() error {
 // newBackend creates backend from given configuration.
 func newBackend(cnf *pb.Backend) (*backend, error) {
 	b := &backend{}
+	b.ctx, b.cancel = context.WithCancel(context.Background())
+
 	target, resolver, err := chooseNamingResolver(cnf)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to construct resolver for backend %s", cnf.Name)
@@ -100,7 +103,7 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 		return nil, err
 	}
 
-	b.tripper, err = lbtransport.New(target, b.transport, resolver, chooseBalancerPolicy(cnf))
+	b.tripper, err = lbtransport.New(b.ctx, target, b.transport, resolver, chooseBalancerPolicy(cnf))
 	if err != nil {
 		return nil, err
 	}

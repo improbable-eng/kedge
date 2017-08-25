@@ -10,7 +10,7 @@ import (
 )
 
 type endpointClient interface {
-	StartChangeStream(ctx context.Context, t targetEntry, resourceVersion int) (io.ReadCloser, error)
+	StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error)
 }
 
 type client struct {
@@ -21,17 +21,12 @@ type client struct {
 // StartChangeStream starts stream of changes from watch endpoint.
 // See https://kubernetes.io/docs/api-reference/v1.7/#watch-132
 // NOTE: In the beginning of stream, k8s will give us sufficient info about current state. (No need to GET first)
-// `resourceVersion` is just a revision.
-func (c *client) StartChangeStream(ctx context.Context, t targetEntry, resourceVersion int) (io.ReadCloser, error) {
+func (c *client) StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error) {
 	epWatchURL := fmt.Sprintf("%s/api/v1/watch/namespaces/%s/endpoints/%s",
 		c.k8sURL,
 		t.namespace,
 		t.service,
 	)
-
-	if resourceVersion != 0 {
-		epWatchURL = fmt.Sprintf("%s?resourceVersion=%d", epWatchURL, resourceVersion)
-	}
 
 	return c.startGET(ctx, epWatchURL)
 }

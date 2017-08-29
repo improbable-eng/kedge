@@ -46,9 +46,8 @@ var (
 
 	flagLogstashAddress = sharedflags.Set.String("logstash_hostport", "", "Host:port of logstash for remote logging. If empty remote logging is disabled.")
 
-	flagLogTestBackendpoolResolution = sharedflags.Set.Bool("log_backend_resolution_on_startup", false, "With this option "+
-		"kedge will parse configuration, fill static backendpool, perform test resolution and print the resolved addresses."+
-		"Useful for debugging backend routings.")
+	flagLogTestBackendpoolResolution = sharedflags.Set.Bool("log_backend_resolution_on_addition", false, "With this option "+
+		"kedge will always try to resolve and log (only) new backend entry. Useful for debugging backend routings.")
 )
 
 func main() {
@@ -71,12 +70,6 @@ func main() {
 			log.WithError(err).Fatal("Failed to create new logstash hook")
 		}
 		log.AddHook(hook)
-	}
-
-	if *flagLogTestBackendpoolResolution {
-		log.SetLevel(log.DebugLevel)
-		testLogBackendpool(log.StandardLogger())
-		log.SetLevel(log.InfoLevel)
 	}
 
 	grpc.EnableTracing = *flagGrpcWithTracing

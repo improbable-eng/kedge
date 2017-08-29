@@ -32,7 +32,7 @@ var (
 		"Contents of the Kedge Backendpool configuration. Dynamically settable or read from file").WithFileFlag("../misc/backendpool.json").WithValidator(generalValidator).WithNotifier(backendConfigReloaded)
 
 	grpcBackendPool = grpc_bp.NewDynamic()
-	httpBackendPool = http_bp.NewDynamic()
+	httpBackendPool = http_bp.NewDynamic(logrus.StandardLogger())
 	grpcRouter      = grpc_router.NewDynamic()
 	httpRouter      = http_router.NewDynamic()
 	httpAddresser   = http_adhoc.NewDynamic()
@@ -87,7 +87,7 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 	httpConfig := newConfig.GetHttp()
 	if httpConfig != nil {
 		for _, backend := range newConfig.GetHttp().Backends {
-			if err := httpBackendPool.AddOrUpdate(backend); err != nil {
+			if err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution); err != nil {
 				logrus.Errorf("failed creating http backend %v: %v", backend.Name, err)
 			}
 			logrus.Infof("adding new http backend: %v", backend.Name)

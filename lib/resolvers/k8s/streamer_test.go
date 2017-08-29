@@ -3,15 +3,13 @@ package k8sresolver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"fmt"
-	"strings"
 )
 
 type readerCloserMock struct {

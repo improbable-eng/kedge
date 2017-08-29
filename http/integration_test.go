@@ -45,6 +45,7 @@ import (
 	"github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/resolvers/srv"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -286,7 +287,7 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 	// Proxy with auth.
 	s.proxy = &http.Server{
 		Handler: chi.Chain(director.AuthMiddleware(s.authorizer)).
-			Handler(director.New(pool, staticRouter, addresser)),
+			Handler(director.New(pool, staticRouter, addresser, logrus.New())),
 	}
 
 	proxyPort := s.proxyListenerTls.Addr().String()[strings.LastIndex(s.proxyListenerTls.Addr().String(), ":")+1:]

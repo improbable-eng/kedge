@@ -66,6 +66,7 @@ func (s *BalancedRRTransportSuite) SetupSuite() {
 	}
 	s.policy = RoundRobinPolicy(testFailBlacklistDuration, testDialTimeout).(*roundRobinPolicy)
 	s.lbTrans, err = New(
+		context.TODO(),
 		"my-magic-srv",
 		http.DefaultTransport,
 		s, // self implements naming.Resolver

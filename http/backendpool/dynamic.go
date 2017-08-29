@@ -10,8 +10,9 @@ import (
 
 // dynamic is a Pool to which you can update or remove routes.
 type dynamic struct {
-	backends       map[string]*backend
 	mu             sync.RWMutex
+
+	backends       map[string]*backend
 	backendFactory func(backend *pb.Backend) (*backend, error)
 }
 

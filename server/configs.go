@@ -6,10 +6,8 @@ import (
 	"github.com/mwitkow/go-proto-validators"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 	grpc_bp "github.com/mwitkow/kedge/grpc/backendpool"
-	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	grpc_router "github.com/mwitkow/kedge/grpc/director/router"
 	http_bp "github.com/mwitkow/kedge/http/backendpool"
-	http_director "github.com/mwitkow/kedge/http/director"
 	http_adhoc "github.com/mwitkow/kedge/http/director/adhoc"
 	http_router "github.com/mwitkow/kedge/http/director/router"
 	"github.com/mwitkow/kedge/lib/sharedflags"
@@ -38,9 +36,6 @@ var (
 	grpcRouter      = grpc_router.NewDynamic()
 	httpRouter      = http_router.NewDynamic()
 	httpAddresser   = http_adhoc.NewDynamic()
-
-	httpDirector = http_director.New(httpBackendPool, httpRouter, httpAddresser)
-	grpcDirector = grpc_director.New(grpcBackendPool, grpcRouter)
 )
 
 func generalValidator(msg proto.Message) error {

@@ -13,7 +13,6 @@ import (
 	"github.com/mwitkow/kedge/lib/tokenauth"
 	"github.com/mwitkow/kedge/lib/tokenauth/http"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/naming"
 )
 
@@ -28,13 +27,11 @@ const (
 
 // resolver resolves service names using Kubernetes endpoints instead of usual SRV DNS lookup.
 type resolver struct {
-	logger logrus.FieldLogger
-	cl     *client
+	cl *client
 }
 
 func NewFromConfig(conf *pb.K8SResolver) (target string, name naming.Resolver, err error) {
-	logger := logrus.New().WithField("target", conf.GetDnsPortName())
-	resolver, err := NewFromFlags(logger)
+	resolver, err := NewFromFlags()
 	if err != nil {
 		return "", nil, err
 	}
@@ -42,7 +39,7 @@ func NewFromConfig(conf *pb.K8SResolver) (target string, name naming.Resolver, e
 }
 
 // New returns a new Kubernetes resolver with HTTP client (based on given tokenauth Source and tlsConfig) to be used against kube-apiserver.
-func New(logger logrus.FieldLogger, k8sURL string, source tokenauth.Source, tlsConfig *tls.Config) naming.Resolver {
+func New(k8sURL string, source tokenauth.Source, tlsConfig *tls.Config) naming.Resolver {
 	k8sClient := &http.Client{
 		// TLS transport with auth injection.
 		Transport: httpauth.NewTripper(
@@ -53,16 +50,12 @@ func New(logger logrus.FieldLogger, k8sURL string, source tokenauth.Source, tlsC
 			"Authorization",
 		),
 	}
-	return NewWithClient(logger, k8sURL, k8sClient)
+	return NewWithClient(k8sURL, k8sClient)
 }
 
 // NewWithClient returns a new Kubernetes resolver using given http.Client configured to be used against kube-apiserver.
-func NewWithClient(logger logrus.FieldLogger, k8sURL string, k8sClient *http.Client) naming.Resolver {
-	if logger == nil {
-		logger = logrus.New()
-	}
+func NewWithClient(k8sURL string, k8sClient *http.Client) naming.Resolver {
 	return &resolver{
-		logger: logger,
 		cl: &client{
 			k8sURL:    k8sURL,
 			k8sClient: k8sClient,
@@ -138,5 +131,5 @@ func (r *resolver) Resolve(target string) (naming.Watcher, error) {
 	}
 
 	// Now the tricky part begins (:
-	return startNewWatcher(r.logger, t, r.cl), nil
+	return startNewWatcher(t, r.cl)
 }

@@ -3,13 +3,12 @@ package k8sresolver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/jpillora/backoff"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,27 +36,32 @@ func (m *readerCloserMock) Close() error {
 	return nil
 }
 
+func (m *readerCloserMock) isClosed() bool {
+	isClosed, ok := m.IsClosed.Load().(bool)
+	if ok {
+		return isClosed
+	}
+	return false
+}
+
 type endpointClientMock struct {
 	t *testing.T
 
 	expectedTarget          targetEntry
 	expectedResourceVersion int
 
-	connMock   *readerCloserMock
-	reconnects uint
+	connMock *readerCloserMock
 }
 
-func (m *endpointClientMock) StartChangeStream(ctx context.Context, t targetEntry, resourceVersion int) (io.ReadCloser, error) {
-	m.reconnects++
+func (m *endpointClientMock) StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error) {
 	require.Equal(m.t, m.expectedTarget, t)
 	return m.connMock, nil
 }
 
-func TestStreamWatcher(t *testing.T) {
+func startTestStream(t *testing.T) (chan []byte, chan error, *readerCloserMock, chan watchResult, func()) {
 	bytesCh := make(chan []byte)
 	errCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
 
 	connMock := &readerCloserMock{
 		Ctx:     ctx,
@@ -78,36 +82,53 @@ func TestStreamWatcher(t *testing.T) {
 	}
 
 	streamWatcherCtx, cancel2 := context.WithCancel(ctx)
-	defer cancel2()
+	closeFn := func() {
+		cancel()
+		cancel2()
+	}
 
 	eventsCh := make(chan watchResult)
 
-	startWatchingEndpointsChanges(
+	err := startWatchingEndpointsChanges(
 		streamWatcherCtx,
-		logrus.New(),
 		testTarget,
 		epClientMock,
 		eventsCh,
-		&backoff.Backoff{Min: 10 * time.Millisecond, Max: 10 * time.Millisecond},
-		0,
 	)
+	if err != nil {
+		closeFn()
+		t.Fatal(err.Error())
+	}
 
-	localReconnectCounter := uint(1)
+	return bytesCh, errCh, connMock, eventsCh, closeFn
+}
 
-	// Call number 1 - triggering error while decoding
+func TestStreamWatcher_DecodingError_EventErr_ClosesStream(t *testing.T) {
+	bytesCh, _, connMock, eventsCh, cancel := startTestStream(t)
+	defer cancel()
 
+	// Triggering error while decoding.
 	// It should block on connMock.Read by now.
 	// Send some undecodable stuff:
 	bytesCh <- []byte(`{{{{ "temp-err": true}`)
-	eventCh := <-eventsCh
-	require.Error(t, eventCh.err, "we expect it fails to decode eventCh")
-	require.Nil(t, eventCh.ep)
+	event := <-eventsCh
+	require.Error(t, event.err, "we expect it fails to decode eventCh")
 
-	// This error should recreate stream
-	localReconnectCounter++
+	// Expect connection closed.
+	select {
+	case <-eventsCh:
+		t.Error("No event was expected")
+	// Not really nice to use time in tests, but should be enough for now.
+	case <-time.After(200 * time.Millisecond):
+	}
+	require.True(t, connMock.isClosed())
+}
 
-	// Call number 2 - triggering not supported event.
+func TestStreamWatcher_NotSupportedType_EventErr_ClosesConn(t *testing.T) {
+	bytesCh, _, connMock, eventsCh, cancel := startTestStream(t)
+	defer cancel()
 
+	// Triggering not supported event.
 	wrongEvent := event{
 		Type: "not-supported",
 	}
@@ -115,26 +136,43 @@ func TestStreamWatcher(t *testing.T) {
 	require.NoError(t, err)
 
 	bytesCh <- []byte(b)
-	eventCh = <-eventsCh
-	require.Error(t, eventCh.err, "we expect it invalid event type error")
-	require.Nil(t, eventCh.ep)
+	event := <-eventsCh
+	require.Error(t, event.err, "we expect it invalid event type error")
 
-	// Call number 3 - triggering EOF.
-
-	errCh <- io.EOF
-	// Just expect reconnect.
+	// Expect connection closed.
 	select {
 	case <-eventsCh:
 		t.Error("No event was expected")
 	// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
+	require.True(t, connMock.isClosed())
+}
 
-	// This error should recreate stream
-	localReconnectCounter++
+func TestStreamWatcher_EOF_EventErr_ClosesConn(t *testing.T) {
+	_, errCh, connMock, eventsCh, cancel := startTestStream(t)
+	defer cancel()
 
-	// Call number 4 - triggering OK event.
+	// Triggering EOF.
+	errCh <- io.EOF
+	event := <-eventsCh
+	require.Error(t, event.err, "we expect it invalid event type error")
 
+	// Expect connection closed.
+	select {
+	case <-eventsCh:
+		t.Error("No event was expected")
+	// Not really nice to use time in tests, but should be enough for now.
+	case <-time.After(200 * time.Millisecond):
+	}
+	require.True(t, connMock.isClosed())
+}
+
+func TestStreamWatcher_OK_2OKEvents(t *testing.T) {
+	bytesCh, _, _, eventsCh, cancel := startTestStream(t)
+	defer cancel()
+
+	// Triggering OK gotEvent.
 	expectedEvent := event{
 		Type: added,
 		Object: endpoints{
@@ -159,12 +197,42 @@ func TestStreamWatcher(t *testing.T) {
 		},
 	}
 
-	b, err = json.Marshal(expectedEvent)
+	b, err := json.Marshal(expectedEvent)
 	require.NoError(t, err)
 	bytesCh <- b
-	eventCh = <-eventsCh
-	require.NoError(t, eventCh.err)
-	require.Equal(t, expectedEvent, *eventCh.ep)
+	gotEvent := <-eventsCh
+	require.NoError(t, gotEvent.err)
+	require.Equal(t, expectedEvent, *gotEvent.ep)
 
-	require.Equal(t, localReconnectCounter, epClientMock.reconnects)
+	expectedEvent2 := event{
+		Type: added,
+		Object: endpoints{
+			Metadata: metadata{
+				ResourceVersion: "123",
+			},
+			Subsets: []subset{
+				{
+					Ports: []port{
+						{
+							Port: 8080,
+							Name: "noName",
+						},
+					},
+					Addresses: []address{
+						{
+							IP: "1.2.3.4",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	b2, err2 := json.Marshal(expectedEvent2)
+	fmt.Println(string(b2))
+	require.NoError(t, err2)
+	bytesCh <- b2
+	gotEvent2 := <-eventsCh
+	require.NoError(t, gotEvent2.err)
+	require.Equal(t, expectedEvent2, *gotEvent2.ep)
 }

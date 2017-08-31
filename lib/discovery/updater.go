@@ -111,14 +111,42 @@ func (u *updater) onEvent(e event) (*pb_config.DirectorConfig, *pb_config.Backen
 	serviceObj := e.Object
 	service := serviceKey{serviceObj.Metadata.Name, serviceObj.Metadata.Namespace}
 
+	switch e.Type {
+	case deleted:
+		return u.onDeletedEvent(serviceObj, service)
+	case added, modified:
+		return u.onModifiedOrAddedEvent(serviceObj, service, e.Type)
+	}
+	return nil, nil, errors.Errorf("Got not supported event type %s", e.Type)
+}
+
+func (u *updater) onDeletedEvent(serviceObj service, service serviceKey) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
 	routings, ok := u.lastSeenServices[service]
-	if ok {
-		if e.Type == added {
-			return nil, nil, errors.Errorf("Got Added event for item %v that already exists", service)
-		}
-	} else {
-		if e.Type == modified || e.Type == deleted {
-			return nil, nil, errors.Errorf("Got %s event for item %v that we are seeing for the first time", e.Type, service)
+	if !ok {
+		return nil, nil, errors.Errorf("Got %s event for item %v that we are seeing for the first time", deleted, service)
+	}
+
+	for backendName, r := range routings.http {
+		u.applyHTTPRouteToDirectorAndBackendpool(backendName, httpRoute{}, r, deleted)
+	}
+
+	for backendName, r := range routings.grpc {
+		u.applygRPCRouteToDirectorAndBackendpool(backendName, grpcRoute{}, r, deleted)
+	}
+
+	delete(u.lastSeenServices, service)
+	return u.validatedAndReturnConfigs()
+}
+
+func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey, eType eventType) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
+	routings, ok := u.lastSeenServices[service]
+	if ok && eType == added {
+		return nil, nil, errors.Errorf("Got %s event for item %v that already exists", eType, service)
+	}
+
+	if !ok {
+		if eType == modified {
+			return nil, nil, errors.Errorf("Got %s event for item %v that we are seeing for the first time", eType, service)
 		}
 		routings = serviceRoutings{
 			http: make(map[string]httpRoute),
@@ -126,24 +154,9 @@ func (u *updater) onEvent(e event) (*pb_config.DirectorConfig, *pb_config.Backen
 		}
 	}
 
-	if serviceObj.Metadata.Annotations == nil || e.Type == deleted {
-		for backendName, r := range routings.http {
-			u.applyHTTPRouteToDirectorAndBackendpool(backendName, httpRoute{}, r, e.Type)
-		}
-
-		for backendName, r := range routings.grpc {
-			u.applygRPCRouteToDirectorAndBackendpool(backendName, grpcRoute{}, r, e.Type)
-		}
-
-		switch e.Type {
-		case added:
-			u.lastSeenServices[service] = routings
-		case deleted:
-			delete(u.lastSeenServices, service)
-		case modified:
-
-		}
-		return u.validatedAndReturnConfigs()
+	annotations := serviceObj.Metadata.Annotations
+	if serviceObj.Metadata.Annotations == nil {
+		annotations = map[string]string{}
 	}
 
 	foundRoutings := struct {
@@ -153,7 +166,7 @@ func (u *updater) onEvent(e event) (*pb_config.DirectorConfig, *pb_config.Backen
 		http: make(map[string]struct{}),
 		grpc: make(map[string]struct{}),
 	}
-	for annotationKey, value := range serviceObj.Metadata.Annotations {
+	for annotationKey, value := range annotations {
 		var portToExpose string
 		if strings.HasPrefix(annotationKey, u.httpAnnotationPrefix) {
 			portToExpose = strings.TrimPrefix(annotationKey, u.httpAnnotationPrefix)
@@ -183,7 +196,7 @@ func (u *updater) onEvent(e event) (*pb_config.DirectorConfig, *pb_config.Backen
 				portMatcher: portMatcher,
 				domainPort:  domainPort,
 			}
-			u.applyHTTPRouteToDirectorAndBackendpool(backendName, route, httpRoute{}, e.Type)
+			u.applyHTTPRouteToDirectorAndBackendpool(backendName, route, httpRoute{}, eType)
 			foundRoutings.http[backendName] = struct{}{}
 			routings.http[backendName] = route
 			continue
@@ -195,7 +208,7 @@ func (u *updater) onEvent(e event) (*pb_config.DirectorConfig, *pb_config.Backen
 				portMatcher:        portMatcher,
 				domainPort:         domainPort,
 			}
-			u.applygRPCRouteToDirectorAndBackendpool(backendName, route, grpcRoute{}, e.Type)
+			u.applygRPCRouteToDirectorAndBackendpool(backendName, route, grpcRoute{}, eType)
 			foundRoutings.grpc[backendName] = struct{}{}
 			routings.grpc[backendName] = route
 			continue
@@ -209,7 +222,7 @@ func (u *updater) onEvent(e event) (*pb_config.DirectorConfig, *pb_config.Backen
 		}
 
 		// Not found, so it needs to be removed.
-		u.applyHTTPRouteToDirectorAndBackendpool(backend, httpRoute{}, r, e.Type)
+		u.applyHTTPRouteToDirectorAndBackendpool(backend, httpRoute{}, r, eType)
 		delete(routings.http, backend)
 	}
 
@@ -219,7 +232,7 @@ func (u *updater) onEvent(e event) (*pb_config.DirectorConfig, *pb_config.Backen
 		}
 
 		// Not found, so it needs to be removed.
-		u.applygRPCRouteToDirectorAndBackendpool(backend, grpcRoute{}, r, e.Type)
+		u.applygRPCRouteToDirectorAndBackendpool(backend, grpcRoute{}, r, eType)
 		delete(routings.grpc, backend)
 	}
 

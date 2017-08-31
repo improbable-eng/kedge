@@ -6,14 +6,16 @@ import (
 	"sync"
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	"github.com/sirupsen/logrus"
 )
 
 // dynamic is a Pool to which you can update or remove routes.
 type dynamic struct {
-	mu             sync.RWMutex
+	mu sync.RWMutex
 
 	backends       map[string]*backend
 	backendFactory func(backend *pb.Backend) (*backend, error)
+	logger         logrus.FieldLogger
 }
 
 func (s *dynamic) Close() error {
@@ -26,8 +28,8 @@ func (s *dynamic) Close() error {
 }
 
 // NewDynamic creates a pool with a dynamic allocator
-func NewDynamic() *dynamic {
-	s := &dynamic{backends: make(map[string]*backend), backendFactory: newBackend}
+func NewDynamic(logger logrus.FieldLogger) *dynamic {
+	s := &dynamic{backends: make(map[string]*backend), backendFactory: newBackend, logger: logger}
 	return s
 }
 
@@ -45,14 +47,24 @@ func (s *dynamic) Tripper(backendName string) (http.RoundTripper, error) {
 //
 // If a backend of a given name already exists, and the configuration hasn't changed, no new work will be done.
 // If a backend requires changes, the previous one will be removed and closed.
-func (s *dynamic) AddOrUpdate(config *pb.Backend) error {
+func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) error {
 	s.mu.RLock()
 	existing, ok := s.backends[config.Name]
 	s.mu.RUnlock()
+	var err error
 	if !ok {
-		return s.addNewBackend(config)
+		err = s.addNewBackend(config)
+	} else {
+		err = s.updateBackendWithDiffing(existing, config)
 	}
-	return s.updateBackendWithDiffing(existing, config)
+	if err != nil {
+		return err
+	}
+
+	if logTestResolution {
+		go s.backends[config.Name].LogTestResolution(s.logger.WithField("backend", config.Name))
+	}
+	return nil
 }
 
 func (s *dynamic) addNewBackend(config *pb.Backend) error {

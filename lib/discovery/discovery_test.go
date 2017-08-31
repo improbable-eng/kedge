@@ -50,28 +50,17 @@ func TestUpdater_OnEvent_SingleAddition_HTTP(t *testing.T) {
 
 	okEvent := event{
 		Type: added,
-		Object: serviceListV1Core{
+		Object: service{
 			Kind: "Services",
-			Items: []service{
-				{
-					Metadata: metadata{
-						Name:        "s1",
-						Namespace:   "ns1",
-						Annotations: nil,
-					},
-				},
-				{
-					Metadata: metadata{
-						Name:      "s2",
-						Namespace: "ns1",
-						Annotations: map[string]string{
-							"some-trash":                   "ok",
-							"http.kedge-exposed.com/port1": "external.host.com:1",
-							"http.kedge-exposed.com/port3": "external.host.com",
-							"http.kedge-exposed.com/port5": "",
-							"http.kedge-exposed.com/port7": ":7",
-						},
-					},
+			Metadata: metadata{
+				Name:      "s2",
+				Namespace: "ns1",
+				Annotations: map[string]string{
+					"some-trash":                   "ok",
+					"http.kedge-exposed.com/port1": "external.host.com:1",
+					"http.kedge-exposed.com/port3": "external.host.com",
+					"http.kedge-exposed.com/port5": "",
+					"http.kedge-exposed.com/port7": ":7",
 				},
 			},
 		},
@@ -214,28 +203,16 @@ func TestUpdater_OnEvent_SingleAddition_GRPC(t *testing.T) {
 
 	okEvent := event{
 		Type: added,
-		Object: serviceListV1Core{
-			Kind: "Services",
-			Items: []service{
-				{
-					Metadata: metadata{
-						Name:        "s1",
-						Namespace:   "ns1",
-						Annotations: nil,
-					},
-				},
-				{
-					Metadata: metadata{
-						Name:      "s2",
-						Namespace: "ns1",
-						Annotations: map[string]string{
-							"some-trash":                   "ok",
-							"grpc.kedge-exposed.com/port2": "external.com/Method1:2",
-							"grpc.kedge-exposed.com/port4": "external.com/Method2",
-							"grpc.kedge-exposed.com/port6": "",
-							"grpc.kedge-exposed.com/port8": ":8",
-						},
-					},
+		Object: service{
+			Metadata: metadata{
+				Name:      "s2",
+				Namespace: "ns1",
+				Annotations: map[string]string{
+					"some-trash":                   "ok",
+					"grpc.kedge-exposed.com/port2": "external.com/Method1:2",
+					"grpc.kedge-exposed.com/port4": "external.com/Method2",
+					"grpc.kedge-exposed.com/port6": "",
+					"grpc.kedge-exposed.com/port8": ":8",
 				},
 			},
 		},

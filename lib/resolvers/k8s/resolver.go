@@ -33,10 +33,10 @@ func NewFromConfig(conf *pb.K8SResolver) (target string, name naming.Resolver, e
 }
 
 // NewWithClient returns a new Kubernetes resolver using given k8s.APIClient configured to be used against kube-apiserver.
-func NewWithClient(client *k8s.APIClient) naming.Resolver {
+func NewWithClient(apiClient *k8s.APIClient) naming.Resolver {
 	return &resolver{
 		cl: &client{
-			k8sClient: client,
+			k8sClient: apiClient,
 		},
 	}
 }

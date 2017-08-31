@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -54,16 +55,17 @@ const (
 // event represents a single event to a watched resource.
 type event struct {
 	Type   eventType `json:"type"`
-	Object service `json:"object"`
+	Object service   `json:"object"`
 }
 
 type service struct {
-	Kind       string   `json:"kind"`
-	APIVersion string   `json:"apiVersion"`
-	// If kind: Services
-	Metadata   metadata `json:"metadata"`
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Metadata metadata `json:"metadata"`
 	// If kind: Status
-	Status  status `json:"status"`
+	Status status      `json:"status"`
+	// If kind: Services
+	Spec   serviceSpec `json:"spec"`
 }
 
 type status struct {
@@ -77,6 +79,18 @@ type metadata struct {
 	ResourceVersion string            `json:"resourceVersion"`
 	Namespace       string            `json:"namespace"` // Namespace where service is sitting.
 	Annotations     map[string]string `json:"annotations"`
+}
+
+type serviceSpec struct {
+	Ports []portSpec `json:"ports"`
+}
+
+type portSpec struct {
+	// What pod port to get.
+	TargetPort interface{} `json:"targetPort"` // uint32 / string
+	Name       string `json:"name"`
+	// Expose port.
+	Port uint32 `json:"port"`
 }
 
 // proxyAllEvents gets events in loop and proxies to eventsCh. If event include some error it always returns, because
@@ -101,7 +115,7 @@ func proxyAllEvents(ctx context.Context, decoder *json.Decoder, eventsCh chan<- 
 				eventErr = errors.Wrap(err, "Unable to decode an event from the watch stream")
 			}
 		}
-
+		spew.Dump(got)
 		if eventErr == nil {
 			switch got.Type {
 			case added, modified, deleted:

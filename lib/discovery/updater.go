@@ -3,7 +3,6 @@ package discovery
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
@@ -41,8 +40,7 @@ type updater struct {
 	currentDirectorConfig *pb_config.DirectorConfig
 	currentBackendConfig  *pb_config.BackendPoolConfig
 	externalDomainSuffix  string
-	httpAnnotationPrefix  string
-	grpcAnnotationPrefix  string
+	labelAnnotationPrefix string
 
 	lastSeenServices map[serviceKey]serviceRoutings
 }
@@ -51,8 +49,7 @@ func newUpdater(
 	baseDirector *pb_config.DirectorConfig,
 	baseBackendpool *pb_config.BackendPoolConfig,
 	externalDomainSuffix string,
-	httpAnnotationPrefix string,
-	grpcAnnotationPrefix string,
+	labelAnnotationPrefix string,
 ) *updater {
 
 	resultDirectorConfig, resultBackendPool := cloneConfigs(baseDirector, baseBackendpool)
@@ -60,8 +57,7 @@ func newUpdater(
 		currentDirectorConfig: resultDirectorConfig,
 		currentBackendConfig:  resultBackendPool,
 		externalDomainSuffix:  externalDomainSuffix,
-		httpAnnotationPrefix:  httpAnnotationPrefix,
-		grpcAnnotationPrefix:  grpcAnnotationPrefix,
+		labelAnnotationPrefix: labelAnnotationPrefix,
 		lastSeenServices:      make(map[serviceKey]serviceRoutings),
 	}
 }
@@ -138,6 +134,14 @@ func (u *updater) onDeletedEvent(serviceObj service, service serviceKey) (*pb_co
 	return u.validatedAndReturnConfigs()
 }
 
+func (u *updater) hostMatcherAnnotation() string {
+	return fmt.Sprintf("%s%s", u.labelAnnotationPrefix, hostMatcherAnnotationSuffix)
+}
+
+func (u *updater) serviceNameMatcherAnnotation() string {
+	return fmt.Sprintf("%s%s", u.labelAnnotationPrefix, serviceNameMatcherAnnotationSuffix)
+}
+
 func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey, eType eventType) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
 	routings, ok := u.lastSeenServices[service]
 	if ok && eType == added {
@@ -154,9 +158,13 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		}
 	}
 
-	annotations := serviceObj.Metadata.Annotations
-	if serviceObj.Metadata.Annotations == nil {
-		annotations = map[string]string{}
+	var hostMatcherOverride string
+	if serviceObj.Metadata.Annotations != nil {
+		hostMatcherOverride = serviceObj.Metadata.Annotations[u.hostMatcherAnnotation()]
+	}
+	var serviceNameMatcherOverride string
+	if serviceObj.Metadata.Annotations != nil {
+		serviceNameMatcherOverride = serviceObj.Metadata.Annotations[u.serviceNameMatcherAnnotation()]
 	}
 
 	foundRoutings := struct {
@@ -166,49 +174,47 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		http: make(map[string]struct{}),
 		grpc: make(map[string]struct{}),
 	}
-	for annotationKey, value := range annotations {
-		var portToExpose string
-		if strings.HasPrefix(annotationKey, u.httpAnnotationPrefix) {
-			portToExpose = strings.TrimPrefix(annotationKey, u.httpAnnotationPrefix)
-		}
-
-		if strings.HasPrefix(annotationKey, u.grpcAnnotationPrefix) {
-			portToExpose = strings.TrimPrefix(annotationKey, u.grpcAnnotationPrefix)
-		}
-
-		if portToExpose == "" {
-			// Not our annotation.
-			continue
-		}
-
+	for _, port := range serviceObj.Spec.Ports {
 		// NOTE: There is no check if this port actually is exposed by serviceObj!
-		backendName := fmt.Sprintf("%s_%s_%s", service.name, service.namespace, portToExpose)
-		domainPort := fmt.Sprintf("%s.%s:%s", service.name, service.namespace, portToExpose)
-
-		mainMatcher, portMatcher, err := u.annotationValueToMatchers(service.name, annotationKey, value)
-		if err != nil {
-			return nil, nil, err
+		portToExpose := port.TargetPort
+		if portToExpose == nil {
+			portToExpose = port.Port
 		}
 
-		if strings.HasPrefix(annotationKey, u.httpAnnotationPrefix) {
+		backendName := fmt.Sprintf("%s_%s_%v", service.name, service.namespace, portToExpose)
+		domainPort := fmt.Sprintf("%s.%s:%v", service.name, service.namespace, port.Name)
+		mainMatcher := fmt.Sprintf("%s.%s", service.name, u.externalDomainSuffix)
+		portMatcher := port.Port
+
+		if port.Name == "http" || strings.HasPrefix(port.Name, "http-") {
+			if hostMatcherOverride != "" {
+				mainMatcher = hostMatcherOverride
+			}
 			route := httpRoute{
 				hostMatcher: mainMatcher,
 				portMatcher: portMatcher,
 				domainPort:  domainPort,
 			}
-			u.applyHTTPRouteToDirectorAndBackendpool(backendName, route, httpRoute{}, eType)
+
+			oldRoute := routings.http[backendName]
+			u.applyHTTPRouteToDirectorAndBackendpool(backendName, route, oldRoute, eType)
 			foundRoutings.http[backendName] = struct{}{}
 			routings.http[backendName] = route
 			continue
 		}
 
-		if strings.HasPrefix(annotationKey, u.grpcAnnotationPrefix) {
+		if port.Name == "grpc" || strings.HasPrefix(port.Name, "grpc-") {
+			if serviceNameMatcherOverride != "" {
+				mainMatcher = serviceNameMatcherOverride
+			}
 			route := grpcRoute{
 				serviceNameMatcher: mainMatcher,
 				portMatcher:        portMatcher,
 				domainPort:         domainPort,
 			}
-			u.applygRPCRouteToDirectorAndBackendpool(backendName, route, grpcRoute{}, eType)
+
+			oldRoute := routings.grpc[backendName]
+			u.applygRPCRouteToDirectorAndBackendpool(backendName, route, oldRoute, eType)
 			foundRoutings.grpc[backendName] = struct{}{}
 			routings.grpc[backendName] = route
 			continue
@@ -220,7 +226,6 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		if _, ok := foundRoutings.http[backend]; ok {
 			continue
 		}
-
 		// Not found, so it needs to be removed.
 		u.applyHTTPRouteToDirectorAndBackendpool(backend, httpRoute{}, r, eType)
 		delete(routings.http, backend)
@@ -230,7 +235,6 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		if _, ok := foundRoutings.grpc[backend]; ok {
 			continue
 		}
-
 		// Not found, so it needs to be removed.
 		u.applygRPCRouteToDirectorAndBackendpool(backend, grpcRoute{}, r, eType)
 		delete(routings.grpc, backend)
@@ -253,25 +257,6 @@ func (u *updater) validatedAndReturnConfigs() (*pb_config.DirectorConfig, *pb_co
 
 	u.sortConfigs()
 	return u.currentDirectorConfig, u.currentBackendConfig, nil
-}
-
-func (u *updater) annotationValueToMatchers(serviceName string, key, value string) (string, uint32, error) {
-	split := strings.Split(value, ":")
-	mainMatcher := split[0]
-	if mainMatcher == "" {
-		mainMatcher = fmt.Sprintf("%s.%s", serviceName, u.externalDomainSuffix)
-	}
-
-	portMatcher := uint32(0)
-	if len(split) > 1 && split[1] != "" {
-		portMatcherInt, err := strconv.Atoi(split[1])
-		if err != nil {
-			return "", 0, errors.Errorf("Wrong format of %s annotation value %s. In hostport, expected port to be empty or valid uint32. Got %s", key, value, split[1])
-		}
-		portMatcher = uint32(portMatcherInt)
-	}
-
-	return mainMatcher, portMatcher, nil
 }
 
 func (u *updater) applyHTTPRouteToDirectorAndBackendpool(backendName string, newRoute httpRoute, oldRoute httpRoute, eventType eventType) {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -59,13 +58,13 @@ type event struct {
 }
 
 type service struct {
-	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
-	Metadata metadata `json:"metadata"`
+	Kind       string   `json:"kind"`
+	APIVersion string   `json:"apiVersion"`
+	Metadata   metadata `json:"metadata"`
 	// If kind: Status
-	Status status      `json:"status"`
+	Status status `json:"status"`
 	// If kind: Services
-	Spec   serviceSpec `json:"spec"`
+	Spec serviceSpec `json:"spec"`
 }
 
 type status struct {
@@ -88,7 +87,7 @@ type serviceSpec struct {
 type portSpec struct {
 	// What pod port to get.
 	TargetPort interface{} `json:"targetPort"` // uint32 / string
-	Name       string `json:"name"`
+	Name       string      `json:"name"`
 	// Expose port.
 	Port uint32 `json:"port"`
 }
@@ -115,7 +114,7 @@ func proxyAllEvents(ctx context.Context, decoder *json.Decoder, eventsCh chan<- 
 				eventErr = errors.Wrap(err, "Unable to decode an event from the watch stream")
 			}
 		}
-		spew.Dump(got)
+
 		if eventErr == nil {
 			switch got.Type {
 			case added, modified, deleted:

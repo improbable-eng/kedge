@@ -182,6 +182,9 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		}
 
 		backendName := fmt.Sprintf("%s_%s_%v", service.name, service.namespace, portToExpose)
+		// BackendName needs to conform regex: "^[a-z_0-9.]{2,64}$"
+		backendName = strings.Replace(backendName, "-", "_", -1)
+
 		domainPort := fmt.Sprintf("%s.%s:%v", service.name, service.namespace, port.Name)
 		mainMatcher := fmt.Sprintf("%s.%s", service.name, u.externalDomainSuffix)
 		portMatcher := port.Port

@@ -190,6 +190,11 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		portMatcher := port.Port
 
 		if port.Name == "http" || strings.HasPrefix(port.Name, "http-") {
+			if _, ok := foundRoutings.http[backendName]; ok {
+				// Duplicates can happen, but they are targeting same thing, so just ignore other ones.
+				continue
+			}
+
 			if hostMatcherOverride != "" {
 				mainMatcher = hostMatcherOverride
 			}
@@ -207,6 +212,11 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		}
 
 		if port.Name == "grpc" || strings.HasPrefix(port.Name, "grpc-") {
+			if _, ok := foundRoutings.grpc[backendName]; ok {
+				// Duplicates can happen, but they are targeting same thing, so just ignore other ones.
+				continue
+			}
+
 			if serviceNameMatcherOverride != "" {
 				mainMatcher = serviceNameMatcherOverride
 			}

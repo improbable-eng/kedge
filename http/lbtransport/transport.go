@@ -89,6 +89,7 @@ func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr 
 			time.Sleep(resolveRetryBackoff.Duration())
 			continue
 		}
+		resolveRetryBackoff.Reset()
 
 		localCurrentTargets := []*Target{}
 		// Starting getting Next updates. On Error we will retry.

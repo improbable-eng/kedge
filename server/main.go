@@ -21,6 +21,7 @@ import (
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	http_director "github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
@@ -32,6 +33,8 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"github.com/mwitkow/kedge/lib/discovery"
+	"context"
 )
 
 var (
@@ -48,6 +51,10 @@ var (
 
 	flagLogTestBackendpoolResolution = sharedflags.Set.Bool("log_backend_resolution_on_addition", false, "With this option "+
 		"kedge will always try to resolve and log (only) new backend entry. Useful for debugging backend routings.")
+
+	flagDynamicRoutingDiscoveryEnabled = sharedflags.Set.Bool("kedge_dynamic_routings_enabled", false,
+		"If enabled, kedge will watch on service changes (services which has particular label) and generates " +
+			"director & backendpool routings. It will update them directly into into flagz value, so you can see the current routings anytime in debug/flagz")
 )
 
 func main() {
@@ -70,6 +77,33 @@ func main() {
 			log.WithError(err).Fatal("Failed to create new logstash hook")
 		}
 		log.AddHook(hook)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if *flagDynamicRoutingDiscoveryEnabled {
+		log.Info("Flag 'kedge_dynamic_routings_enabled' is true. Enabling dynamic routing with base configuration fetched from provided" +
+			"directorConfig and backendpoolConfig.")
+		routingDiscovery, err := discovery.NewFromFlags(
+			log.StandardLogger(),
+			flagConfigDirector.Get().(*pb_config.DirectorConfig),
+			flagConfigBackendpool.Get().(*pb_config.BackendPoolConfig),
+		)
+		if err != nil {
+			log.WithError(err).Fatal("Failed to create routingDiscovery")
+		}
+
+		go func() {
+			err := routingDiscovery.DiscoverAndSetFlags(
+				ctx,
+				flagConfigDirector,
+				flagConfigBackendpool,
+			)
+			if err != nil {
+				log.WithError(err).Fatal("Dynamic Routing Discovery failed")
+			}
+		}()
 	}
 
 	grpc.EnableTracing = *flagGrpcWithTracing

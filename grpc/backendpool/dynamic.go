@@ -6,6 +6,7 @@ import (
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
 	"google.golang.org/grpc"
+	"github.com/sirupsen/logrus"
 )
 
 // dynamic is a Pool to which you can update or remove routes.
@@ -13,6 +14,7 @@ type dynamic struct {
 	backends       map[string]*backend
 	mu             sync.RWMutex
 	backendFactory func(backend *pb.Backend) (*backend, error)
+	logger         logrus.FieldLogger
 }
 
 func (s *dynamic) Close() error {
@@ -25,8 +27,8 @@ func (s *dynamic) Close() error {
 }
 
 // NewDynamic creates a pool with a dynamic allocator
-func NewDynamic() *dynamic {
-	s := &dynamic{backends: make(map[string]*backend), backendFactory: newBackend}
+func NewDynamic(logger logrus.FieldLogger) *dynamic {
+	s := &dynamic{backends: make(map[string]*backend), backendFactory: newBackend, logger: logger}
 	return s
 }
 
@@ -44,14 +46,24 @@ func (s *dynamic) Conn(backendName string) (*grpc.ClientConn, error) {
 //
 // If a backend of a given name already exists, and the configuration hasn't changed, no new work will be done.
 // If a backend requires changes, the previous one will be removed and closed.
-func (s *dynamic) AddOrUpdate(config *pb.Backend) error {
+func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (changed bool, err error) {
 	s.mu.RLock()
 	existing, ok := s.backends[config.Name]
 	s.mu.RUnlock()
 	if !ok {
-		return s.addNewBackend(config)
+		changed = true
+		err = s.addNewBackend(config)
+	} else {
+		changed, err = s.updateBackendWithDiffing(existing, config)
 	}
-	return s.updateBackendWithDiffing(existing, config)
+	if err != nil {
+		return changed, err
+	}
+
+	if changed && logTestResolution {
+		go s.backends[config.Name].LogTestResolution(s.logger.WithField("backend", config.Name))
+	}
+	return changed, nil
 }
 
 func (s *dynamic) addNewBackend(config *pb.Backend) error {
@@ -65,16 +77,16 @@ func (s *dynamic) addNewBackend(config *pb.Backend) error {
 	return nil
 }
 
-func (s *dynamic) updateBackendWithDiffing(existing *backend, config *pb.Backend) error {
+func (s *dynamic) updateBackendWithDiffing(existing *backend, config *pb.Backend) (changed bool, err error) {
 	if configsAreTheSame(existing.config, config) {
-		return nil
+		return false, nil
 	}
 	if err := s.addNewBackend(config); err != nil {
-		return err
+		return true, err
 	}
 	// Make sure we clear up resources.
 	existing.Close()
-	return nil
+	return true, nil
 }
 
 // Remove removes and shuts down a previously active backend.

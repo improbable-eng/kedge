@@ -19,7 +19,7 @@ func startWatchingEndpointsChanges(
 ) error {
 	stream, err := epClient.StartChangeStream(ctx, target)
 	if err != nil {
-		return errors.Wrapf(err, "k8sresolver stream: Failed to do start stream for target %s", target)
+		return errors.Wrapf(err, "k8sresolver stream: Failed to do start stream for target %v", target)
 	}
 
 	go func() {

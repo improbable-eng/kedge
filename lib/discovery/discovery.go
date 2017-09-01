@@ -116,6 +116,12 @@ func (d *RoutingDiscovery) DiscoverOnce(ctx context.Context) (*pb_config.Directo
 		var event event
 		select {
 		case <-ctx.Done():
+			if resultBackendPool == nil {
+				resultBackendPool = d.baseBackendpool
+			}
+			if resultDirectorConfig == nil {
+				resultDirectorConfig = d.baseDirector
+			}
 			// Time is up, let's return what we have so far.
 			return resultDirectorConfig, resultBackendPool, nil
 		case r := <-watchResultCh:

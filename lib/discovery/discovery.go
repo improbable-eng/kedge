@@ -2,9 +2,11 @@ package discovery
 
 import (
 	"context"
+	"github.com/golang/protobuf/jsonpb"
 	"fmt"
 	"time"
 
+	"github.com/mwitkow/go-flagz/protobuf"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 	"github.com/mwitkow/kedge/lib/k8s"
 	"github.com/mwitkow/kedge/lib/sharedflags"
@@ -136,4 +138,90 @@ func (d *RoutingDiscovery) DiscoverOnce(ctx context.Context) (*pb_config.Directo
 			return nil, nil, errors.Wrapf(err, "error on updating routing on event %v", event)
 		}
 	}
+}
+
+func (d *RoutingDiscovery) DiscoverAndSetFlags(
+	ctx context.Context,
+	directorFlagz *protoflagz.DynProto3Value,
+	backendpoolFlagz *protoflagz.DynProto3Value,
+) error  {
+	watchResultCh := make(chan watchResult)
+	defer close(watchResultCh)
+
+	updater := newUpdater(
+		d.baseDirector,
+		d.baseBackendpool,
+		d.externalDomainSuffix,
+		d.labelAnnotationPrefix,
+	)
+
+	for ctx.Err() == nil {
+		streamCtx, streamCancel := context.WithCancel(ctx)
+		// All errors from watching service or watchResultCh are irrecoverable.
+		err := startWatchingServicesChanges(streamCtx, d.labelSelectorKey, d.serviceClient, watchResultCh)
+		if err != nil {
+			streamCancel()
+			d.logger.WithError(err).Errorf("Failed to start watching services by %s selector stream", d.labelSelectorKey)
+
+			// Add backoff
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		for {
+			var event event
+			select {
+			case <-ctx.Done():
+				return nil
+			case r := <-watchResultCh:
+				if r.err != nil {
+					d.logger.WithError(err).Error("Error on reading event stream. Retrying stream...")
+					break
+				}
+				event = *r.ep
+			}
+
+			directorConfig, backendPool, err := updater.onEvent(event)
+			if err != nil {
+				d.logger.WithError(err).Errorf("Error on updating routing on event %v. Retrying stream...", event)
+				// TODO(bplotka) Metric here!
+				// There is possiblity we missed event, so retry stream.
+				break
+			}
+
+			err = d.setFlags(directorConfig, directorFlagz, backendPool, backendpoolFlagz)
+			if err != nil {
+				return errors.Wrap(err, "Error on updating flags from director and backendpool configs")
+			}
+		}
+		streamCancel()
+	}
+
+	return nil
+}
+
+func (d *RoutingDiscovery) setFlags(
+	directorConfig *pb_config.DirectorConfig,
+	directorFlagz *protoflagz.DynProto3Value,
+	backenpoolConfig *pb_config.BackendPoolConfig,
+	backendpoolFlagz *protoflagz.DynProto3Value,
+) error {
+	director, err := (&jsonpb.Marshaler{}).MarshalToString(directorConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal directorConfig")
+	}
+	err = directorFlagz.Set(string(director))
+	if err != nil {
+		return errors.Wrap(err, "failed to set directorConfig into protoflagz flag")
+	}
+
+	backendpool, err := (&jsonpb.Marshaler{}).MarshalToString(backenpoolConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal backenpoolConfig")
+	}
+	err = backendpoolFlagz.Set(backendpool)
+	if err != nil {
+		return errors.Wrap(err, "failed to set backenpoolConfig into protoflagz flag")
+	}
+	return nil
 }

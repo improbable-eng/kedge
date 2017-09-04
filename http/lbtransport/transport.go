@@ -63,16 +63,13 @@ func New(ctx context.Context, targetAddr string, parent http.RoundTripper, resol
 	return s, nil
 }
 
-var (
-	resolveRetryBackoff = &backoff.Backoff{
+func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr string) {
+	resolveRetryBackoff := &backoff.Backoff{
 		Min:    50 * time.Millisecond,
 		Jitter: true,
 		Factor: 2,
 		Max:    2 * time.Second,
 	}
-)
-
-func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr string) {
 	var lastNextError error
 
 	for ctx.Err() == nil {

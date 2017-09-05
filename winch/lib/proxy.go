@@ -26,7 +26,7 @@ type winchMapper interface {
 	kedge_map.Mapper
 }
 
-func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry) *Proxy {
+func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *http.ServeMux) *Proxy {
 	// Prepare chain of trippers for winch logic. (The last wrapped will be first in the chain of tripperwares)
 	// 5) Last, default transport for communication with our kedges.
 	// 4) Kedge auth tipper - injects auth for kedge based on route.
@@ -42,6 +42,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry) *Proxy 
 
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	return &Proxy{
+		mux: mux,
 		kedgeReverseProxy: &httputil.ReverseProxy{
 			Director:      func(r *http.Request) {},
 			Transport:     parentTransport,
@@ -53,8 +54,10 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry) *Proxy 
 }
 
 // Proxy is a forward/reverse proxy that implements Mapper+Kedge forwarding.
+// Mux is for routes that directed to winch directly.
 type Proxy struct {
 	kedgeReverseProxy *httputil.ReverseProxy
+	mux               *http.ServeMux
 }
 
 func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -62,9 +65,10 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
 	}
 
+	// Is this request directly to us, or just to be proxied?
+	// This is to handle case when winch have /debug/xxx endpoint and we want to proxy through winch to same endpoint's path.
 	if req.URL.Scheme == "" {
-		// Local resource was requested and was not in previous route pattern.
-		http.NotFound(resp, req)
+		p.mux.ServeHTTP(resp, req)
 		return
 	}
 

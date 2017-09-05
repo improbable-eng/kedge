@@ -91,6 +91,7 @@ func main() {
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 	mux.Handle("/debug/traces", http.HandlerFunc(trace.Traces))
 	mux.Handle("/debug/events", http.HandlerFunc(trace.Events))
+	mux.Handle("/version", http.HandlerFunc(handleVersion))
 	pacHandle, err := winch.NewPacFromFlags(httpPlainListener.Addr().String())
 	if err != nil {
 		log.WithError(err).Fatalf("failed to init PAC handler")
@@ -106,11 +107,13 @@ func main() {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
 
-	mux.Handle("/",
+	proxyMux := http.NewServeMux()
+	proxyMux.Handle("/",
 		winch.New(
 			kedge_map.RouteMapper(routes.Get()),
 			tlsConfig,
 			logEntry,
+			mux,
 		),
 	)
 	winchServer := &http.Server{
@@ -121,7 +124,7 @@ func main() {
 			http_ctxtags.Middleware("winch"),
 			http_debug.Middleware(),
 			http_logrus.Middleware(logEntry, http_logrus.WithLevels(winchCodeToLevel)),
-		).Handler(mux),
+		).Handler(proxyMux),
 	}
 
 	cleanupWG := &sync.WaitGroup{}

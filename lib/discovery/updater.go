@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
-	pb_resolvers "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	pb_grpcbackends "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
 	pb_grpcroutes "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/routes"
 	pb_httpbackends "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
@@ -14,26 +13,37 @@ import (
 	"github.com/pkg/errors"
 )
 
-type httpRoute struct {
-	hostMatcher string
+type route struct {
+	// Host (HTTP) or Service (Grpc).
+	nameMatcher string
+	// If 0 it means just name matcher only.
 	portMatcher uint32
-	domainPort  string
-}
-
-type grpcRoute struct {
-	serviceNameMatcher string
-	portMatcher        uint32
-	domainPort         string
 }
 
 type serviceKey struct {
 	name, namespace string
 }
 
+type backendName struct {
+	service    serviceKey
+	targetPort string
+}
+
+func (b backendName) String() string {
+	backendName := fmt.Sprintf("%s_%s_%v", b.service.name, b.service.namespace, b.targetPort)
+	// BackendName needs to conform regex: "^[a-z_0-9.]{2,64}$"
+	return strings.Replace(backendName, "-", "_", -1)
+}
+
 type serviceRoutings struct {
-	// by backend name.
-	http map[string]httpRoute
-	grpc map[string]grpcRoute
+	// There could be more than one director routing per backend.
+	http map[backendName][]route
+	grpc map[backendName][]route
+}
+
+type serviceBackends struct {
+	httpDomainPorts map[backendName]string
+	grpcDomainPorts map[backendName]string
 }
 
 type updater struct {
@@ -51,7 +61,6 @@ func newUpdater(
 	externalDomainSuffix string,
 	labelAnnotationPrefix string,
 ) *updater {
-
 	resultDirectorConfig, resultBackendPool := cloneConfigs(baseDirector, baseBackendpool)
 	return &updater{
 		currentDirectorConfig: resultDirectorConfig,
@@ -122,12 +131,14 @@ func (u *updater) onDeletedEvent(serviceObj service, service serviceKey) (*pb_co
 		return nil, nil, errors.Errorf("Got %s event for item %v that we are seeing for the first time", deleted, service)
 	}
 
-	for backendName, r := range routings.http {
-		u.applyHTTPRouteToDirectorAndBackendpool(backendName, httpRoute{}, r, deleted)
+	for backend, routes := range routings.http {
+		u.applyHTTPRouteToDirector(backend.String(), routes, []route{})
+		u.applyHTTPRouteToBackendpool(backend, map[backendName]string{})
 	}
 
-	for backendName, r := range routings.grpc {
-		u.applygRPCRouteToDirectorAndBackendpool(backendName, grpcRoute{}, r, deleted)
+	for backend, routes := range routings.grpc {
+		u.applygRPCRouteToDirector(backend.String(), routes, []route{})
+		u.applygRPCRouteToBackendpool(backend, map[backendName]string{})
 	}
 
 	delete(u.lastSeenServices, service)
@@ -153,8 +164,8 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 			return nil, nil, errors.Errorf("Got %s event for item %v that we are seeing for the first time", eType, service)
 		}
 		routings = serviceRoutings{
-			http: make(map[string]httpRoute),
-			grpc: make(map[string]grpcRoute),
+			http: make(map[backendName][]route),
+			grpc: make(map[backendName][]route),
 		}
 	}
 
@@ -167,12 +178,13 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		serviceNameMatcherOverride = serviceObj.Metadata.Annotations[u.serviceNameMatcherAnnotation()]
 	}
 
-	foundRoutings := struct {
-		http map[string]struct{}
-		grpc map[string]struct{}
-	}{
-		http: make(map[string]struct{}),
-		grpc: make(map[string]struct{}),
+	foundRoutes := serviceRoutings{
+		http: make(map[backendName][]route),
+		grpc: make(map[backendName][]route),
+	}
+	foundBackends := serviceBackends{
+		httpDomainPorts: make(map[backendName]string),
+		grpcDomainPorts: make(map[backendName]string),
 	}
 	for _, port := range serviceObj.Spec.Ports {
 		// NOTE: There is no check if this port actually is exposed by serviceObj!
@@ -181,80 +193,83 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 			portToExpose = port.Port
 		}
 
-		backendName := fmt.Sprintf("%s_%s_%v", service.name, service.namespace, portToExpose)
-		// BackendName needs to conform regex: "^[a-z_0-9.]{2,64}$"
-		backendName = strings.Replace(backendName, "-", "_", -1)
-
+		backendName := backendName{
+			service:    service,
+			targetPort: fmt.Sprintf("%v", portToExpose),
+		}
 		domainPort := fmt.Sprintf("%s.%s:%v", service.name, service.namespace, port.Name)
-		mainMatcher := fmt.Sprintf("%s.%s", service.name, u.externalDomainSuffix)
-		portMatcher := port.Port
-
+		foundRoute := route{
+			nameMatcher: fmt.Sprintf("%s.%s", service.name, u.externalDomainSuffix),
+			portMatcher: port.Port,
+		}
 		if port.Name == "http" || strings.HasPrefix(port.Name, "http-") {
-			if _, ok := foundRoutings.http[backendName]; ok {
-				// Duplicates can happen, but they are targeting same thing, so just ignore other ones.
-				continue
-			}
-
 			if hostMatcherOverride != "" {
-				mainMatcher = hostMatcherOverride
-			}
-			route := httpRoute{
-				hostMatcher: mainMatcher,
-				portMatcher: portMatcher,
-				domainPort:  domainPort,
+				foundRoute.nameMatcher = hostMatcherOverride
 			}
 
-			oldRoute := routings.http[backendName]
-			u.applyHTTPRouteToDirectorAndBackendpool(backendName, route, oldRoute, eType)
-			foundRoutings.http[backendName] = struct{}{}
-			routings.http[backendName] = route
+			if port.Port == 80 {
+				// Avoid specific ports if possible.
+				foundRoute.portMatcher = 0
+			}
+
+			foundRoutes.http[backendName] = append(foundRoutes.http[backendName], foundRoute)
+			// Since target port is the same we can use whatever domainPort we have here.
+			foundBackends.httpDomainPorts[backendName] = domainPort
 			continue
 		}
 
 		if port.Name == "grpc" || strings.HasPrefix(port.Name, "grpc-") {
-			if _, ok := foundRoutings.grpc[backendName]; ok {
-				// Duplicates can happen, but they are targeting same thing, so just ignore other ones.
-				continue
-			}
-
 			if serviceNameMatcherOverride != "" {
-				mainMatcher = serviceNameMatcherOverride
-			}
-			route := grpcRoute{
-				serviceNameMatcher: mainMatcher,
-				portMatcher:        portMatcher,
-				domainPort:         domainPort,
+				foundRoute.nameMatcher = serviceNameMatcherOverride
 			}
 
-			oldRoute := routings.grpc[backendName]
-			u.applygRPCRouteToDirectorAndBackendpool(backendName, route, oldRoute, eType)
-			foundRoutings.grpc[backendName] = struct{}{}
-			routings.grpc[backendName] = route
+			foundRoutes.grpc[backendName] = append(foundRoutes.grpc[backendName], foundRoute)
+			// Since target port is the same we can use whatever domainPort we have here.
+			foundBackends.grpcDomainPorts[backendName] = domainPort
 			continue
 		}
 	}
+	u.applyHTTPRoutes(routings, foundRoutes, foundBackends)
+	u.applygRPCRoutes(routings, foundRoutes, foundBackends)
+	u.lastSeenServices[service] = foundRoutes
 
-	// What to remove?
-	for backend, r := range routings.http {
-		if _, ok := foundRoutings.http[backend]; ok {
-			continue
-		}
-		// Not found, so it needs to be removed.
-		u.applyHTTPRouteToDirectorAndBackendpool(backend, httpRoute{}, r, eType)
-		delete(routings.http, backend)
-	}
-
-	for backend, r := range routings.grpc {
-		if _, ok := foundRoutings.grpc[backend]; ok {
-			continue
-		}
-		// Not found, so it needs to be removed.
-		u.applygRPCRouteToDirectorAndBackendpool(backend, grpcRoute{}, r, eType)
-		delete(routings.grpc, backend)
-	}
-
-	u.lastSeenServices[service] = routings
 	return u.validatedAndReturnConfigs()
+}
+
+func (u *updater) applyHTTPRoutes(oldRoutings serviceRoutings, newRoutings serviceRoutings, backendTargets serviceBackends) {
+	// What to add/change per backend?
+	for backend := range backendTargets.httpDomainPorts {
+		u.applyHTTPRouteToDirector(backend.String(), oldRoutings.http[backend], newRoutings.http[backend])
+		u.applyHTTPRouteToBackendpool(backend, backendTargets.httpDomainPorts)
+	}
+
+	// What backend to remove completely?
+	for backend, r := range oldRoutings.http {
+		if _, ok := newRoutings.http[backend]; ok {
+			continue
+		}
+		// Not found, so it needs to be removed.
+		u.applyHTTPRouteToDirector(backend.String(), r, []route{})
+		u.applyHTTPRouteToBackendpool(backend, backendTargets.httpDomainPorts)
+	}
+}
+
+func (u *updater) applygRPCRoutes(oldRoutings serviceRoutings, newRoutings serviceRoutings, backendTargets serviceBackends) {
+	// What to add/change per backend?
+	for backend := range backendTargets.grpcDomainPorts {
+		u.applygRPCRouteToDirector(backend.String(), oldRoutings.grpc[backend], newRoutings.grpc[backend])
+		u.applygRPCRouteToBackendpool(backend, backendTargets.grpcDomainPorts)
+	}
+
+	// What backend to remove completely?
+	for backend, r := range oldRoutings.grpc {
+		if _, ok := newRoutings.grpc[backend]; ok {
+			continue
+		}
+		// Not found, so it needs to be removed.
+		u.applygRPCRouteToDirector(backend.String(), r, []route{})
+		u.applygRPCRouteToBackendpool(backend, backendTargets.grpcDomainPorts)
+	}
 }
 
 func (u *updater) validatedAndReturnConfigs() (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
@@ -270,159 +285,6 @@ func (u *updater) validatedAndReturnConfigs() (*pb_config.DirectorConfig, *pb_co
 
 	u.sortConfigs()
 	return u.currentDirectorConfig, u.currentBackendConfig, nil
-}
-
-func (u *updater) applyHTTPRouteToDirectorAndBackendpool(backendName string, newRoute httpRoute, oldRoute httpRoute, eventType eventType) {
-	if eventType == deleted || eventType == modified {
-		toDeleteIndex := -1
-		for i, directorRoute := range u.currentDirectorConfig.GetHttp().Routes {
-			if !directorRoute.Autogenerated {
-				// Do not modify not generated ones.
-				continue
-			}
-
-			if directorRoute.HostMatcher == oldRoute.hostMatcher &&
-				directorRoute.PortMatcher == oldRoute.portMatcher {
-				toDeleteIndex = i
-				break
-			}
-		}
-
-		if toDeleteIndex >= 0 {
-			u.currentDirectorConfig.GetHttp().Routes = append(
-				u.currentDirectorConfig.GetHttp().Routes[:toDeleteIndex],
-				u.currentDirectorConfig.GetHttp().Routes[toDeleteIndex+1:]...,
-			)
-		}
-
-		toDeleteIndex = -1
-		for i, backends := range u.currentBackendConfig.GetHttp().Backends {
-			if !backends.Autogenerated {
-				// Do not modify not generated ones.
-				continue
-			}
-
-			if backends.Name == backendName {
-				toDeleteIndex = i
-				break
-			}
-		}
-
-		if toDeleteIndex >= 0 {
-			u.currentBackendConfig.GetHttp().Backends = append(
-				u.currentBackendConfig.GetHttp().Backends[:toDeleteIndex],
-				u.currentBackendConfig.GetHttp().Backends[toDeleteIndex+1:]...,
-			)
-		}
-	}
-
-	var empty httpRoute
-	if newRoute == empty {
-		return
-	}
-
-	if eventType == added || eventType == modified {
-		u.currentDirectorConfig.GetHttp().Routes = append(
-			u.currentDirectorConfig.GetHttp().Routes,
-			&pb_httproutes.Route{
-				Autogenerated: true,
-				BackendName:   backendName,
-				HostMatcher:   newRoute.hostMatcher,
-				PortMatcher:   newRoute.portMatcher,
-				ProxyMode:     pb_httproutes.ProxyMode_REVERSE_PROXY,
-			},
-		)
-
-		u.currentBackendConfig.GetHttp().Backends = append(
-			u.currentBackendConfig.GetHttp().Backends,
-			&pb_httpbackends.Backend{
-				Autogenerated: true,
-				Name:          backendName,
-				Resolver: &pb_httpbackends.Backend_K8S{
-					K8S: &pb_resolvers.K8SResolver{
-						DnsPortName: newRoute.domainPort,
-					},
-				},
-				Balancer: pb_httpbackends.Balancer_ROUND_ROBIN,
-			},
-		)
-	}
-}
-
-func (u *updater) applygRPCRouteToDirectorAndBackendpool(backendName string, newRoute grpcRoute, oldRoute grpcRoute, eventType eventType) {
-	if eventType == deleted || eventType == modified {
-		toDeleteIndex := -1
-		for i, directorRoute := range u.currentDirectorConfig.GetGrpc().Routes {
-			if !directorRoute.Autogenerated {
-				// Do not modify not generated ones.
-				continue
-			}
-
-			if directorRoute.ServiceNameMatcher == oldRoute.serviceNameMatcher &&
-				directorRoute.PortMatcher == oldRoute.portMatcher {
-				toDeleteIndex = i
-				break
-			}
-		}
-
-		if toDeleteIndex >= 0 {
-			u.currentDirectorConfig.GetGrpc().Routes = append(
-				u.currentDirectorConfig.GetGrpc().Routes[:toDeleteIndex],
-				u.currentDirectorConfig.GetGrpc().Routes[toDeleteIndex+1:]...,
-			)
-		}
-
-		toDeleteIndex = -1
-		for i, backends := range u.currentBackendConfig.GetGrpc().Backends {
-			if !backends.Autogenerated {
-				// Do not modify not generated ones.
-				continue
-			}
-
-			if backends.Name == backendName {
-				toDeleteIndex = i
-				break
-			}
-		}
-
-		if toDeleteIndex >= 0 {
-			u.currentBackendConfig.GetGrpc().Backends = append(
-				u.currentBackendConfig.GetGrpc().Backends[:toDeleteIndex],
-				u.currentBackendConfig.GetGrpc().Backends[toDeleteIndex+1:]...,
-			)
-		}
-	}
-
-	var empty grpcRoute
-	if newRoute == empty {
-		return
-	}
-
-	if eventType == added || eventType == modified {
-		u.currentDirectorConfig.GetGrpc().Routes = append(
-			u.currentDirectorConfig.GetGrpc().Routes,
-			&pb_grpcroutes.Route{
-				Autogenerated:      true,
-				BackendName:        backendName,
-				ServiceNameMatcher: newRoute.serviceNameMatcher,
-				PortMatcher:        newRoute.portMatcher,
-			},
-		)
-
-		u.currentBackendConfig.GetGrpc().Backends = append(
-			u.currentBackendConfig.GetGrpc().Backends,
-			&pb_grpcbackends.Backend{
-				Autogenerated: true,
-				Name:          backendName,
-				Resolver: &pb_grpcbackends.Backend_K8S{
-					K8S: &pb_resolvers.K8SResolver{
-						DnsPortName: newRoute.domainPort,
-					},
-				},
-				Balancer: pb_grpcbackends.Balancer_ROUND_ROBIN,
-			},
-		)
-	}
 }
 
 func httpDirectorRouteSort(routes []*pb_httproutes.Route) {

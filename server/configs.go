@@ -1,6 +1,8 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/mwitkow/go-flagz/protobuf"
 	"github.com/mwitkow/go-proto-validators"
@@ -31,11 +33,13 @@ var (
 		},
 		"Contents of the Kedge Backendpool configuration. Dynamically settable or read from file").WithFileFlag("../misc/backendpool.json").WithValidator(generalValidator).WithNotifier(backendConfigReloaded)
 
-	grpcBackendPool = grpc_bp.NewDynamic()
+	grpcBackendPool = grpc_bp.NewDynamic(logrus.StandardLogger())
 	httpBackendPool = http_bp.NewDynamic(logrus.StandardLogger())
 	grpcRouter      = grpc_router.NewDynamic()
 	httpRouter      = http_router.NewDynamic()
 	httpAddresser   = http_adhoc.NewDynamic()
+
+	backendMu sync.Mutex
 )
 
 func generalValidator(msg proto.Message) error {
@@ -57,6 +61,9 @@ func directorConfigReload(_ proto.Message, newValue proto.Message) {
 }
 
 func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
+	backendMu.Lock()
+	defer backendMu.Unlock()
+
 	newConfig := newValue.(*pb_config.BackendPoolConfig)
 
 	// The gRPC and HTTP fields are guaranteed to be there because of validation.
@@ -65,11 +72,13 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 	grpcConfig := newConfig.GetGrpc()
 	if grpcConfig != nil {
 		for _, backend := range grpcConfig.Backends {
-			if err := grpcBackendPool.AddOrUpdate(backend); err != nil {
-				logrus.Errorf("failed creating gRPC backend %v: %v", backend.Name, err)
+			changed, err := grpcBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
+			if err != nil {
+				logrus.Errorf("failed creating grpc backend %v: %v", backend.Name, err)
 			}
-			logrus.Infof("adding new gRPC backend: %v", backend.Name)
-
+			if changed {
+				logrus.Infof("adding new grpc backend: %v", backend.Name)
+			}
 			grpcBackendInNewConfig[backend.Name] = struct{}{}
 		}
 	}
@@ -83,24 +92,24 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 
 	httpBackendInNewConfig := make(map[string]struct{})
 	httpBackendInOldConfig := httpBackendPool.Configs()
-
 	httpConfig := newConfig.GetHttp()
 	if httpConfig != nil {
 		for _, backend := range newConfig.GetHttp().Backends {
-			if err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution); err != nil {
+			changed, err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
+			if err != nil {
 				logrus.Errorf("failed creating http backend %v: %v", backend.Name, err)
 			}
-			logrus.Infof("adding new http backend: %v", backend.Name)
-
+			if changed {
+				logrus.Infof("adding new http backend: %v", backend.Name)
+			}
 			httpBackendInNewConfig[backend.Name] = struct{}{}
 		}
 	}
 
 	for backendName := range httpBackendInOldConfig {
-		if _, exists := grpcBackendInNewConfig[backendName]; !exists {
+		if _, exists := httpBackendInNewConfig[backendName]; !exists {
 			logrus.Infof("removing http backend: %v", backendName)
-
-			grpcBackendPool.Remove(backendName)
+			httpBackendPool.Remove(backendName)
 		}
 	}
 }

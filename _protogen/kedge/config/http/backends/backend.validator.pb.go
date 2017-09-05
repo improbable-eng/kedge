@@ -27,11 +27,11 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-var _regex_Backend_Name = regexp.MustCompile("^[a-z_.]{2,64}$")
+var _regex_Backend_Name = regexp.MustCompile("^[a-z_0-9.]{2,64}$")
 
 func (this *Backend) Validate() error {
 	if !_regex_Backend_Name.MatchString(this.Name) {
-		return github_com_mwitkow_go_proto_validators.FieldError("Name", fmt.Errorf(`value '%v' must be a string conforming to regex "^[a-z_.]{2,64}$"`, this.Name))
+		return github_com_mwitkow_go_proto_validators.FieldError("Name", fmt.Errorf(`value '%v' must be a string conforming to regex "^[a-z_0-9.]{2,64}$"`, this.Name))
 	}
 	if this.Security != nil {
 		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Security); err != nil {

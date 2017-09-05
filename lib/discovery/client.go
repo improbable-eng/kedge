@@ -1,4 +1,4 @@
-package k8sresolver
+package discovery
 
 import (
 	"context"
@@ -10,25 +10,24 @@ import (
 	"github.com/pkg/errors"
 )
 
-type endpointClient interface {
-	StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error)
+type ServiceClient interface {
+	StartChangeStream(ctx context.Context, labelSelector string) (io.ReadCloser, error)
 }
 
 type client struct {
 	k8sClient *k8s.APIClient
 }
 
-// StartChangeStream starts stream of changes from watch endpoint.
+// StartChangeStream starts stream of changes from watch services.
 // See https://kubernetes.io/docs/api-reference/v1.7/#watch-132
 // NOTE: In the beginning of stream, k8s will give us sufficient info about current state. (No need to GET first)
-func (c *client) StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error) {
-	epWatchURL := fmt.Sprintf("%s/api/v1/watch/namespaces/%s/endpoints/%s",
+func (c *client) StartChangeStream(ctx context.Context, labelSelector string) (io.ReadCloser, error) {
+	servicesToExposeWatch := fmt.Sprintf("%s/api/v1/watch/services?labelSelector=%s",
 		c.k8sClient.Address,
-		t.namespace,
-		t.service,
+		labelSelector,
 	)
 
-	return c.startGET(ctx, epWatchURL)
+	return c.startGET(ctx, servicesToExposeWatch)
 }
 
 // NOTE: It is caller responsibility to read body through and close it.

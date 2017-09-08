@@ -1,13 +1,13 @@
 package k8sauth
 
 import (
-	"github.com/mwitkow/kedge/lib/tokenauth"
 	"github.com/Bplotka/oidc/login/k8scache"
+	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/oauth2"
+	"github.com/mwitkow/kedge/lib/tokenauth/sources/oidc"
 	"github.com/pkg/errors"
 	cfg "k8s.io/client-go/tools/clientcmd"
-	"github.com/mwitkow/kedge/lib/tokenauth/sources/oidc"
-	"github.com/mwitkow/kedge/lib/tokenauth/sources/oauth2"
-	"github.com/mwitkow/kedge/lib/tokenauth/sources/direct"
 )
 
 // New constructs appropriate tokenAuth Source to the given AuthInfo from kube config referenced by user.
@@ -56,5 +56,5 @@ func New(name string, configPath string, userName string) (tokenauth.Source, err
 		return directauth.New(name, info.Token), nil
 	}
 
-	return nil, errors.Errorf("Not found supported auth source from k8s config %+v", info)
+	return nil, errors.Errorf("Not found supported auth source called %s from k8s config %+v", userName, info)
 }

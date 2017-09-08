@@ -198,7 +198,8 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	m.Handle("/", winch.New(kedge_map.RouteMapper(
 		s.routes.Get()),
 		s.tlsClientConfigForTest(),
-		logrus.NewEntry(logrus.New())),
+		logrus.NewEntry(logrus.New()),
+		nil),
 	)
 	s.winch = &http.Server{
 		Handler: m,

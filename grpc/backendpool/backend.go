@@ -15,6 +15,7 @@ import (
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
 	"github.com/mwitkow/kedge/lib/resolvers/k8s"
 	"github.com/mwitkow/kedge/lib/resolvers/srv"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -33,6 +34,9 @@ type backend struct {
 	conn   *grpc.ClientConn
 	config *pb.Backend
 	closed bool
+
+	target   string
+	resolver naming.Resolver
 }
 
 func (b *backend) Conn() (*grpc.ClientConn, error) {
@@ -52,7 +56,13 @@ func (b *backend) Conn() (*grpc.ClientConn, error) {
 	if b.closed {
 		return nil, grpc.Errorf(codes.Internal, "backend already closed")
 	}
-	cc, err := buildClientConn(b.config)
+	target, resolver, err := chooseNamingResolver(b.config)
+	if err != nil {
+		return nil, err
+	}
+	b.target = target
+	b.resolver = resolver
+	cc, err = buildClientConn(b.config, target, resolver)
 	if err != nil {
 		return nil, err
 	}
@@ -71,28 +81,34 @@ func (b *backend) Close() error {
 }
 
 func newBackend(cnf *pb.Backend) (*backend, error) {
-	cc, err := buildClientConn(cnf)
-	if err != nil && err.Error() == "grpc: there is no address available to dial" {
-		return &backend{conn: nil, config: cnf}, nil // make this lazy
-	} else if err != nil {
-		return nil, fmt.Errorf("backend '%v' dial error: %v", cnf.Name, err)
+	b := &backend{
+		config: cnf,
 	}
-	return &backend{conn: cc, config: cnf}, nil
-}
-
-func buildClientConn(cnf *pb.Backend) (*grpc.ClientConn, error) {
-	opts := []grpc.DialOption{}
 	target, resolver, err := chooseNamingResolver(cnf)
 	if err != nil {
 		return nil, err
 	}
+	b.target = target
+	b.resolver = resolver
+
+	cc, err := buildClientConn(cnf, target, resolver)
+	if err != nil && err.Error() == "grpc: there is no address available to dial" {
+		return b, nil // make this lazy
+	} else if err != nil {
+		return nil, fmt.Errorf("backend '%v' dial error: %v", cnf.Name, err)
+	}
+	b.conn = cc
+	return b, nil
+}
+
+func buildClientConn(cnf *pb.Backend, target string, resolver naming.Resolver) (*grpc.ClientConn, error) {
+	opts := []grpc.DialOption{}
 	opts = append(opts, chooseDialFuncOpt(cnf))
 	opts = append(opts, chooseSecurityOpt(cnf))
 	opts = append(opts, grpc.WithCodec(proxy.Codec())) // needed for the director to function at all.
 	opts = append(opts, chooseInterceptors(cnf)...)
 	opts = append(opts, grpc.WithBalancer(chooseBalancerPolicy(cnf, resolver)))
 	return grpc.Dial(target, opts...)
-
 }
 
 func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
@@ -154,4 +170,54 @@ func chooseBalancerPolicy(cnf *pb.Backend, resolver naming.Resolver) grpc.Balanc
 	default:
 		return grpc.RoundRobin(resolver)
 	}
+}
+
+func (b *backend) LogTestResolution(logger logrus.FieldLogger) {
+	logger = logger.WithField("target", b.target)
+
+	// Mimick run-time resolution to check if the target makes sense.
+	watcher, err := b.resolver.Resolve(b.target)
+	if err != nil {
+		logger.WithError(err).Error("Creating watcher failed.")
+		return
+	}
+
+	var updates []*naming.Update
+	ctx, cancel := context.WithCancel(context.TODO())
+	go func() {
+		for ctx.Err() == nil {
+			u, err := watcher.Next()
+			if err != nil {
+				if ctx.Err() != nil {
+					cancel()
+					return
+				}
+				logger.WithError(err).Error("Getting update failed.")
+				continue
+			}
+
+			updates = append(updates, u...)
+		}
+
+	}()
+
+	// Watch for next 2 seconds and try to reconstruct state.
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+	}
+	cancel()
+	watcher.Close()
+
+	addresses := map[string]struct{}{}
+	for _, u := range updates {
+		if u.Op == naming.Add {
+			addresses[u.Addr] = struct{}{}
+		}
+		if u.Op == naming.Delete {
+			delete(addresses, u.Addr)
+		}
+	}
+
+	logger.Infof("Resolved Addresses: %v", addresses)
 }

@@ -71,7 +71,9 @@ func (b *backend) Close() error {
 
 // newBackend creates backend from given configuration.
 func newBackend(cnf *pb.Backend) (*backend, error) {
-	b := &backend{}
+	b := &backend{
+		config: cnf,
+	}
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 
 	target, resolver, err := chooseNamingResolver(cnf)

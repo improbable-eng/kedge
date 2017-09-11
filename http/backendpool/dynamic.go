@@ -47,24 +47,24 @@ func (s *dynamic) Tripper(backendName string) (http.RoundTripper, error) {
 //
 // If a backend of a given name already exists, and the configuration hasn't changed, no new work will be done.
 // If a backend requires changes, the previous one will be removed and closed.
-func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) error {
+func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (changed bool, err error) {
 	s.mu.RLock()
 	existing, ok := s.backends[config.Name]
 	s.mu.RUnlock()
-	var err error
 	if !ok {
+		changed = true
 		err = s.addNewBackend(config)
 	} else {
-		err = s.updateBackendWithDiffing(existing, config)
+		changed, err = s.updateBackendWithDiffing(existing, config)
 	}
 	if err != nil {
-		return err
+		return changed, err
 	}
 
-	if logTestResolution {
+	if changed && logTestResolution {
 		go s.backends[config.Name].LogTestResolution(s.logger.WithField("backend", config.Name))
 	}
-	return nil
+	return changed, nil
 }
 
 func (s *dynamic) addNewBackend(config *pb.Backend) error {
@@ -78,16 +78,16 @@ func (s *dynamic) addNewBackend(config *pb.Backend) error {
 	return nil
 }
 
-func (s *dynamic) updateBackendWithDiffing(existing *backend, config *pb.Backend) error {
+func (s *dynamic) updateBackendWithDiffing(existing *backend, config *pb.Backend) (changed bool, err error)  {
 	if configsAreTheSame(existing.config, config) {
-		return nil
+		return false, nil
 	}
 	if err := s.addNewBackend(config); err != nil {
-		return err
+		return true, err
 	}
 	// Make sure we clear up resources.
 	existing.Close()
-	return nil
+	return true, nil
 }
 
 // Remove removes and shuts down a previously active backend.

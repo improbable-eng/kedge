@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/mwitkow/kedge/lib/k8s"
 	"github.com/pkg/errors"
 )
 
@@ -14,8 +15,7 @@ type endpointClient interface {
 }
 
 type client struct {
-	k8sURL    string
-	k8sClient *http.Client
+	k8sClient *k8s.APIClient
 }
 
 // StartChangeStream starts stream of changes from watch endpoint.
@@ -23,7 +23,7 @@ type client struct {
 // NOTE: In the beginning of stream, k8s will give us sufficient info about current state. (No need to GET first)
 func (c *client) StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error) {
 	epWatchURL := fmt.Sprintf("%s/api/v1/watch/namespaces/%s/endpoints/%s",
-		c.k8sURL,
+		c.k8sClient.Address,
 		t.namespace,
 		t.service,
 	)

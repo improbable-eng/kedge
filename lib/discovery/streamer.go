@@ -19,7 +19,7 @@ type watchResult struct {
 func startWatchingServicesChanges(
 	ctx context.Context,
 	labelSelector string,
-	serviceClient ServiceClient,
+	serviceClient serviceClient,
 	eventsCh chan<- watchResult,
 ) error {
 	stream, err := serviceClient.StartChangeStream(ctx, labelSelector)
@@ -36,7 +36,6 @@ func startWatchingServicesChanges(
 
 	go func() {
 		proxyAllEvents(ctx, json.NewDecoder(stream), eventsCh)
-		stream.Close()
 	}()
 
 	return nil

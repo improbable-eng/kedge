@@ -160,8 +160,10 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 				foundRoute.nameMatcher = hostMatcherOverride
 			}
 
+			// We need to avoid specific ports if possible, since Golang removes the port from request.URL.Port() for default ports,
+			// even when user specifies http://<host>:80 or https://<host>:443 explicitly. As a result we convert default
+			// ports to NO port, which mean host-wide routing.
 			if port.Port == 80 {
-				// Avoid specific ports if possible.
 				foundRoute.portMatcher = 0
 			}
 

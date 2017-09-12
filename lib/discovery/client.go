@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ServiceClient interface {
+type serviceClient interface {
 	StartChangeStream(ctx context.Context, labelSelector string) (io.ReadCloser, error)
 }
 

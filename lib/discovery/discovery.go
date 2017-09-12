@@ -2,17 +2,17 @@ package discovery
 
 import (
 	"context"
-	"github.com/golang/protobuf/jsonpb"
 	"fmt"
 	"time"
 
-	"github.com/mwitkow/go-flagz/protobuf"
+	"github.com/golang/protobuf/jsonpb"
+	"github.com/jpillora/backoff"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 	"github.com/mwitkow/kedge/lib/k8s"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/jpillora/backoff"
+	"github.com/mwitkow/go-flagz/protobuf"
 )
 
 const (
@@ -27,7 +27,6 @@ var (
 		"that will be added to service name to constructs external domain for director route")
 	flagAnnotationLabelPrefix = sharedflags.Set.String("discovery_label_annotation_prefix", "kedge.com/",
 		"Expected annotation/label prefix for all kedge annotations and kedge-exposed label")
-
 	streamRetryBackoff = &backoff.Backoff{
 		Min:    50 * time.Millisecond,
 		Jitter: true,
@@ -67,7 +66,7 @@ var (
 // - no check if the target port inside service actually exists.
 type RoutingDiscovery struct {
 	logger                logrus.FieldLogger
-	serviceClient         ServiceClient
+	serviceClient         serviceClient
 	baseBackendpool       *pb_config.BackendPoolConfig
 	baseDirector          *pb_config.DirectorConfig
 	labelSelectorKey      string
@@ -75,6 +74,7 @@ type RoutingDiscovery struct {
 	labelAnnotationPrefix string
 }
 
+// NewFromFlags creates new RoutingDiscovery flow flags.
 func NewFromFlags(logger logrus.FieldLogger, baseDirector *pb_config.DirectorConfig, baseBackendpool *pb_config.BackendPoolConfig) (*RoutingDiscovery, error) {
 	if *flagExternalDomainSuffix == "" {
 		return nil, errors.Errorf("required flag 'discovery_external_domain_suffix' is not specified.")
@@ -88,7 +88,7 @@ func NewFromFlags(logger logrus.FieldLogger, baseDirector *pb_config.DirectorCon
 }
 
 // NewWithClient returns a new Kubernetes RoutingDiscovery using given k8s.APIClient configured to be used against kube-apiserver.
-func NewWithClient(logger logrus.FieldLogger, baseDirector *pb_config.DirectorConfig, baseBackendpool *pb_config.BackendPoolConfig, serviceClient ServiceClient) *RoutingDiscovery {
+func NewWithClient(logger logrus.FieldLogger, baseDirector *pb_config.DirectorConfig, baseBackendpool *pb_config.BackendPoolConfig, serviceClient serviceClient) *RoutingDiscovery {
 	return &RoutingDiscovery{
 		logger:                logger,
 		baseBackendpool:       baseBackendpool,
@@ -101,8 +101,8 @@ func NewWithClient(logger logrus.FieldLogger, baseDirector *pb_config.DirectorCo
 }
 
 // DiscoverOnce returns director & backendpool configs filled with mix of persistent routes & backends given in base configs and dynamically discovered ones.
-func (d *RoutingDiscovery) DiscoverOnce(ctx context.Context) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
-	ctx, cancel := context.WithTimeout(ctx, 4*time.Second) // Let's give 4 seconds to gather all changes.
+func (d *RoutingDiscovery) DiscoverOnce(ctx context.Context, timeToWait time.Duration) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeToWait) // Let's give 4 seconds to gather all changes.
 	defer cancel()
 
 	watchResultCh := make(chan watchResult)
@@ -148,11 +148,14 @@ func (d *RoutingDiscovery) DiscoverOnce(ctx context.Context) (*pb_config.Directo
 	}
 }
 
+// DiscoverAndSetFlags constantly watches service list endpoint for changes and sets director and backendpool
+// flags to change routing configuration. Having it set by flagz is giving us possibility to see current values in
+// debug/flagz page and perform proper apply in different place (where we are parsing flags).
 func (d *RoutingDiscovery) DiscoverAndSetFlags(
 	ctx context.Context,
 	directorFlagz *protoflagz.DynProto3Value,
 	backendpoolFlagz *protoflagz.DynProto3Value,
-) error  {
+) error {
 	watchResultCh := make(chan watchResult)
 	defer close(watchResultCh)
 

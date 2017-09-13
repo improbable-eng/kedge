@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/mwitkow/kedge)](https://goreportcard.com/report/github.com/mwitkow/kedge)
 [![GoDoc](http://img.shields.io/badge/GoDoc-Reference-blue.svg)](https://godoc.org/github.com/mwitkow/grpc-proxy)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![quality: WIF](https://img.shields.io/badge/quality-WIP-red.svg)](#status)
+[![quality: WIF](https://img.shields.io/badge/quality-BETA-blue.svg)](#status)
 
  > [kedge](https://www.merriam-webster.com/dictionary/kedge) (verb) to move (a ship) by means of a line attached to a small anchor dropped at the distance and in the direction desired
 
@@ -70,14 +70,13 @@ Kedge Service:
  * [ ] - example Kubernetes YAML files (deployment, config maps)
  * [ ] - TLS configuration (CA chains, etc.) for gRPC and HTTP backends 
  * [ ] - "adhoc routes" - support for HTTP Forward Proxying to an arbitrary (but filtered) SRV destination without a backend - calling pods
- * [ ] - support for K8S auto-discovery of service backends based off metadata
  * [ ] - support for TLS client certificate authentication on routes (metadata matches)
  * [ ] - similar to above but for Open ID Connect: Support for different OIDC permission per route (group match)
  * [ ] - support for load balanced CONNECT method proxying for TLS passthrough to backends - if needed
  
 Winch (kedge client):
 * [ ] - gRPC forward Proxy.
-* [ ] - add auto-configuration for browser to use our PAC (WPAD)
+* [ ] - add auto-configuration for all browser to use our PAC (WPAD is working, but no automatic way to configure browser for that)
 * [ ] - reading of TLS client certs from ~/.config/kedge
 
 ## License

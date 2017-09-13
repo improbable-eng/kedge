@@ -1,5 +1,15 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.0](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.0)
+Kedge service:
+* [x] added support for K8S auto-discovery of service backends based off metadata (no need to actually specify routes manually!)
+* [x] fixed retry backoff bug in lbtransport
+* [x] added test log resolution
+* [x] logging improvements
+
+Winch (kedge client):
+* [x]  fixed handling of debug endpoints.
+
 ### [v1.0.0-alpha.3](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.3)
 Kedge Service:
 * [x] - fixed remote logging

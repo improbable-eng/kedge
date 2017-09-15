@@ -11,6 +11,8 @@ import (
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
+	"github.com/mwitkow/go-httpwares/metrics/prometheus"
+	"github.com/mwitkow/go-httpwares/reporter"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/adhoc"
@@ -21,6 +23,7 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
+	"github.com/mwitkow/go-httpwares/metrics"
 )
 
 var (
@@ -51,17 +54,22 @@ var (
 func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
 	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
+
+	clientMetrics := http_prometheus.ClientMetrics(http_prometheus.WithLatency())
+	backendTripper := http_metrics.Tripperware(clientMetrics)(&backendPoolTripper{pool: pool})
+	adhocTripper := http_metrics.Tripperware(clientMetrics)(AdhocTransport)
+
 	p := &Proxy{
 		backendReverseProxy: &httputil.ReverseProxy{
 			Director:      func(r *http.Request) {},
-			Transport:     &backendPoolTripper{pool: pool},
+			Transport:     backendTripper,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "backend reverseProxy")),
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
 			Director:      func(r *http.Request) {},
-			Transport:     AdhocTransport,
+			Transport:     adhocTripper,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "adhoc reverseProxy")),

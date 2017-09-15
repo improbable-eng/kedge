@@ -29,12 +29,15 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"github.com/mwitkow/kedge/lib/discovery"
 	"context"
+	"github.com/mwitkow/go-httpwares/metrics/prometheus"
+	"github.com/mwitkow/go-httpwares/reporter"
 )
 
 var (
@@ -137,8 +140,10 @@ func main() {
 	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
+		http_reporter.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),
 		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry, http_logrus.WithLevels(kedgeCodeToLevel)),
+
 	)
 
 	// HTTP debug chain.
@@ -247,7 +252,7 @@ func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logE
 func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlewares chi.Middlewares) (*http.Server, error) {
 	m := chi.NewMux()
 	m.Handle("/_healthz", noAuthMiddlewares.HandlerFunc(healthEndpoint))
-	m.Handle("/debug/metrics", noAuthMiddlewares.Handler(prometheus.UninstrumentedHandler()))
+	m.Handle("/debug/metrics", noAuthMiddlewares.Handler(promhttp.Handler()))
 
 	m.Handle("/_version",
 		// The only one worth to log.

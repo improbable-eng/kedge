@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -18,26 +19,24 @@ import (
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-flagz"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
+	"github.com/mwitkow/go-httpwares/metrics"
+	"github.com/mwitkow/go-httpwares/metrics/prometheus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 	grpc_director "github.com/mwitkow/kedge/grpc/director"
 	http_director "github.com/mwitkow/kedge/http/director"
+	"github.com/mwitkow/kedge/lib/discovery"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
 	"github.com/mwitkow/kedge/lib/logstash"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"github.com/mwitkow/kedge/lib/discovery"
-	"context"
-	"github.com/mwitkow/go-httpwares/metrics/prometheus"
-	"github.com/mwitkow/go-httpwares/reporter"
 )
 
 var (
@@ -56,7 +55,7 @@ var (
 		"kedge will always try to resolve and log (only) new backend entry. Useful for debugging backend routings.")
 
 	flagDynamicRoutingDiscoveryEnabled = sharedflags.Set.Bool("kedge_dynamic_routings_enabled", false,
-		"If enabled, kedge will watch on service changes (services which has particular label) and generates " +
+		"If enabled, kedge will watch on service changes (services which has particular label) and generates "+
 			"director & backendpool routings. It will update them directly into into flagz value, so you can see the current routings anytime in debug/flagz")
 )
 
@@ -140,10 +139,9 @@ func main() {
 	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
-		http_reporter.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),
+		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),
 		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry, http_logrus.WithLevels(kedgeCodeToLevel)),
-
 	)
 
 	// HTTP debug chain.
@@ -221,7 +219,6 @@ func main() {
 			}
 		}()
 	}
-
 
 	err = <-errChan // this waits for some server breaking
 	log.WithError(err).Fatalf("Fail")

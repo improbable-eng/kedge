@@ -11,8 +11,8 @@ import (
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
+	"github.com/mwitkow/go-httpwares/metrics"
 	"github.com/mwitkow/go-httpwares/metrics/prometheus"
-	"github.com/mwitkow/go-httpwares/reporter"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/backendpool"
 	"github.com/mwitkow/kedge/http/director/adhoc"
@@ -23,7 +23,6 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
-	"github.com/mwitkow/go-httpwares/metrics"
 )
 
 var (

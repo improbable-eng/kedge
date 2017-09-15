@@ -100,10 +100,12 @@ imports:
   subpackages:
   - protobuf
 - name: github.com/mwitkow/go-httpwares
-  version: 9e14d5232784653b9d4d5da9e6df52ce5f7394cf
+  version: b4db44c6691bb87b6d207ee2d2e62121e4aec910
   subpackages:
   - logging
   - logging/logrus
+  - metrics
+  - metrics/prometheus
   - tags
   - tracing/debug
 - name: github.com/mwitkow/go-proto-validators

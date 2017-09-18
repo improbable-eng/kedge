@@ -72,12 +72,9 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 	grpcConfig := newConfig.GetGrpc()
 	if grpcConfig != nil {
 		for _, backend := range grpcConfig.Backends {
-			changed, err := grpcBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
+			err := grpcBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
 			if err != nil {
-				logrus.Errorf("failed creating grpc backend %v: %v", backend.Name, err)
-			}
-			if changed {
-				logrus.Infof("adding new grpc backend: %v", backend.Name)
+				logrus.Errorf("failed Adding or Updating grpc backend %v: %v", backend.Name, err)
 			}
 			grpcBackendInNewConfig[backend.Name] = struct{}{}
 		}
@@ -95,12 +92,9 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 	httpConfig := newConfig.GetHttp()
 	if httpConfig != nil {
 		for _, backend := range newConfig.GetHttp().Backends {
-			changed, err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
+			err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
 			if err != nil {
 				logrus.Errorf("failed creating http backend %v: %v", backend.Name, err)
-			}
-			if changed {
-				logrus.Infof("adding new http backend: %v", backend.Name)
 			}
 			httpBackendInNewConfig[backend.Name] = struct{}{}
 		}

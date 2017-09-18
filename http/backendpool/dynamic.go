@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	"github.com/mwitkow/kedge/lib/metrics"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,24 +48,42 @@ func (s *dynamic) Tripper(backendName string) (http.RoundTripper, error) {
 //
 // If a backend of a given name already exists, and the configuration hasn't changed, no new work will be done.
 // If a backend requires changes, the previous one will be removed and closed.
-func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (changed bool, err error) {
+func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (err error) {
 	s.mu.RLock()
 	existing, ok := s.backends[config.Name]
 	s.mu.RUnlock()
+
+	var changed bool
+	defer func() {
+		if changed && logTestResolution {
+			go s.backends[config.Name].LogTestResolution(
+				s.logger.WithField("protocol", "http").WithField("backend", config.Name),
+			)
+		}
+	}()
+
 	if !ok {
-		changed = true
 		err = s.addNewBackend(config)
-	} else {
-		changed, err = s.updateBackendWithDiffing(existing, config)
-	}
-	if err != nil {
-		return changed, err
+		if err != nil {
+			return err
+		}
+		changed = true
+		s.logger.Debug("Adding new http backend: %v", config.Name)
+		metrics.BackendHTTPConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionCreate).Inc()
+		return nil
 	}
 
-	if changed && logTestResolution {
-		go s.backends[config.Name].LogTestResolution(s.logger.WithField("backend", config.Name))
+	var updated bool
+	updated, err = s.updateBackendWithDiffing(existing, config)
+	if err != nil {
+		return err
 	}
-	return changed, nil
+	if updated {
+		changed = true
+		s.logger.Debug("Updated http backend: %v", config.Name)
+		metrics.BackendHTTPConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionChange).Inc()
+	}
+	return nil
 }
 
 func (s *dynamic) addNewBackend(config *pb.Backend) error {
@@ -78,7 +97,7 @@ func (s *dynamic) addNewBackend(config *pb.Backend) error {
 	return nil
 }
 
-func (s *dynamic) updateBackendWithDiffing(existing *backend, config *pb.Backend) (changed bool, err error)  {
+func (s *dynamic) updateBackendWithDiffing(existing *backend, config *pb.Backend) (changed bool, err error) {
 	if configsAreTheSame(existing.config, config) {
 		return false, nil
 	}
@@ -102,6 +121,9 @@ func (s *dynamic) Remove(backendName string) error {
 	delete(s.backends, backendName)
 	s.mu.Unlock()
 	existing.Close()
+
+	s.logger.Debug("Removed grpc backend: %v", backendName)
+	metrics.BackendHTTPConfigurationCounter.WithLabelValues(backendName, metrics.ConfiguationActionDelete).Inc()
 	return nil
 }
 

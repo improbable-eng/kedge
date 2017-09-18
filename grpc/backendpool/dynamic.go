@@ -47,12 +47,11 @@ func (s *dynamic) Conn(backendName string) (*grpc.ClientConn, error) {
 //
 // If a backend of a given name already exists, and the configuration hasn't changed, no new work will be done.
 // If a backend requires changes, the previous one will be removed and closed.
-func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (err error) {
+func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (changed bool, err error) {
 	s.mu.RLock()
 	existing, ok := s.backends[config.Name]
 	s.mu.RUnlock()
 
-	var changed bool
 	defer func() {
 		if changed && logTestResolution {
 			go s.backends[config.Name].LogTestResolution(
@@ -64,25 +63,25 @@ func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (err e
 	if !ok {
 		err = s.addNewBackend(config)
 		if err != nil {
-			return err
+			return changed, err
 		}
 		changed = true
 		s.logger.Debug("Adding new grpc backend: %v", config.Name)
 		metrics.BackendGRPCConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionCreate).Inc()
-		return nil
+		return changed, nil
 	}
 
 	var updated bool
 	updated, err = s.updateBackendWithDiffing(existing, config)
 	if err != nil {
-		return err
+		return changed, err
 	}
 	if updated {
 		changed = true
 		s.logger.Debug("Updated grpc backend: %v", config.Name)
 		metrics.BackendGRPCConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionChange).Inc()
 	}
-	return nil
+	return changed, nil
 }
 
 func (s *dynamic) addNewBackend(config *pb.Backend) error {

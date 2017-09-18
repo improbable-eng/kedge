@@ -16,7 +16,7 @@ func TestDynamic_Operations(t *testing.T) {
 		return &backend{config: config}, nil
 	}
 	assert.Len(t, d.Configs(), 0, "at first there needs to be nothing")
-	changed, err := d.AddOrUpdate(
+	err := d.AddOrUpdate(
 		&pb.Backend{
 			Name: "foobar", DisableConntracking: true, Resolver: &pb.Backend_K8S{
 				K8S: &pb_resolvers.K8SResolver{

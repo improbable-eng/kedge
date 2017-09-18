@@ -72,7 +72,7 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 	grpcConfig := newConfig.GetGrpc()
 	if grpcConfig != nil {
 		for _, backend := range grpcConfig.Backends {
-			err := grpcBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
+			_, err := grpcBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
 			if err != nil {
 				logrus.Errorf("failed Adding or Updating grpc backend %v: %v", backend.Name, err)
 			}
@@ -92,7 +92,7 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 	httpConfig := newConfig.GetHttp()
 	if httpConfig != nil {
 		for _, backend := range newConfig.GetHttp().Backends {
-			err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
+			_, err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
 			if err != nil {
 				logrus.Errorf("failed creating http backend %v: %v", backend.Name, err)
 			}

@@ -5,8 +5,9 @@ import (
 	"sync"
 
 	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
-	"google.golang.org/grpc"
+	"github.com/mwitkow/kedge/lib/metrics"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 // dynamic is a Pool to which you can update or remove routes.
@@ -46,24 +47,42 @@ func (s *dynamic) Conn(backendName string) (*grpc.ClientConn, error) {
 //
 // If a backend of a given name already exists, and the configuration hasn't changed, no new work will be done.
 // If a backend requires changes, the previous one will be removed and closed.
-func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (changed bool, err error) {
+func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (err error) {
 	s.mu.RLock()
 	existing, ok := s.backends[config.Name]
 	s.mu.RUnlock()
+
+	var changed bool
+	defer func() {
+		if changed && logTestResolution {
+			go s.backends[config.Name].LogTestResolution(
+				s.logger.WithField("protocol", "grpc").WithField("backend", config.Name),
+			)
+		}
+	}()
+
 	if !ok {
-		changed = true
 		err = s.addNewBackend(config)
-	} else {
-		changed, err = s.updateBackendWithDiffing(existing, config)
-	}
-	if err != nil {
-		return changed, err
+		if err != nil {
+			return err
+		}
+		changed = true
+		s.logger.Debug("Adding new grpc backend: %v", config.Name)
+		metrics.BackendGRPCConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionCreate).Inc()
+		return nil
 	}
 
-	if changed && logTestResolution {
-		go s.backends[config.Name].LogTestResolution(s.logger.WithField("backend", config.Name))
+	var updated bool
+	updated, err = s.updateBackendWithDiffing(existing, config)
+	if err != nil {
+		return err
 	}
-	return changed, nil
+	if updated {
+		changed = true
+		s.logger.Debug("Updated grpc backend: %v", config.Name)
+		metrics.BackendGRPCConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionChange).Inc()
+	}
+	return nil
 }
 
 func (s *dynamic) addNewBackend(config *pb.Backend) error {
@@ -101,6 +120,9 @@ func (s *dynamic) Remove(backendName string) error {
 	delete(s.backends, backendName)
 	s.mu.Unlock()
 	existing.Close()
+
+	s.logger.Debug("Removed grpc backend: %v", backendName)
+	metrics.BackendGRPCConfigurationCounter.WithLabelValues(backendName, metrics.ConfiguationActionDelete).Inc()
 	return nil
 }
 

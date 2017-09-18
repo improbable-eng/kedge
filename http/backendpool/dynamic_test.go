@@ -4,14 +4,15 @@ import (
 	"context"
 	"testing"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
 	pb_resolvers "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
+	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDynamic_Operations(t *testing.T) {
-	d := NewDynamic(nil)
+	d := NewDynamic(logrus.New())
 	d.backendFactory = func(config *pb.Backend) (*backend, error) {
 		b := &backend{config: config}
 		b.ctx, b.cancel = context.WithCancel(context.Background())

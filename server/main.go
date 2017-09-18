@@ -139,9 +139,9 @@ func main() {
 	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy"),
-		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),
 		http_debug.Middleware(),
 		http_logrus.Middleware(logEntry, http_logrus.WithLevels(kedgeCodeToLevel)),
+		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),
 	)
 
 	// HTTP debug chain.

@@ -100,7 +100,7 @@ imports:
   subpackages:
   - protobuf
 - name: github.com/mwitkow/go-httpwares
-  version: b4db44c6691bb87b6d207ee2d2e62121e4aec910
+  version: 273442965bae30322cd270de8230e2a5aa20fb7c
   subpackages:
   - logging
   - logging/logrus

@@ -1,5 +1,11 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.1)
+Kedge service:
+* [x] added metrics for backend configuration change
+* [x] added metrics for HTTP requests/response to middleware and from tripperware
+* [x] updated go-httpares dep  
+
 ### [v1.0.0-beta.0](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.0)
 Kedge service:
 * [x] added support for K8S auto-discovery of service backends based off metadata (no need to actually specify routes manually!)

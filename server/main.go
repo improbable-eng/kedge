@@ -37,6 +37,8 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"github.com/mwitkow/kedge/lib/http/header"
+	"github.com/mwitkow/kedge/lib/reporter"
 )
 
 var (
@@ -138,10 +140,11 @@ func main() {
 
 	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
-		http_ctxtags.Middleware("proxy"),
-		http_debug.Middleware(),
-		http_logrus.Middleware(logEntry, http_logrus.WithLevels(kedgeCodeToLevel)),
-		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),
+		http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
+		http_debug.Middleware(), // Traces.
+		http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)), // Std Request/Response Logs.
+		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())), // Std Request/Response Metrics.
+		reporter.Middleware(), // Kedge proxy metrics/logs
 	)
 
 	// HTTP debug chain.
@@ -255,8 +258,9 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 		// The only one worth to log.
 		chi.Chain(http_logrus.Middleware(logEntry.WithField(ctxtags.TagForScheme, "plain"), http_logrus.WithLevels(kedgeCodeToLevel))).
 			Handler(middlewares.HandlerFunc(versionEndpoint)))
-	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 
+	// NOTE: These can contain sensitive data like user headers.
+	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 	m.Handle("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))
 	m.Handle("/debug/pprof/cmdline", middlewares.HandlerFunc(pprof.Cmdline))
 	m.Handle("/debug/pprof/profile", middlewares.HandlerFunc(pprof.Profile))
@@ -292,11 +296,18 @@ func healthEndpoint(resp http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(resp, "kedge isok")
 }
 
-func kedgeCodeToLevel(httpStatusCode int) log.Level {
-	if httpStatusCode < 400 || httpStatusCode == http.StatusNotFound {
-		return log.DebugLevel
-	} else if httpStatusCode < 500 {
-		return log.WarnLevel
+// NOTE: There is no good way to determine if the error is relevant to proxying itself or just it
+// was backend/user error here, so all of it just DEBUG.
+func logAsDebug(_ int) log.Level {
+	return log.DebugLevel
+}
+
+func kedgeRequestIDTagExtractor(req *http.Request) map[string]interface{} {
+	tags := map[string]interface{}{}
+
+	if requestID := req.Header.Get(header.KedgeRequestID); requestID != "" {
+		tags[ctxtags.TagRequestID] = requestID
 	}
-	return log.ErrorLevel
+
+	return tags
 }

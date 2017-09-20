@@ -23,6 +23,8 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
+	"github.com/mwitkow/kedge/lib/reporter"
+	"github.com/mwitkow/kedge/lib/reporter/errtypes"
 )
 
 var (
@@ -49,25 +51,29 @@ var (
 // The Router decides which "well-known" routes a given request matches, and which backend from the Pool it should be
 // sent to. The backends in the Pool have pre-dialed connections and are load balanced.
 //
-// If  Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
+// If Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
 func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
 	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 
 	clientMetrics := http_prometheus.ClientMetrics(http_prometheus.WithLatency())
-	backendTripper := http_metrics.Tripperware(clientMetrics)(&backendPoolTripper{pool: pool})
-	adhocTripper := http_metrics.Tripperware(clientMetrics)(AdhocTransport)
+	backendTripper := http_metrics.Tripperware(clientMetrics)(
+		reporter.Tripperware()(
+			&backendPoolTripper{pool: pool}))
+	adhocTripper := http_metrics.Tripperware(clientMetrics)(
+		reporter.Tripperware()(
+			AdhocTransport))
 
 	p := &Proxy{
 		backendReverseProxy: &httputil.ReverseProxy{
-			Director:      func(r *http.Request) {},
+			Director:      reporter.ReverseProxyDirector,
 			Transport:     backendTripper,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "backend reverseProxy")),
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
-			Director:      func(r *http.Request) {},
+			Director:      reporter.ReverseProxyDirector,
 			Transport:     adhocTripper,
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
@@ -89,14 +95,37 @@ type Proxy struct {
 }
 
 func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	// Note that resp needs to implement Flusher, otherwise flush intervals won't work.
+	// We can panic, unit tests will catch that.
 	if _, ok := resp.(http.Flusher); !ok {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
 	}
-	// note resp needs to implement Flusher, otherwise flush intervals won't work.
+
 	normReq := proxyreq.NormalizeInboundRequest(req)
-	backend, err := p.router.Route(req)
 	tags := http_ctxtags.ExtractInbound(req)
 	tags.Set(http_ctxtags.TagForCallService, "proxy")
+
+	// Perform routing.
+	// We can have one of these 4 cases:
+	// - backend routing
+	// - adhoc routing
+	// - unknown route to host
+	// - routing error
+
+	backend, err := p.router.Route(req)
+	if err == router.ErrRouteNotFound {
+		// Try adhoc.
+		var addr string
+		addr, err = p.addresser.Address(req)
+		if err == nil {
+			normReq.URL.Host = addr
+			tags.Set(ctxtags.TagForProxyAdhoc, addr)
+			tags.Set(http_ctxtags.TagForHandlerName, "_adhoc")
+			p.adhocReverseProxy.ServeHTTP(resp, normReq)
+			return
+		}
+	}
+
 	if err == nil {
 		resp.Header().Set("x-kedge-backend-name", backend)
 		tags.Set(ctxtags.TagForProxyBackend, backend)
@@ -104,18 +133,8 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		normReq.URL.Host = backend
 		p.backendReverseProxy.ServeHTTP(resp, normReq)
 		return
-	} else if err != router.ErrRouteNotFound {
-		respondWithError(err, req, resp)
-		return
 	}
-	addr, err := p.addresser.Address(req)
-	if err == nil {
-		normReq.URL.Host = addr
-		tags.Set(ctxtags.TagForProxyAdhoc, addr)
-		tags.Set(http_ctxtags.TagForHandlerName, "_adhoc")
-		p.adhocReverseProxy.ServeHTTP(resp, normReq)
-		return
-	}
+
 	respondWithError(err, req, resp)
 }
 
@@ -127,12 +146,19 @@ type backendPoolTripper struct {
 func (t *backendPoolTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	tripper, err := t.pool.Tripper(req.URL.Host)
 	if err != nil {
-		return nil, err
+		return nil, reporter.WrapError(errtypes.NoBackend, err)
 	}
 	return tripper.RoundTrip(req)
 }
 
 func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
+	tracker := reporter.Extract(req)
+	if err == router.ErrRouteNotFound {
+		tracker.ReportError(errtypes.NoRoute, err)
+	} else {
+		tracker.ReportError(errtypes.RouteUnknownError, err)
+	}
+
 	status := http.StatusBadGateway
 	if rErr, ok := (err).(*router.Error); ok {
 		status = rErr.StatusCode()
@@ -159,9 +185,12 @@ func AuthMiddleware(authorizer authorize.Authorizer) httpwares.Middleware {
 }
 
 func respondWithUnauthorized(err error, req *http.Request, resp http.ResponseWriter) {
+	reporter.Extract(req).ReportError(errtypes.Unauthorized, err)
+
 	status := http.StatusUnauthorized
 	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
 	resp.Header().Set("x-kedge-error", err.Error())
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)
+	fmt.Fprintln(resp, "Unauthorized")
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
+	"github.com/mwitkow/kedge/lib/reporter"
+	"github.com/mwitkow/kedge/lib/reporter/errtypes"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
@@ -126,21 +128,27 @@ func (s *tripper) Close() error {
 
 func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	tags := http_ctxtags.ExtractInbound(r)
-	tags.Set(ctxtags.TagForBackendAuthTime, s.targetName)
+	tags.Set(ctxtags.TagForBackendTarget, s.targetName)
 
 	s.mu.RLock()
 	targetsRef := s.currentTargets
 	lastResolvErr := s.lastResolveError
 	s.mu.RUnlock()
 	if len(targetsRef) == 0 {
-		return nil, errors.Wrapf(lastResolvErr, "lb: no resolution available for %s", s.targetName)
+		return nil, reporter.WrapError(
+			errtypes.NoResolutionAvailable,
+			errors.Wrapf(lastResolvErr, "lb: no resolution available for %s", s.targetName),
+		)
 	}
 
 	picker := s.policy.Picker()
 	for {
 		target, err := picker.Pick(r, targetsRef)
 		if err != nil {
-			return nil, errors.Wrapf(err, "lb: failed choosing valid target for %s", s.targetName)
+			return nil, reporter.WrapError(
+				errtypes.NoConnToAllResolvedAddresses,
+				errors.Wrapf(err, "lb: failed choosing valid target for %s", s.targetName),
+			)
 		}
 
 		// Override the host for downstream Tripper, usually http.DefaultTransport.

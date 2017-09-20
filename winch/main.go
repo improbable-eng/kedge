@@ -45,6 +45,9 @@ var (
 		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
 		WithFileFlag("../../misc/winch_auth.json").WithValidator(validateMapper)
 	flagLogLevel = sharedflags.Set.String("log_level", "info", "Log level")
+	flagDebugMode = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. " +
+		"This will force DEBUG log level on winch and will append header to the request signaling Kedge to Log to INFO all debug" +
+		"level logs for this request, overriding the kedge log level setting.")
 )
 
 func validateMapper(msg proto.Message) error {
@@ -70,11 +73,13 @@ func main() {
 
 	log.SetOutput(os.Stdout)
 
-	lvl, err := log.ParseLevel(*flagLogLevel)
-	if err != nil {
-		log.WithError(err).Fatal("Cannot parse log level: %s", *flagLogLevel)
+	lvl := log.DebugLevel
+	if !*flagDebugMode {
+		lvl, err = log.ParseLevel(*flagLogLevel)
+		if err != nil {
+			log.WithError(err).Fatal("Cannot parse log level: %s", *flagLogLevel)
+		}
 	}
-
 	log.SetLevel(lvl)
 	logEntry := log.NewEntry(log.StandardLogger())
 
@@ -107,15 +112,18 @@ func main() {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
 
-	proxyMux := http.NewServeMux()
-	proxyMux.Handle("/",
-		winch.New(
-			kedge_map.RouteMapper(routes.Get()),
-			tlsConfig,
-			logEntry,
-			mux,
-		),
+	winchHandler := winch.New(
+		kedge_map.RouteMapper(routes.Get()),
+		tlsConfig,
+		logEntry,
+		mux,
 	)
+	if *flagDebugMode {
+		winchHandler.AddDebugTripperware()
+	}
+
+	proxyMux := http.NewServeMux()
+	proxyMux.Handle("/", winchHandler)
 	winchServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
@@ -165,6 +173,8 @@ func buildListenerOrFail(name string, port int) net.Listener {
 	)
 }
 
+// NOTE: This might be too spammy. There is no good way to determine if the error is relevant to proxying itself or just it
+// was backend/user error.
 func winchCodeToLevel(httpStatusCode int) log.Level {
 	if httpStatusCode < 400 || httpStatusCode == http.StatusNotFound {
 		return log.DebugLevel

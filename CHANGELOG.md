@@ -1,5 +1,14 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.2)
+Kedge service:
+* [x] added support winch debug mode.
+* [x] added support for request ID
+
+Winch (kedge client):
+* [x] added debug mode
+* [x] added request ID.
+
 ### [v1.0.0-beta.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.1)
 Kedge service:
 * [x] added metrics for backend configuration change

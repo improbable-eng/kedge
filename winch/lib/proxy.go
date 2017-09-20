@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mwitkow/go-httpwares/logging/logrus"
-	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/lib/http/tripperware"
 	"github.com/mwitkow/kedge/lib/map"
@@ -39,6 +38,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 	parentTransport = tripperware.WrapForBackendAuth(parentTransport)
 	parentTransport = tripperware.WrapForRouting(parentTransport)
 	parentTransport = tripperware.WrapForMapping(mapper, parentTransport)
+	parentTransport = tripperware.WrapForRequestID("winch-", parentTransport)
 
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	return &Proxy{
@@ -60,6 +60,10 @@ type Proxy struct {
 	mux               *http.ServeMux
 }
 
+func (p *Proxy) AddDebugTripperware() {
+	p.kedgeReverseProxy.Transport = tripperware.WrapForDebug(p.kedgeReverseProxy.Transport)
+}
+
 func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if _, ok := resp.(http.Flusher); !ok {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
@@ -73,8 +77,5 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	normReq := proxyreq.NormalizeInboundRequest(req)
-	tags := http_ctxtags.ExtractInbound(req)
-	tags.Set(http_ctxtags.TagForCallService, "winch")
-
 	p.kedgeReverseProxy.ServeHTTP(resp, normReq)
 }

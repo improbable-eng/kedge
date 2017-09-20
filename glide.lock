@@ -1,10 +1,11 @@
 hash: f4ae0280c4e03e3cf46f9b15f839c8ba24afa0bdcca553bd2bee45305079f044
-updated: 2017-08-23T09:01:14.689534372+01:00
+updated: 2017-09-20T13:31:18.742966356+01:00
 imports:
 - name: cloud.google.com/go
   version: fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0
   subpackages:
   - compute/metadata
+  - internal
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
   subpackages:
@@ -57,6 +58,8 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
+- name: github.com/google/uuid
+  version: 7e072fc3a7be179aee6d3359e46015aa8c995314
 - name: github.com/grpc-ecosystem/go-grpc-middleware
   version: f63a7dfb64c138bd93d5c5b896d8b33c4b08e000
   subpackages:
@@ -100,7 +103,7 @@ imports:
   subpackages:
   - protobuf
 - name: github.com/mwitkow/go-httpwares
-  version: 273442965bae30322cd270de8230e2a5aa20fb7c
+  version: b4db44c6691bb87b6d207ee2d2e62121e4aec910
   subpackages:
   - logging
   - logging/logrus
@@ -128,6 +131,7 @@ imports:
   version: c5b7fccd204277076155f10851dad72b76a49317
   subpackages:
   - prometheus
+  - prometheus/promhttp
 - name: github.com/prometheus/client_model
   version: 6f3806018612930941127f2a7c6c453ba2c527d2
   subpackages:

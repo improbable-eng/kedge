@@ -19,6 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
+	"github.com/mwitkow/kedge/lib/reporter"
+	"github.com/mwitkow/kedge/lib/reporter/errtypes"
 )
 
 var (
@@ -29,7 +31,7 @@ var (
 	}).DialContext
 
 	closedTripper = httpwares.RoundTripperFunc(func(*http.Request) (*http.Response, error) {
-		return nil, errors.New("backend transport closed")
+		return nil, reporter.WrapError(errtypes.BackendTransportClosed, errors.New("backend transport closed"))
 	})
 )
 

@@ -1,6 +1,7 @@
 package ctxtags
 
 const (
+
 	// TagForAuth is used in authTripperware to specify auth.Source for backend auth.
 	TagForAuth = "http.auth"
 	// TagForProxyAuth is used in authTripperware to specify auth.Source for proxy auth.
@@ -23,6 +24,9 @@ const (
 	// It can sometimes take time in case of full OIDC login.
 	TagForBackendAuthTime = "http.auth.time"
 
-	// TagForBackendTarget specifies the target name used to resolve in lbtransport.
+	// TagForBackendTarget specifies the target name used to resolve in lbtransport by backend
 	TagForBackendTarget = "http.backend.target"
+
+	// TagRequestID specified request ID of the request.
+	TagRequestID = "http.request_id"
 )

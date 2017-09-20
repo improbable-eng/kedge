@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/naming"
+	"github.com/mwitkow/kedge/lib/reporter"
+	"github.com/mwitkow/kedge/lib/reporter/errtypes"
 )
 
 var (
@@ -102,6 +104,10 @@ func (s *BalancedRRTransportSuite) waitForSRVPropagation(backends []*httptest.Se
 				foundAll = false
 				break
 			}
+		}
+		if len(backends) != len(s.lbTrans.currentTargets) {
+			// There are even too many backends.
+			foundAll = false
 		}
 		s.lbTrans.mu.Unlock()
 
@@ -214,11 +220,41 @@ func (s *BalancedRRTransportSuite) TestRoundRobinRetryRequestsForInvalidBackends
 	s.callLBTransportAndAssert(50, testBackendCount+1)
 }
 
-//func (s *BalancedRRTransportSuite) TestSrvLbErrorsOnBadTarget() {
-//	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
-//	_, err := client.Get("http://not-my-magic-srv/something")
-//	require.Error(s.T(), err, "srvlb should not be able to dial targets thOat are not known")
-//}
+func (s *BalancedRRTransportSuite) TestSrvLbErrorsNoResolution() {
+	// No backends.
+	s.backendSRVWatcher.UpdateBackends([]*httptest.Server{})
+	s.waitForSRVPropagation([]*httptest.Server{}, 1*time.Second)
+	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
+	_, err := client.Get("http://my-magic-srv/something")
+	s.Require().Error(err, "srvlb should not be able to start dialing, because of no resolution")
+
+	reportableErr, ok :=  err.(reporter.ReportableError)
+	s.Require().True(ok)
+	s.Assert().Equal(errtypes.NoResolutionAvailable, reportableErr.Type)
+}
+
+func (s *BalancedRRTransportSuite) TestSrvLbErrorsAllResolvedAddressesAreWrong() {
+	// Add 5 not accessible backends.
+	backends := []*httptest.Server{}
+	for i := 0; i < 5; i ++ {
+		b := httptest.NewUnstartedServer(nil)
+		// Don't even listen on socket - we want dial to fail immediately.
+		b.Close()
+		backends = append(backends, b)
+	}
+
+	// No backends.
+	s.backendSRVWatcher.UpdateBackends(backends)
+	s.waitForSRVPropagation(backends, 1*time.Second)
+	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
+	_, err := client.Get("http://my-magic-srv/something")
+	s.Require().Error(err, "srvlb should not be able to dial any target")
+
+	reportableErr, ok :=  err.(reporter.ReportableError)
+	s.Require().True(ok)
+	s.Assert().Equal(errtypes.NoConnToAllResolvedAddresses, reportableErr.Type)
+}
+
 
 // mockSRVWatcher implements naming.Watcher that is used inside lbtransport to watch for SRV lookup changes.
 type mockSRVWatcher struct {

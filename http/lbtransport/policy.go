@@ -1,6 +1,7 @@
 package lbtransport
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -20,6 +21,8 @@ var (
 type LBPolicy interface {
 	// Picker returns PolicyPicker that is suitable to be used within single request.
 	Picker() LBPolicyPicker
+
+	Close()
 }
 
 // LBPolicyPicker decides which target to pick for a given call. Should be short-living.
@@ -47,7 +50,10 @@ type roundRobinPolicy struct {
 	atomicCounter uint64
 
 	dialTimeout time.Duration
-	timeNow     func() time.Time
+	closeFn     context.CancelFunc
+
+	// For testing purposes.
+	timeNow func() time.Time
 }
 
 func RoundRobinPolicyFromFlags() LBPolicy {
@@ -55,21 +61,31 @@ func RoundRobinPolicyFromFlags() LBPolicy {
 }
 
 func RoundRobinPolicy(backoffDuration time.Duration, dialTimeout time.Duration) LBPolicy {
+	ctx, cancel := context.WithCancel(context.Background())
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: backoffDuration,
 		blacklistedTargets:       make(map[Target]time.Time),
 		dialTimeout:              dialTimeout,
+		closeFn:                  cancel,
 
 		timeNow: time.Now,
 	}
 
 	go func() {
 		for {
-			time.Sleep(10 * time.Minute)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Minute):
+			}
 			rr.cleanUpBlacklist()
 		}
 	}()
 	return rr
+}
+
+func (rr *roundRobinPolicy) Close() {
+	rr.closeFn()
 }
 
 func (rr *roundRobinPolicy) cleanUpBlacklist() {

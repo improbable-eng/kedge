@@ -152,6 +152,9 @@ func Tripperware(next http.RoundTripper) http.RoundTripper {
 // SetErrorHeaders adds Kedge Error headers useful to immediately see kedge error on HTTP response.
 // NOTE: This method can be invoked only before resp.WriteHeader(...)
 func SetErrorHeaders(headerMap http.Header, t *Tracker) {
+	if t.lastSeenErr == nil {
+		return
+	}
 	headerMap.Set(header.ResponseKedgeError, t.lastSeenErr.Error())
 	headerMap.Set(header.ResponseKedgeErrorType, string(t.lastSeenErrType))
 }

@@ -2,12 +2,15 @@ package winch
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httputil"
 	"time"
 
 	"github.com/mwitkow/go-httpwares/logging/logrus"
+	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
+	"github.com/mwitkow/kedge/lib/http/header"
 	"github.com/mwitkow/kedge/lib/http/tripperware"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/sharedflags"
@@ -49,6 +52,16 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "winch.ReverseProxy")),
+			// Do not modify anything, just log interesting errors directly on winch.
+			ModifyResponse: func(r *http.Response) error {
+				if val := r.Header.Get(header.ResponseKedgeError); val != "" {
+					// This request was not proxied. Why?
+					tags := http_ctxtags.ExtractInbound(r.Request).Values()
+					tags["err_type"] = r.Header.Get(header.ResponseKedgeErrorType)
+					logEntry.WithFields(tags).WithError(errors.New(val)).Error("Kedge was unable to proxy request.")
+				}
+				return nil
+			},
 		},
 	}
 }

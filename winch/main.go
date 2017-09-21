@@ -44,9 +44,9 @@ var (
 		&pb_config.AuthConfig{},
 		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
 		WithFileFlag("../../misc/winch_auth.json").WithValidator(validateMapper)
-	flagLogLevel = sharedflags.Set.String("log_level", "info", "Log level")
-	flagDebugMode = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. " +
-		"This will force DEBUG log level on winch and will append header to the request signaling Kedge to Log to INFO all debug" +
+	flagLogLevel  = sharedflags.Set.String("log_level", "info", "Log level")
+	flagDebugMode = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. "+
+		"This will force DEBUG log level on winch and will append header to the request signaling Kedge to Log to INFO all debug"+
 		"level logs for this request, overriding the kedge log level setting.")
 )
 
@@ -131,7 +131,7 @@ func main() {
 		Handler: chi.Chain(
 			http_ctxtags.Middleware("winch"),
 			http_debug.Middleware(),
-			http_logrus.Middleware(logEntry, http_logrus.WithLevels(winchCodeToLevel)),
+			http_logrus.Middleware(logEntry, http_logrus.WithLevels(allAsDebug)),
 		).Handler(proxyMux),
 	}
 
@@ -174,15 +174,7 @@ func buildListenerOrFail(name string, port int) net.Listener {
 }
 
 // NOTE: This might be too spammy. There is no good way to determine if the error is relevant to proxying itself or just it
-// was backend/user error.
-func winchCodeToLevel(httpStatusCode int) log.Level {
-	if httpStatusCode < 400 || httpStatusCode == http.StatusNotFound {
-		return log.DebugLevel
-	} else if httpStatusCode < 500 {
-		return log.WarnLevel
-	} else if httpStatusCode < 600 {
-		return log.ErrorLevel
-	} else {
-		return log.ErrorLevel
-	}
+// was backend/user error that's why all logs are DEBUG.
+func allAsDebug(_ int) log.Level {
+	return log.DebugLevel
 }

@@ -258,7 +258,8 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 
 	// NOTE: These can contain sensitive data like user headers.
 	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-	m.Handle("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))
+
+	m.Mount("/debug/pprof/", middlewares.HandlerFunc(pprof.Index))
 	m.Handle("/debug/pprof/cmdline", middlewares.HandlerFunc(pprof.Cmdline))
 	m.Handle("/debug/pprof/profile", middlewares.HandlerFunc(pprof.Profile))
 	m.Handle("/debug/pprof/symbol", middlewares.HandlerFunc(pprof.Symbol))

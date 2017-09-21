@@ -135,20 +135,21 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	lastResolvErr := s.lastResolveError
 	s.mu.RUnlock()
 	if len(targetsRef) == 0 {
-		return nil, reporter.WrapError(
-			errtypes.NoResolutionAvailable,
-			errors.Wrapf(lastResolvErr, "lb: no resolution available for %s", s.targetName),
-		)
+		if lastResolvErr == nil {
+			lastResolvErr = errors.New("0 resolved addresses")
+		}
+		err := errors.Wrapf(lastResolvErr, "lb: no resolution available for %s", s.targetName)
+		reporter.Extract(r).ReportError(errtypes.NoResolutionAvailable, err)
+		return nil, err
 	}
 
 	picker := s.policy.Picker()
 	for {
 		target, err := picker.Pick(r, targetsRef)
 		if err != nil {
-			return nil, reporter.WrapError(
-				errtypes.NoConnToAllResolvedAddresses,
-				errors.Wrapf(err, "lb: failed choosing valid target for %s", s.targetName),
-			)
+			err = errors.Wrapf(err, "lb: failed choosing valid target for %s", s.targetName)
+			reporter.Extract(r).ReportError(errtypes.NoConnToAllResolvedAddresses, err)
+			return nil, err
 		}
 
 		// Override the host for downstream Tripper, usually http.DefaultTransport.

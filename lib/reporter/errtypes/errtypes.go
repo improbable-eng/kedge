@@ -3,6 +3,8 @@ package errtypes
 type Type string
 
 const (
+	OK Type = ""
+
 	// Unauthorized is an error returned by proxy.AuthMiddleware indicating case when request is not authorized to be proxied.
 	// NOTE: This is only for OIDC auth. Cert auth is done on http.Server level, and there is no reporting implemented yet on that.
 	Unauthorized Type = "unauthorized"

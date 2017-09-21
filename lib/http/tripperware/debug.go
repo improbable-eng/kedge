@@ -37,7 +37,7 @@ func (t *setHeaderTripperware) RoundTrip(req *http.Request) (*http.Response, err
 // better debug tracking.
 func WrapForRequestID(prefix string, parentTransport http.RoundTripper) http.RoundTripper {
 	return &setHeaderTripperware{
-		headerName: header.KedgeRequestID,
+		headerName: header.RequestKedgeRequestID,
 		headerValueFn: func()string {
 			return fmt.Sprintf("%s%s", prefix, uuid.New().String())
 		},
@@ -49,7 +49,7 @@ func WrapForRequestID(prefix string, parentTransport http.RoundTripper) http.Rou
 // WrapForDebug wraps tripperware with new one that signals kedge to use INFO logs for all DEBUG logs.
 func WrapForDebug(parentTransport http.RoundTripper) http.RoundTripper {
 	return &setHeaderTripperware{
-		headerName: header.KedgeForceInfoLogs,
+		headerName: header.RequestKedgeForceInfoLogs,
 		headerValueFn: func()string {
 			return os.ExpandEnv("winch-$USER")
 		},

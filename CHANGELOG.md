@@ -2,6 +2,7 @@
 
 ### [v1.0.0-beta.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.2)
 Kedge service:
+* [x] added reported helping to determine proxy errors from backend errors (producing log and inc metric)
 * [x] added support winch debug mode.
 * [x] added support for request ID
 

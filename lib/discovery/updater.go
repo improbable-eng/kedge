@@ -155,6 +155,8 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 			nameMatcher: fmt.Sprintf("%s.%s", service.name, u.externalDomainSuffix),
 			portMatcher: port.Port,
 		}
+
+		// TODO(bplotka): Add support for TLS between (even insecure for now).
 		if port.Name == "http" || strings.HasPrefix(port.Name, "http-") {
 			if hostMatcherOverride != "" {
 				foundRoute.nameMatcher = hostMatcherOverride

@@ -143,7 +143,7 @@ func main() {
 		http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
 		http_debug.Middleware(),                                                                     // Traces.
 		http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)),                        // Std Request/Response Logs.
-		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),       // Std Request/Response Metrics.
+		http_metrics.Middleware(http_prometheus.ServerMetrics()),       // Std Request/Response Metrics.
 		reporter.Middleware(logEntry),                                                               // Kedge proxy metrics/logs
 	)
 

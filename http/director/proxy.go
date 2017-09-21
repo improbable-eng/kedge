@@ -56,7 +56,7 @@ func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser,
 	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 
-	clientMetrics := http_prometheus.ClientMetrics(http_prometheus.WithLatency())
+	clientMetrics := http_prometheus.ClientMetrics()
 	backendTripper := http_metrics.Tripperware(clientMetrics)(&backendPoolTripper{pool: pool})
 	adhocTripper := http_metrics.Tripperware(clientMetrics)(AdhocTransport)
 

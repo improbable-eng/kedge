@@ -29,7 +29,9 @@ import (
 	http_director "github.com/mwitkow/kedge/http/director"
 	"github.com/mwitkow/kedge/lib/discovery"
 	"github.com/mwitkow/kedge/lib/http/ctxtags"
+	"github.com/mwitkow/kedge/lib/http/header"
 	"github.com/mwitkow/kedge/lib/logstash"
+	"github.com/mwitkow/kedge/lib/reporter"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -37,8 +39,6 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"github.com/mwitkow/kedge/lib/http/header"
-	"github.com/mwitkow/kedge/lib/reporter"
 )
 
 var (
@@ -141,10 +141,10 @@ func main() {
 	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
-		http_debug.Middleware(), // Traces.
-		http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)), // Std Request/Response Logs.
-		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())), // Std Request/Response Metrics.
-		reporter.Middleware(), // Kedge proxy metrics/logs
+		http_debug.Middleware(),                                                                     // Traces.
+		http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)),                        // Std Request/Response Logs.
+		http_metrics.Middleware(http_prometheus.ServerMetrics(http_prometheus.WithLatency())),       // Std Request/Response Metrics.
+		reporter.Middleware(logEntry),                                                               // Kedge proxy metrics/logs
 	)
 
 	// HTTP debug chain.
@@ -254,10 +254,7 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	m.Handle("/_healthz", noAuthMiddlewares.HandlerFunc(healthEndpoint))
 	m.Handle("/debug/metrics", noAuthMiddlewares.Handler(promhttp.Handler()))
 
-	m.Handle("/_version",
-		// The only one worth to log.
-		chi.Chain(http_logrus.Middleware(logEntry.WithField(ctxtags.TagForScheme, "plain"), http_logrus.WithLevels(kedgeCodeToLevel))).
-			Handler(middlewares.HandlerFunc(versionEndpoint)))
+	m.Handle("/_version", middlewares.HandlerFunc(versionEndpoint))
 
 	// NOTE: These can contain sensitive data like user headers.
 	m.Handle("/debug/flagz", middlewares.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
@@ -305,7 +302,7 @@ func logAsDebug(_ int) log.Level {
 func kedgeRequestIDTagExtractor(req *http.Request) map[string]interface{} {
 	tags := map[string]interface{}{}
 
-	if requestID := req.Header.Get(header.KedgeRequestID); requestID != "" {
+	if requestID := req.Header.Get(header.RequestKedgeRequestID); requestID != "" {
 		tags[ctxtags.TagRequestID] = requestID
 	}
 

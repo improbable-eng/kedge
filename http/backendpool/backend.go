@@ -30,8 +30,10 @@ var (
 		KeepAlive: 30 * time.Second,
 	}).DialContext
 
-	closedTripper = httpwares.RoundTripperFunc(func(*http.Request) (*http.Response, error) {
-		return nil, reporter.WrapError(errtypes.BackendTransportClosed, errors.New("backend transport closed"))
+	closedTripper = httpwares.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		err := errors.New("backend transport closed")
+		reporter.Extract(req).ReportError(errtypes.BackendTransportClosed, err)
+		return nil, err
 	})
 )
 

@@ -139,7 +139,7 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 		err := startWatchingServicesChanges(streamCtx, d.labelSelectorKey, d.serviceClient, watchResultCh)
 		if err != nil {
 			streamCancel()
-			d.logger.WithError(err).Errorf("Failed to start watching services by %s selector stream", d.labelSelectorKey)
+			d.logger.WithError(err).Errorf("discovery: Failed to start watching services by %s selector stream", d.labelSelectorKey)
 
 			time.Sleep(streamRetryBackoff.Duration())
 			continue
@@ -153,29 +153,18 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 			d.labelAnnotationPrefix,
 		)
 		for {
-			var event event
-			select {
-			case <-ctx.Done():
-				return nil
-			case r := <-watchResultCh:
-				if r.err != nil {
-					d.logger.WithError(err).Error("Error on reading event stream. Retrying stream...")
-					break
-				}
-				event = *r.ep
-			}
+			// Watch loop.
 
-			directorConfig, backendPool, err := updater.onEvent(event)
+			director, backendPool, err := d.next(ctx, updater, watchResultCh)
 			if err != nil {
-				d.logger.WithError(err).Errorf("Error on updating routing on event %v. Retrying stream...", event)
-				// TODO(bplotka) Metric here!
-				// There is possibility we missed event, so retry stream.
+				d.logger.WithError(err).Error("discovery: Error on watching event stream. Retrying stream... ")
 				break
 			}
 
-			err = d.setFlags(directorConfig, directorFlagz, backendPool, backendpoolFlagz)
+			err = d.setFlags(director, directorFlagz, backendPool, backendpoolFlagz)
 			if err != nil {
-				return errors.Wrap(err, "Error on updating flags from director and backendpool configs")
+				// This is critical error, since retry will not help. Not much we can do, abort dynamic discovery.
+				return errors.Wrap(err, "discovery: Critical error on updating flags from director and backendpool configs. Discover will not work!")
 			}
 		}
 		streamCancel()
@@ -183,6 +172,30 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 
 	return nil
 }
+
+// next is waiting for next watcher update and returns valid full director and backendPool configs that includes change.
+// NOTE that error from next() method are irrecoverable.
+func (d *RoutingDiscovery) next(ctx context.Context, updater *updater, watchResultCh <-chan watchResult) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
+	var event event
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case r := <-watchResultCh:
+		if r.err != nil {
+			return nil, nil, r.err
+		}
+		event = *r.ep
+	}
+
+	director, backendPool, err := updater.onEvent(event)
+	if err != nil {
+		// There is possibility we missed event, so retry stream.
+		return nil, nil, errors.Wrapf(err, "internal error on updating routing on event %v.", event)
+	}
+
+	return director, backendPool, nil
+}
+
 
 func (d *RoutingDiscovery) setFlags(
 	directorConfig *pb_config.DirectorConfig,

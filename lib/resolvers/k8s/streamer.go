@@ -28,13 +28,8 @@ func startWatchingEndpointsChanges(
 	go func() {
 		select {
 		case <-innerCtx.Done():
-			logrus.Info("k8sresolver: Reading all")
 			// Request is cancelled, so we need to read what is left there to not leak go routines.
-			_, err := ioutil.ReadAll(stream)
-			if err != nil {
-				logrus.WithError(err).Warn("k8sresolver: Failed to ReadAll on cancelled stream request")
-			}
-			logrus.Info("k8sresolver: Closing")
+			_, _ = ioutil.ReadAll(stream)
 			err = stream.Close()
 			if err != nil {
 				logrus.WithError(err).Warn("k8sresolver: Failed to Close cancelled stream connection")

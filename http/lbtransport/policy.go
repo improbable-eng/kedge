@@ -78,6 +78,7 @@ func RoundRobinPolicy(backoffDuration time.Duration, dialTimeout time.Duration) 
 				return
 			case <-time.After(10 * time.Minute):
 			}
+			// Clean old targets from blacklist if they were not cleaned, because resolution changed.
 			rr.cleanUpBlacklist()
 		}
 	}()

@@ -74,7 +74,7 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 		for _, backend := range grpcConfig.Backends {
 			_, err := grpcBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
 			if err != nil {
-				logrus.Errorf("failed Adding or Updating grpc backend %v: %v", backend.Name, err)
+				logrus.Errorf("failed to or update grpc backend %v: %v", backend.Name, err)
 			}
 			grpcBackendInNewConfig[backend.Name] = struct{}{}
 		}
@@ -82,8 +82,10 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 
 	for backendName := range grpcBackendInOldConfig {
 		if _, exists := grpcBackendInNewConfig[backendName]; !exists {
-			logrus.Infof("removing gRPC backend: %v", backendName)
-			grpcBackendPool.Remove(backendName)
+			err := grpcBackendPool.Remove(backendName)
+			if err != nil {
+				logrus.Errorf("failed to remove grpc backend %v: %v", backendName, err)
+			}
 		}
 	}
 
@@ -94,7 +96,7 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 		for _, backend := range newConfig.GetHttp().Backends {
 			_, err := httpBackendPool.AddOrUpdate(backend, *flagLogTestBackendpoolResolution)
 			if err != nil {
-				logrus.Errorf("failed creating http backend %v: %v", backend.Name, err)
+				logrus.Errorf("failed to add or update http backend %v: %v", backend.Name, err)
 			}
 			httpBackendInNewConfig[backend.Name] = struct{}{}
 		}
@@ -102,8 +104,10 @@ func backendConfigReloaded(_ proto.Message, newValue proto.Message) {
 
 	for backendName := range httpBackendInOldConfig {
 		if _, exists := httpBackendInNewConfig[backendName]; !exists {
-			logrus.Infof("removing http backend: %v", backendName)
-			httpBackendPool.Remove(backendName)
+			err := httpBackendPool.Remove(backendName)
+			if err != nil {
+				logrus.Errorf("failed to remove http backend %v: %v", backendName, err)
+			}
 		}
 	}
 }

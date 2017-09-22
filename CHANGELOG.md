@@ -3,12 +3,14 @@
 ### [v1.0.0-beta.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.2)
 Kedge service:
 * [x] added reported helping to determine proxy errors from backend errors (producing log and inc metric)
-* [x] added support winch debug mode.
+* [x] added support winch debug mode
 * [x] added support for request ID
+* [x] fixed go routine leaks on discovery and k8sresolver streams
+* [x] improved logging on discovery logic
 
 Winch (kedge client):
 * [x] added debug mode
-* [x] added request ID.
+* [x] added request ID
 
 ### [v1.0.0-beta.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.1)
 Kedge service:

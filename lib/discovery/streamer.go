@@ -6,6 +6,8 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"io/ioutil"
+	"github.com/sirupsen/logrus"
 )
 
 type watchResult struct {
@@ -22,20 +24,32 @@ func startWatchingServicesChanges(
 	serviceClient serviceClient,
 	eventsCh chan<- watchResult,
 ) error {
-	stream, err := serviceClient.StartChangeStream(ctx, labelSelector)
+	innerCtx, innerCancel := context.WithCancel(ctx)
+	stream, err := serviceClient.StartChangeStream(innerCtx, labelSelector)
 	if err != nil {
 		return errors.Wrapf(err, "discovery stream: Failed to do start stream for label %s", labelSelector)
 	}
 
 	go func() {
 		select {
-		case <-ctx.Done():
-			stream.Close()
+		case <-innerCtx.Done():
+			logrus.Info("discovery: Reading all")
+			// Request is cancelled, so we need to read what is left there to not leak go routines.
+			_, err := ioutil.ReadAll(stream)
+			if err != nil {
+				logrus.WithError(err).Warn("discovery: Failed to ReadAll on cancelled stream request")
+			}
+			logrus.Info("discovery: Closing")
+			err = stream.Close()
+			if err != nil {
+				logrus.WithError(err).Warn("discovery: Failed to Close cancelled stream connection")
+			}
 		}
 	}()
 
 	go func() {
-		proxyAllEvents(ctx, json.NewDecoder(stream), eventsCh)
+		proxyAllEvents(innerCtx, json.NewDecoder(stream), eventsCh)
+		innerCancel()
 	}()
 
 	return nil

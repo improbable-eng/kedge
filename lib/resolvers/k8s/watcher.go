@@ -4,20 +4,9 @@ import (
 	"context"
 	"net"
 	"strconv"
-	"time"
 
-	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/naming"
-)
-
-var (
-	watchRetryBackoff = &backoff.Backoff{
-		Min:    20 * time.Millisecond,
-		Jitter: true,
-		Factor: 2,
-		Max:    3 * time.Second,
-	}
 )
 
 type watchResult struct {
@@ -65,7 +54,7 @@ func (w *watcher) Close() {
 func (w *watcher) Next() ([]*naming.Update, error) {
 	if w.ctx.Err() != nil {
 		// We already stopped.
-		return []*naming.Update(nil), errors.Wrap(w.ctx.Err(), "watcher.Next already stopped or Next returned error already. "+
+		return []*naming.Update(nil), errors.Wrap(w.ctx.Err(), "k8sresolver: watcher.Next already stopped or Next returned error already. "+
 			"Note that watcher errors are not recoverable.")
 	}
 	u, err := w.next()
@@ -86,7 +75,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 		return []*naming.Update(nil), w.ctx.Err()
 	case r := <-w.watchChange:
 		if r.err != nil {
-			return []*naming.Update(nil), errors.Wrap(r.err, "error on reading event stream")
+			return []*naming.Update(nil), errors.Wrap(r.err, "k8sresolver: error on reading event stream")
 		}
 		event = *r.ep
 	}
@@ -95,7 +84,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 	for _, subset := range event.Object.Subsets {
 		updatedAddresses, err := subsetToAddresses(w.target, subset)
 		if err != nil {
-			return []*naming.Update(nil), errors.Wrap(err, "failed to convert k8s endpoint subset to update Addr")
+			return []*naming.Update(nil), errors.Wrap(err, "k8sresolver: failed to convert k8s endpoint subset to update Addr")
 		}
 
 		for _, address := range updatedAddresses {
@@ -156,7 +145,7 @@ type port struct {
 
 func subsetToAddresses(t targetEntry, sub subset) ([]string, error) {
 	if len(sub.Ports) == 0 {
-		return []string(nil), errors.Errorf("Retrieved subset update contains no port")
+		return []string(nil), errors.Errorf("retrieved subset update contains no port")
 	}
 
 	var port string

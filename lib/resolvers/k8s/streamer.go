@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // startWatchingEndpointsChanges starts a stream that in go routine reads from connection for every change event.
@@ -17,21 +19,32 @@ func startWatchingEndpointsChanges(
 	epClient endpointClient,
 	eventsCh chan<- watchResult,
 ) error {
-	stream, err := epClient.StartChangeStream(ctx, target)
+	innerCtx, innerCancel := context.WithCancel(ctx)
+	stream, err := epClient.StartChangeStream(innerCtx, target)
 	if err != nil {
-		return errors.Wrapf(err, "k8sresolver stream: Failed to do start stream for target %v", target)
+		return errors.Wrapf(err, "k8sresolver: Failed to do start stream for target %v", target)
 	}
 
 	go func() {
 		select {
-		case <-ctx.Done():
-			stream.Close()
+		case <-innerCtx.Done():
+			logrus.Info("k8sresolver: Reading all")
+			// Request is cancelled, so we need to read what is left there to not leak go routines.
+			_, err := ioutil.ReadAll(stream)
+			if err != nil {
+				logrus.WithError(err).Warn("k8sresolver: Failed to ReadAll on cancelled stream request")
+			}
+			logrus.Info("k8sresolver: Closing")
+			err = stream.Close()
+			if err != nil {
+				logrus.WithError(err).Warn("k8sresolver: Failed to Close cancelled stream connection")
+			}
 		}
 	}()
 
 	go func() {
-		proxyAllEvents(ctx, json.NewDecoder(stream), eventsCh)
-		stream.Close()
+		proxyAllEvents(innerCtx, json.NewDecoder(stream), eventsCh)
+		innerCancel()
 	}()
 
 	return nil

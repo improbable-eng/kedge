@@ -55,6 +55,7 @@ type endpointClientMock struct {
 
 func (m *endpointClientMock) StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error) {
 	require.Equal(m.t, m.expectedTarget, t)
+	m.connMock.Ctx = ctx
 	return m.connMock, nil
 }
 

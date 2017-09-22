@@ -66,7 +66,7 @@ func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (chang
 			return changed, err
 		}
 		changed = true
-		s.logger.Debug("Adding new grpc backend: %v", config.Name)
+		s.logger.Info("Adding new grpc backend: %v", config.Name)
 		metrics.BackendGRPCConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionCreate).Inc()
 		return changed, nil
 	}
@@ -78,7 +78,7 @@ func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (chang
 	}
 	if updated {
 		changed = true
-		s.logger.Debug("Updated grpc backend: %v", config.Name)
+		s.logger.Info("Updated grpc backend: %v", config.Name)
 		metrics.BackendGRPCConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionChange).Inc()
 	}
 	return changed, nil
@@ -120,7 +120,7 @@ func (s *dynamic) Remove(backendName string) error {
 	s.mu.Unlock()
 	existing.Close()
 
-	s.logger.Debug("Removed grpc backend: %v", backendName)
+	s.logger.Info("Removed grpc backend: %v", backendName)
 	metrics.BackendGRPCConfigurationCounter.WithLabelValues(backendName, metrics.ConfiguationActionDelete).Inc()
 	return nil
 }

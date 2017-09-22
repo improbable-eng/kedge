@@ -67,7 +67,7 @@ func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (chang
 			return changed, err
 		}
 		changed = true
-		s.logger.Debug("Adding new http backend: %v", config.Name)
+		s.logger.Infof("Adding new http backend: %v", config.Name)
 		metrics.BackendHTTPConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionCreate).Inc()
 		return changed, nil
 	}
@@ -79,7 +79,7 @@ func (s *dynamic) AddOrUpdate(config *pb.Backend, logTestResolution bool) (chang
 	}
 	if updated {
 		changed = true
-		s.logger.Debug("Updated http backend: %v", config.Name)
+		s.logger.Infof("Updated http backend: %v", config.Name)
 		metrics.BackendHTTPConfigurationCounter.WithLabelValues(config.Name, metrics.ConfiguationActionChange).Inc()
 	}
 	return changed, nil
@@ -121,7 +121,7 @@ func (s *dynamic) Remove(backendName string) error {
 	s.mu.Unlock()
 	existing.Close()
 
-	s.logger.Debug("Removed grpc backend: %v", backendName)
+	s.logger.Infof("Removed grpc backend: %v", backendName)
 	metrics.BackendHTTPConfigurationCounter.WithLabelValues(backendName, metrics.ConfiguationActionDelete).Inc()
 	return nil
 }

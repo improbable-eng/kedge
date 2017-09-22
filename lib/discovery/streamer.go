@@ -33,13 +33,8 @@ func startWatchingServicesChanges(
 	go func() {
 		select {
 		case <-innerCtx.Done():
-			logrus.Info("discovery: Reading all")
 			// Request is cancelled, so we need to read what is left there to not leak go routines.
-			_, err := ioutil.ReadAll(stream)
-			if err != nil {
-				logrus.WithError(err).Warn("discovery: Failed to ReadAll on cancelled stream request")
-			}
-			logrus.Info("discovery: Closing")
+			_, _ = ioutil.ReadAll(stream)
 			err = stream.Close()
 			if err != nil {
 				logrus.WithError(err).Warn("discovery: Failed to Close cancelled stream connection")

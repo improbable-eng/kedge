@@ -152,14 +152,24 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 			d.externalDomainSuffix,
 			d.labelAnnotationPrefix,
 		)
-		for {
+
+		aggregateDelay := 300 * time.Millisecond
+		maxAggrUpdates := 50
+		for ctx.Err() == nil {
 			// Watch loop.
 
-			director, backendPool, err := d.next(ctx, updater, watchResultCh)
+			director, backendPool, err := d.nextWithAggregate(ctx, updater, watchResultCh, aggregateDelay, maxAggrUpdates)
 			if err != nil {
 				d.logger.WithError(err).Error("discovery: Error on watching event stream. Retrying stream... ")
 				break
 			}
+
+			d.logger.Infof("Setting director and backendpool configs with %d (http) and %d (grpc) backends.",
+				len(backendPool.Http.Backends), len(backendPool.Grpc.Backends))
+
+			// Only first update should aggregate that much, to not erase and create backend unnecessarily on watch endpoint EOF (which is every 15 minutes).
+			aggregateDelay = 100 * time.Millisecond
+			maxAggrUpdates = 10
 
 			err = d.setFlags(director, directorFlagz, backendPool, backendpoolFlagz)
 			if err != nil {
@@ -173,27 +183,52 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 	return nil
 }
 
-// next is waiting for next watcher update and returns valid full director and backendPool configs that includes change.
+// nextWithAggregate is waiting for next watcher update. It does not immediately return valid full director and
+// backendPool configs that includes this single change. Instead it aggregates all changes that are gathered within next "aggregateDelay"
+// after last update to aggregate these.
+// Parameter called "maxAggrUpdates" is to have safeguard in case of constant changes. In theory time waiting for an aggregated
+// changes in our configs is maxAggrUpdates * aggregateDelay if we have constant changes (unlikely).
 // NOTE that error from next() method are irrecoverable.
-func (d *RoutingDiscovery) next(ctx context.Context, updater *updater, watchResultCh <-chan watchResult) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
-	var event event
-	select {
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	case r := <-watchResultCh:
-		if r.err != nil {
-			return nil, nil, r.err
+func (d *RoutingDiscovery) nextWithAggregate(ctx context.Context, updater *updater, watchResultCh <-chan watchResult, aggregateDelay time.Duration, maxAggrUpdates int) (*pb_config.DirectorConfig, *pb_config.BackendPoolConfig, error) {
+	var firstUpdateAt time.Time
+
+	var director *pb_config.DirectorConfig
+	var backendPool *pb_config.BackendPoolConfig
+	for {
+		var event event
+		select {
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		case r := <-watchResultCh:
+			if r.err != nil {
+				return nil, nil, r.err
+			}
+
+			if firstUpdateAt.IsZero() {
+				firstUpdateAt = time.Now()
+			}
+			event = *r.ep
+		case <-time.After(aggregateDelay):
+			if firstUpdateAt.IsZero() {
+				// Still waiting for any update.
+				continue
+			}
+			return director, backendPool, nil
 		}
-		event = *r.ep
-	}
 
-	director, backendPool, err := updater.onEvent(event)
-	if err != nil {
-		// There is possibility we missed event, so retry stream.
-		return nil, nil, errors.Wrapf(err, "internal error on updating routing on event %v.", event)
-	}
+		// Safe guard in case of constant changes.
+		maxAggrUpdates--
+		if maxAggrUpdates <= 0 {
+			return director, backendPool, nil
+		}
 
-	return director, backendPool, nil
+		var err error
+		director, backendPool, err = updater.onEvent(event)
+		if err != nil {
+			// There is possibility we missed event, so retry stream.
+			return nil, nil, errors.Wrapf(err, "internal error on updating routing on event %v.", event)
+		}
+	}
 }
 
 

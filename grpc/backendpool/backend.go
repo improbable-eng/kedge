@@ -62,6 +62,7 @@ func (b *backend) Conn() (*grpc.ClientConn, error) {
 	}
 	b.target = target
 	b.resolver = resolver
+
 	cc, err = buildClientConn(b.config, target, resolver)
 	if err != nil {
 		return nil, err

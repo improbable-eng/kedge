@@ -328,5 +328,7 @@ imports:
   - util/integer
   - util/jsonpath
 testImports:
+- name: github.com/fortytw2/leaktest
+  version: 3b724c3d7b8729a35bf4e577f71653aec6e53513
 - name: github.com/go-chi/chi
   version: 25354a53cca531cb2efd3f1d3c565d90ff04d802

@@ -357,7 +357,7 @@ func TestUpdater_OnEvent_AdditionAndModifyAndDelete_HTTP(t *testing.T) {
 }
 
 func TestUpdater_OnEvent_AdditionAndModifyAndDelete_GRPC(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 2*time.Second)()
+	defer leaktest.CheckTimeout(t, 10*time.Second)()
 
 	updater := newUpdater(
 		&pb_config.DirectorConfig{

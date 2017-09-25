@@ -26,7 +26,7 @@ func assertTargetsPickedInOrder(t *testing.T, picker LBPolicyPicker, testTargets
 }
 
 func TestRoundRobinPolicy_PickWithGlobalBlacklists(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 2*time.Second)()
+	defer leaktest.CheckTimeout(t, 10*time.Second)()
 
 	now := time.Now()
 	rr := &roundRobinPolicy{
@@ -102,7 +102,7 @@ func TestRoundRobinPolicy_PickWithGlobalBlacklists(t *testing.T) {
 }
 
 func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 2*time.Second)()
+	defer leaktest.CheckTimeout(t, 10*time.Second)()
 
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: 0 * time.Millisecond, // No global blacklist!
@@ -153,7 +153,7 @@ func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
 }
 
 func TestRoundRobinPolicy_CleanupBlacklist(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 2*time.Second)()
+	defer leaktest.CheckTimeout(t, 10*time.Second)()
 
 	req := httptest.NewRequest("GET", "http://127.0.0.1/x", nil)
 	rr := &roundRobinPolicy{

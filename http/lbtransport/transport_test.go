@@ -29,6 +29,9 @@ type BalancedRRTransportSuite struct {
 	suite.Suite
 
 	policy  *roundRobinPolicy
+	ctx context.Context
+	cancelFn context.CancelFunc
+
 	lbTrans *tripper
 
 	backendHandler   http.HandlerFunc
@@ -60,6 +63,8 @@ func (s *BalancedRRTransportSuite) mockedHandler(id int) http.HandlerFunc {
 }
 
 func (s *BalancedRRTransportSuite) SetupSuite() {
+	s.ctx, s.cancelFn = context.WithCancel(context.TODO())
+
 	s.backendSRVWatcher = &mockSRVWatcher{
 		backendAddrUpdatesCh: make(chan []*naming.Update),
 	}
@@ -70,9 +75,9 @@ func (s *BalancedRRTransportSuite) SetupSuite() {
 		// This may be racy, no synchronization for server start in the httptest :(
 		time.Sleep(25 * time.Millisecond)
 	}
-	s.policy = RoundRobinPolicy(testFailBlacklistDuration, testDialTimeout).(*roundRobinPolicy)
+	s.policy = RoundRobinPolicy(s.ctx, testFailBlacklistDuration, testDialTimeout).(*roundRobinPolicy)
 	s.lbTrans, err = New(
-		context.TODO(),
+		s.ctx,
 		"my-magic-srv",
 		http.DefaultTransport,
 		s, // self implements naming.Resolver
@@ -140,7 +145,8 @@ func (s *BalancedRRTransportSuite) TearDownSuite() {
 	for _, b := range s.backends {
 		b.Close()
 	}
-	s.lbTrans.Close()
+
+	s.cancelFn()
 }
 
 const requestedBackendMinimumShare = 0.3 // Relatively to equal share among backends.

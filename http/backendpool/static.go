@@ -40,3 +40,9 @@ func (s *static) LogTestResolution(logger logrus.FieldLogger) {
 		backend.LogTestResolution(logger.WithField("backend", k))
 	}
 }
+
+func (s *static) Close() {
+	for _, backend := range s.backends {
+		backend.Close()
+	}
+}

@@ -21,8 +21,6 @@ var (
 type LBPolicy interface {
 	// Picker returns PolicyPicker that is suitable to be used within single request.
 	Picker() LBPolicyPicker
-
-	Close()
 }
 
 // LBPolicyPicker decides which target to pick for a given call. Should be short-living.
@@ -50,24 +48,20 @@ type roundRobinPolicy struct {
 	atomicCounter uint64
 
 	dialTimeout time.Duration
-	closeFn     context.CancelFunc
 
 	// For testing purposes.
 	timeNow func() time.Time
 }
 
-func RoundRobinPolicyFromFlags() LBPolicy {
-	return RoundRobinPolicy(*flagBlacklistBackoff, *flagTrialDialTimeout)
+func RoundRobinPolicyFromFlags(ctx context.Context) LBPolicy {
+	return RoundRobinPolicy(ctx, *flagBlacklistBackoff, *flagTrialDialTimeout)
 }
 
-func RoundRobinPolicy(backoffDuration time.Duration, dialTimeout time.Duration) LBPolicy {
-	ctx, cancel := context.WithCancel(context.Background())
+func RoundRobinPolicy(ctx context.Context, backoffDuration time.Duration, dialTimeout time.Duration) LBPolicy {
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: backoffDuration,
 		blacklistedTargets:       make(map[Target]time.Time),
 		dialTimeout:              dialTimeout,
-		closeFn:                  cancel,
-
 		timeNow: time.Now,
 	}
 
@@ -83,10 +77,6 @@ func RoundRobinPolicy(backoffDuration time.Duration, dialTimeout time.Duration) 
 		}
 	}()
 	return rr
-}
-
-func (rr *roundRobinPolicy) Close() {
-	rr.closeFn()
 }
 
 func (rr *roundRobinPolicy) cleanUpBlacklist() {

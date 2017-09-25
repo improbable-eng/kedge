@@ -32,6 +32,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fortytw2/leaktest"
 	"github.com/go-chi/chi"
 	"github.com/improbable-eng/go-srvlb/srv"
 	"github.com/mwitkow/go-conntrack/connhelpers"
@@ -50,7 +51,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/fortytw2/leaktest"
 )
 
 const (
@@ -183,7 +183,6 @@ func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
 	l.servers = append(l.servers, server)
 	l.listeners = append(l.listeners, listener)
 	l.mu.Unlock()
-
 }
 
 func (l *localBackends) setResolvableCount(count int) {
@@ -205,8 +204,11 @@ func (l *localBackends) targets() (targets []*srv.Target) {
 }
 
 func (l *localBackends) Close() error {
-	for _, l := range l.listeners {
-		l.Close()
+	for _, lis := range l.listeners {
+		lis.Close()
+	}
+	for _, s := range l.servers {
+		s.Close()
 	}
 	return nil
 }
@@ -242,9 +244,12 @@ type HttpProxyingIntegrationSuite struct {
 	authorizer    *testAuthorizer
 
 	kedgeClient *http.Client
+	backendPool backendpool.Pool
 }
 
 func TestBackendPoolIntegrationTestSuite(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 2*time.Second)()
+
 	suite.Run(t, &HttpProxyingIntegrationSuite{})
 }
 
@@ -281,7 +286,7 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 
 	s.buildBackends()
 
-	pool, err := backendpool.NewStatic(backendConfigs)
+	s.backendPool, err = backendpool.NewStatic(backendConfigs)
 	require.NoError(s.T(), err, "backend pool creation must not fail")
 	staticRouter := router.NewStatic(routeConfigs)
 	addresser := adhoc.NewStaticAddresser(adhocConfig)
@@ -291,7 +296,7 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 		Handler: chi.Chain(
 			reporter.Middleware(logrus.New()),
 			director.AuthMiddleware(s.authorizer),
-		).Handler(director.New(pool, staticRouter, addresser, logrus.New())),
+		).Handler(director.New(s.backendPool, staticRouter, addresser, logrus.New())),
 	}
 
 	proxyPort := s.proxyListenerTls.Addr().String()[strings.LastIndex(s.proxyListenerTls.Addr().String(), ":")+1:]
@@ -317,10 +322,15 @@ func (s *HttpProxyingIntegrationSuite) reverseProxyClient(listener net.Listener)
 	proxyTlsClientConfig := s.tlsConfigForTest()
 	proxyTlsClientConfig.InsecureSkipVerify = true // the proxy can be dialed over many different hostnames
 	// TODO(mwitkow): Add http2.ConfigureTransport.
+
+	dialer := &net.Dialer{
+		Timeout:   15 * time.Second,
+		KeepAlive: 15 * time.Second,
+	}
 	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("tcp", listener.Addr().String())
+				return dialer.DialContext(ctx, "tcp", listener.Addr().String())
 			},
 			TLSClientConfig: proxyTlsClientConfig,
 		},
@@ -349,6 +359,7 @@ func (s *HttpProxyingIntegrationSuite) buildBackends() {
 	nonSecure.setResolvableCount(100)
 	s.localBackends["_http._tcp.nonsecure.backends.test.local"] = nonSecure
 	secure := &localBackends{}
+
 	http2ServerTlsConfig, err := connhelpers.TlsConfigWithHttp2Enabled(s.tlsConfigForTest())
 	if err != nil {
 		s.FailNow("cannot configure the tls config for http2")
@@ -360,13 +371,15 @@ func (s *HttpProxyingIntegrationSuite) buildBackends() {
 	s.localBackends["_https._tcp.secure.backends.test.local"] = secure
 }
 
-func (s *HttpProxyingIntegrationSuite) SimpleCtx() context.Context {
-	ctx, _ := context.WithTimeout(context.TODO(), 5*time.Second)
-	return ctx
-}
-
 func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, authValue string, err error) {
 	require.NoError(s.T(), err, "no error on a call to a proxy addr")
+
+	require.NotNil(s.T(), resp.Body, "ody should not be empty")
+	b, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	require.NoError(s.T(), err, "no error on a read all body")
+	s.Assert().Equal("TEST", string(b))
+
 	assert.Empty(s.T(), resp.Header.Get("x-kedge-error"))
 	require.Equal(s.T(), http.StatusAccepted, resp.StatusCode)
 	assert.Equal(s.T(), "application/json", resp.Header.Get("content-type"))
@@ -374,12 +387,6 @@ func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Reques
 	assert.Equal(s.T(), req.URL.Host, resp.Header.Get("x-test-req-host"), "host seen on backend must match requested host")
 	assert.Equal(s.T(), authValue, resp.Header.Get("x-test-auth-value"))
 	assert.Empty(s.T(), resp.Header.Get("x-test-proxy-auth-value")) // Proxy value should be cut down.
-
-	s.Require().NotNil(resp.Body, "Body should not be empty")
-	b, err := ioutil.ReadAll(resp.Body)
-	s.Require().NoError(err, "no error on a read all body")
-	defer resp.Body.Close()
-	s.Assert().Equal("TEST", string(b))
 }
 
 func testRequest(url string, backendSecret string, proxySecret string) *http.Request {
@@ -450,6 +457,11 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_ToForwardSecure_
 	req := testRequest("http://secure.backends.test.local/some/strict/path", "", testProxyAuthValue)
 	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
+
+	_, err = ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on read all body")
+	resp.Body.Close()
+
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
 	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
 }
@@ -458,6 +470,11 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_ToReverseNonSecu
 	req := testRequest("http://nonsecure.ext.example.com/some/strict/path", "", testProxyAuthValue)
 	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
+
+	_, err = ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on read all body")
+	resp.Body.Close()
+
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
 	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
 }
@@ -466,6 +483,11 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_NoAuthForProxy()
 	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "")
 	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
+
+	_, err = ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on read all body")
+	resp.Body.Close()
+
 	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
 	assert.Equal(s.T(), "Unauthenticated. No Proxy-Authorization header.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
 }
@@ -474,6 +496,11 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_AuthForProxyNotA
 	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "wrong_auth_token")
 	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
+
+	_, err = ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on read all body")
+	resp.Body.Close()
+
 	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
 	assert.Equal(s.T(), "Unauthenticated. Proxy-Authorization header does not have Bearer format.", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
 }
@@ -482,6 +509,11 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverForwardProxy_WrongAuthForProx
 	req := testRequest("http://secure.backends.test.local/some/strict/path", "bearer abc7", "Bearer wrong_auth_token")
 	resp, err := s.forwardProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
+
+	_, err = ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on read all body")
+	resp.Body.Close()
+
 	assert.Equal(s.T(), http.StatusUnauthorized, resp.StatusCode, "routing should fail")
 	assert.Equal(s.T(), "Unauthenticated", resp.Header.Get("x-kedge-error"), "auth error should be in the header")
 }
@@ -490,6 +522,11 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_NonSecureWithBad
 	req := testRequest("http://nonsecure.ext.example.com/other_path", "", testProxyAuthValue)
 	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
 	require.NoError(s.T(), err, "dialing should not fail")
+
+	_, err = ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on read all body")
+	resp.Body.Close()
+
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
 	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
 }
@@ -558,16 +595,17 @@ func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 	if s.originalAResolver != nil {
 		adhoc.DefaultALookup = s.originalAResolver
 	}
+
 	time.Sleep(10 * time.Millisecond)
 	if s.proxy != nil {
 		s.proxyListenerTls.Close()
 		s.proxyListenerPlain.Close()
+		s.proxy.Close()
 	}
 	for _, be := range s.localBackends {
 		be.Close()
 	}
-
-	s.checkLeaksFn()
+	s.backendPool.Close()
 }
 
 func (s *HttpProxyingIntegrationSuite) tlsConfigForTest() *tls.Config {

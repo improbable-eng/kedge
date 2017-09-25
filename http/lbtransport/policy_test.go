@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/fortytw2/leaktest"
 )
 
 var (
@@ -25,6 +26,8 @@ func assertTargetsPickedInOrder(t *testing.T, picker LBPolicyPicker, testTargets
 }
 
 func TestRoundRobinPolicy_PickWithGlobalBlacklists(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 2*time.Second)()
+
 	now := time.Now()
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: testFailBlacklistDuration,
@@ -99,6 +102,8 @@ func TestRoundRobinPolicy_PickWithGlobalBlacklists(t *testing.T) {
 }
 
 func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 2*time.Second)()
+
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: 0 * time.Millisecond, // No global blacklist!
 		blacklistedTargets:       make(map[Target]time.Time),
@@ -148,6 +153,8 @@ func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
 }
 
 func TestRoundRobinPolicy_CleanupBlacklist(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 2*time.Second)()
+
 	req := httptest.NewRequest("GET", "http://127.0.0.1/x", nil)
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: testFailBlacklistDuration,

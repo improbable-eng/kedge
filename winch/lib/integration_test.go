@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/fortytw2/leaktest"
+	"time"
 )
 
 func unknownPingbackHandler(id int) http.Handler {
@@ -98,6 +100,8 @@ func moveToLocalhost(addr string) string {
 }
 
 func TestWinchIntegrationSuite(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 2*time.Second)()
+
 	suite.Run(t, &WinchIntegrationSuite{})
 }
 

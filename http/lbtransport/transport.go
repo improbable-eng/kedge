@@ -128,13 +128,6 @@ func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr 
 	}
 }
 
-// Close is only used in test. For proper closing we wait for context cancellation from parent context.
-func (s *tripper) Close() error {
-	s.cancel()
-	s.policy.Close()
-	return nil
-}
-
 func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	tags := http_ctxtags.ExtractInbound(r)
 	tags.Set(ctxtags.TagForBackendTarget, s.targetName)

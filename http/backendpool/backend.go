@@ -109,7 +109,7 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 		return nil, err
 	}
 
-	b.tripper, err = lbtransport.New(b.ctx, target, b.transport, resolver, chooseBalancerPolicy(cnf))
+	b.tripper, err = lbtransport.New(b.ctx, target, b.transport, resolver, chooseBalancerPolicy(b.ctx, cnf))
 	if err != nil {
 		return nil, err
 	}
@@ -195,12 +195,12 @@ func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)
 }
 
-func chooseBalancerPolicy(cnf *pb.Backend) lbtransport.LBPolicy {
+func chooseBalancerPolicy(ctx context.Context, cnf *pb.Backend) lbtransport.LBPolicy {
 	switch cnf.GetBalancer() {
 	case pb.Balancer_ROUND_ROBIN:
-		return lbtransport.RoundRobinPolicyFromFlags()
+		return lbtransport.RoundRobinPolicyFromFlags(ctx)
 	default:
-		return lbtransport.RoundRobinPolicyFromFlags()
+		return lbtransport.RoundRobinPolicyFromFlags(ctx)
 	}
 }
 

@@ -14,4 +14,5 @@ var (
 type Pool interface {
 	// Tripper returns an already established http.RoundTripper just for this backend.
 	Tripper(backendName string) (http.RoundTripper, error)
+	Close()
 }

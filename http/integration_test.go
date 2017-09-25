@@ -248,7 +248,7 @@ type HttpProxyingIntegrationSuite struct {
 }
 
 func TestBackendPoolIntegrationTestSuite(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 2*time.Second)()
+	defer leaktest.Check(t)()
 
 	suite.Run(t, &HttpProxyingIntegrationSuite{})
 }

@@ -50,6 +50,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/fortytw2/leaktest"
 )
 
 const (
@@ -565,6 +566,8 @@ func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 	for _, be := range s.localBackends {
 		be.Close()
 	}
+
+	s.checkLeaksFn()
 }
 
 func (s *HttpProxyingIntegrationSuite) tlsConfigForTest() *tls.Config {

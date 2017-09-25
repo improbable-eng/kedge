@@ -90,6 +90,14 @@ func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr 
 		}
 		resolveRetryBackoff.Reset()
 
+		innerCtx, innerCancel := context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-innerCtx.Done():
+				watcher.Close()
+			}
+		}()
+
 		localCurrentTargets := []*Target{}
 		// Starting getting Next updates. On Error we will retry.
 		for ctx.Err() == nil {
@@ -116,7 +124,7 @@ func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr 
 			s.currentTargets = localCurrentTargets
 			s.mu.Unlock()
 		}
-		watcher.Close()
+		innerCancel()
 	}
 }
 

@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fortytw2/leaktest"
 	"github.com/mwitkow/kedge/lib/reporter"
 	"github.com/mwitkow/kedge/lib/reporter/errtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/naming"
+	"io/ioutil"
 )
 
 var (
@@ -37,6 +39,8 @@ type BalancedRRTransportSuite struct {
 }
 
 func TestRRBalancedTransportSuite(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 2*time.Second)()
+
 	suite.Run(t, new(BalancedRRTransportSuite))
 }
 
@@ -160,10 +164,12 @@ func (s *BalancedRRTransportSuite) callLBTransportAndAssert(requestsPerBackend i
 	for i := 0; i < requestsPerBackend*backendsCount; i++ {
 		wg.Add(1)
 		go func(id int) {
-			_, err := client.Get("http://my-magic-srv/something")
+			resp, err := client.Get("http://my-magic-srv/something")
 			if err != nil {
 				s.T().Errorf("Encountered error on request %v: %v", id, err)
 			}
+			_, _  = ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
 			wg.Done()
 		}(i)
 	}

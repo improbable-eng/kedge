@@ -42,7 +42,7 @@ type BalancedRRTransportSuite struct {
 }
 
 func TestRRBalancedTransportSuite(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 2*time.Second)()
+	defer leaktest.CheckTimeout(t, 10*time.Second)()
 
 	suite.Run(t, new(BalancedRRTransportSuite))
 }

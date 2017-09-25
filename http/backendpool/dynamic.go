@@ -19,13 +19,12 @@ type dynamic struct {
 	logger         logrus.FieldLogger
 }
 
-func (s *dynamic) Close() error {
+func (s *dynamic) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, be := range s.backends {
 		be.Close()
 	}
-	return nil
 }
 
 // NewDynamic creates a pool with a dynamic allocator

@@ -2,7 +2,9 @@ package discovery
 
 import (
 	"testing"
+	"time"
 
+	"github.com/fortytw2/leaktest"
 	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
 	pb_resolvers "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
 	pb_grpcbackends "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
@@ -355,6 +357,8 @@ func TestUpdater_OnEvent_AdditionAndModifyAndDelete_HTTP(t *testing.T) {
 }
 
 func TestUpdater_OnEvent_AdditionAndModifyAndDelete_GRPC(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 2*time.Second)()
+
 	updater := newUpdater(
 		&pb_config.DirectorConfig{
 			Grpc: &pb_config.DirectorConfig_Grpc{

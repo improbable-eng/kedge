@@ -140,13 +140,7 @@ func Tripperware(next http.RoundTripper) http.RoundTripper {
 	return httpwares.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		t := Extract(req)
 		resp, err := next.RoundTrip(req)
-		if err != nil {
-			if t.lastSeenErr == nil {
-				// Err not spotted before.
-				t.ReportError(errtypes.ConnErr, err)
-			}
-		}
-		if t.lastSeenErr != nil {
+		if resp != nil && t.lastSeenErr != nil {
 			SetErrorHeaders(resp.Header, t)
 		}
 

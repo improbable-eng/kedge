@@ -7,6 +7,8 @@ Kedge service:
 * [x] added support for request ID
 * [x] fixed go routine leaks on discovery and k8sresolver streams
 * [x] improved logging on discovery logic
+* [x] fixed go routine leaks on lbtransport
+* [x] dynamic discovery changes are less disruptive 
 
 Winch (kedge client):
 * [x] added debug mode

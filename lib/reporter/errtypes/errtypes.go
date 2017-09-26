@@ -30,4 +30,7 @@ const (
 	// NoResolutionAvailable is an error returned by lbtransport.tripper when we have an resolution error constantly and there
 	// is no (even old) resolution, so no target to even try.
 	NoResolutionAvailable Type = "no-resolution-available"
+
+	// ConnErr is an error returned by reporter itself if the roundTrip fails without lastSeen error.
+	ConnErr Type = "conn-err"
 )

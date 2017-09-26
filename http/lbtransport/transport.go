@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
+	"github.com/sirupsen/logrus"
 )
 
 type tripper struct {
@@ -165,6 +166,8 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 
 		if !isDialError(err) {
+			// Debug
+			logrus.WithError(err).Error("DialError on lbtransport")
 			return resp, err
 		}
 

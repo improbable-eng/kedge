@@ -230,10 +230,6 @@ func main() {
 // httpsBouncerHandler decides what kind of requests it is and redirects to GRPC if needed.
 func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logEntry *log.Entry) *http.Server {
 	httpBouncerHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/_healthz" {
-			healthEndpoint(w, req)
-			return
-		}
 		if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
 			grpcHandler.ServeHTTP(w, req)
 			return

@@ -73,8 +73,11 @@ func (l *localKedges) SetupKedges(t *testing.T, config *tls.Config, num int) {
 }
 
 func (l *localKedges) Close() error {
-	for _, l := range l.listeners {
-		l.Close()
+	for _, lis := range l.listeners {
+		lis.Close()
+	}
+	for _, s := range l.servers {
+		s.Close()
 	}
 	return nil
 }
@@ -216,6 +219,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 func (s *WinchIntegrationSuite) TearDownSuite() {
 	if s.winch != nil {
 		s.winchListenerPlain.Close()
+		s.winch.Close()
 	}
 	s.localSecureKedges.Close()
 }

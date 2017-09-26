@@ -31,6 +31,6 @@ const (
 	// is no (even old) resolution, so no target to even try.
 	NoResolutionAvailable Type = "no-resolution-available"
 
-	// ConnErr is an error returned by reporter itself if the roundTrip fails without lastSeen error.
-	ConnErr Type = "conn-err"
+	// KedgeEOF is an error returned by winch to indicate EOF from kedge.
+	KedgeEOF Type = "kedge-eof"
 )

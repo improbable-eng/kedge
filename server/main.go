@@ -260,6 +260,9 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	m.Handle("/debug/pprof/profile", middlewares.HandlerFunc(pprof.Profile))
 	m.Handle("/debug/pprof/symbol", middlewares.HandlerFunc(pprof.Symbol))
 	m.Handle("/debug/pprof/trace", middlewares.HandlerFunc(pprof.Trace))
+
+	// Use Kedge auth.
+	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) { return true, true}
 	m.Handle("/debug/traces", middlewares.HandlerFunc(trace.Traces))
 	m.Handle("/debug/events", middlewares.HandlerFunc(trace.Events))
 

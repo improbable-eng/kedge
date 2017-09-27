@@ -2,6 +2,7 @@ package director
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -60,20 +61,22 @@ func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser,
 	backendTripper := http_metrics.Tripperware(clientMetrics)(&backendPoolTripper{pool: pool})
 	adhocTripper := http_metrics.Tripperware(clientMetrics)(AdhocTransport)
 
+	backendErrLog := http_logrus.AsHttpLogger(logEntry.WithField("caller", "backend reverseProxy"))
+	adhocErrLog := http_logrus.AsHttpLogger(logEntry.WithField("caller", "adhoc reverseProxy"))
 	p := &Proxy{
 		backendReverseProxy: &httputil.ReverseProxy{
 			Director:      func(*http.Request) {},
-			Transport:     reporter.Tripperware(backendTripper),
+			Transport:     reverseProxyErrHandler(backendTripper, backendErrLog),
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
-			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "backend reverseProxy")),
+			ErrorLog:      backendErrLog,
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
 			Director:      func(*http.Request) {},
-			Transport:     reporter.Tripperware(adhocTripper),
+			Transport:     reverseProxyErrHandler(adhocTripper, adhocErrLog),
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
-			ErrorLog:      http_logrus.AsHttpLogger(logEntry.WithField("caller", "adhoc reverseProxy")),
+			ErrorLog:      adhocErrLog,
 		},
 		router:    router,
 		addresser: addresser,
@@ -161,7 +164,7 @@ func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 		status = rErr.StatusCode()
 	}
 	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
-	reporter.SetErrorHeaders(resp.Header(), tracker)
+	reporter.SetKedgeErrorHeaders(resp.Header(), tracker)
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)
 	fmt.Fprintf(resp, "%v", err.Error())
@@ -187,8 +190,27 @@ func respondWithUnauthorized(err error, req *http.Request, resp http.ResponseWri
 
 	status := http.StatusUnauthorized
 	http_ctxtags.ExtractInbound(req).Set(logrus.ErrorKey, err)
-	reporter.SetErrorHeaders(resp.Header(), reporter.Extract(req))
+	reporter.SetKedgeErrorHeaders(resp.Header(), reporter.Extract(req))
 	resp.Header().Set("content-type", "text/plain")
 	resp.WriteHeader(status)
 	fmt.Fprintln(resp, "Unauthorized")
+}
+
+func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.RoundTripper {
+	return httpwares.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		t := reporter.Extract(req)
+		resp, err := next.RoundTrip(req)
+		if err != nil {
+			if resp == nil {
+				resp = &http.Response{
+					StatusCode: http.StatusBadGateway,
+				}
+			}
+			reporter.SetKedgeErrorHeaders(resp.Header, t)
+		}
+
+		// Mimick reverse proxy err handling.
+		errLogger.Printf("http: proxy error: %v", err)
+		return resp, nil
+	})
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/pressly/chi"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
+	"github.com/mwitkow/kedge/lib/reporter"
 )
 
 var (
@@ -132,6 +133,7 @@ func main() {
 			http_ctxtags.Middleware("winch"),
 			http_debug.Middleware(),
 			http_logrus.Middleware(logEntry, http_logrus.WithLevels(allAsDebug)),
+			reporter.Middleware(logEntry),
 		).Handler(proxyMux),
 	}
 

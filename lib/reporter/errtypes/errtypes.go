@@ -31,6 +31,11 @@ const (
 	// is no (even old) resolution, so no target to even try.
 	NoResolutionAvailable Type = "no-resolution-available"
 
-	// KedgeEOF is an error returned by winch to indicate EOF from kedge.
-	KedgeEOF Type = "kedge-eof"
+	// TransportUnknownError.
+	// For Kedge: it is an error reported by lbtransport when we get a non-dial error from http.Transport RoundTrip.
+	// This includes EOF's (backend server timeout) and context cancellations (kedge tripperware timeout).
+	// For Winch: it is an error reported by errHandler tripper when spotted any error on RoundTrip to kedge.
+	// This includes EOF's (kedge server timeout) and context cancellations (winch tripperware timeout), as well as any
+	// other winch internal error.
+	TransportUnknownError Type = "transport-unknown-error"
 )

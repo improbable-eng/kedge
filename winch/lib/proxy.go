@@ -3,16 +3,20 @@ package winch
 import (
 	"crypto/tls"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"time"
 
+	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/logging/logrus"
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/kedge/http/director/proxyreq"
 	"github.com/mwitkow/kedge/lib/http/header"
 	"github.com/mwitkow/kedge/lib/http/tripperware"
 	"github.com/mwitkow/kedge/lib/map"
+	"github.com/mwitkow/kedge/lib/reporter"
+	"github.com/mwitkow/kedge/lib/reporter/errtypes"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
@@ -42,6 +46,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 	parentTransport = tripperware.WrapForRouting(parentTransport)
 	parentTransport = tripperware.WrapForMapping(mapper, parentTransport)
 	parentTransport = tripperware.WrapForRequestID("winch-", parentTransport)
+	parentTransport = reverseProxyErrHandler(parentTransport, http_logrus.AsHttpLogger(logEntry.WithField("caller", "winch.ReverseProxy")))
 
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	return &Proxy{
@@ -88,7 +93,26 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		p.mux.ServeHTTP(resp, req)
 		return
 	}
-
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	p.kedgeReverseProxy.ServeHTTP(resp, normReq)
+}
+
+func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.RoundTripper {
+	return httpwares.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		t := reporter.Extract(req)
+		resp, err := next.RoundTrip(req)
+		if err != nil {
+			t.ReportError(errtypes.TransportUnknownError, err)
+			if resp == nil {
+				resp = &http.Response{
+					StatusCode: http.StatusBadGateway,
+				}
+			}
+			reporter.SetWinchErrorHeaders(resp.Header, t)
+		}
+
+		// Mimick reverse proxy err handling.
+		errLogger.Printf("http: proxy error: %v", err)
+		return resp, nil
+	})
 }

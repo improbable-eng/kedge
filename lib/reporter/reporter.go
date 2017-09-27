@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"runtime"
+	"sync"
 
 	"github.com/mwitkow/go-httpwares"
 	"github.com/mwitkow/go-httpwares/tags"
@@ -17,29 +18,50 @@ var (
 	ctxKey = struct{}{}
 )
 
-// Tracker is used to report an kedge error (error that happen when request was not proxied because of some reason).
-// It covers only last seen error, so ReportError is required to be reporter only once, at the end of handler
-// or reverse proxy tripperware.
-//
+// Tracker is used to report an error spotted by kedge itself (error that happen when request was not succesfully proxied because of some reason).
+// It covers only first seen error and warns when ReportError is called twice on the same request.
 //
 // For Kedge flow there will be only one tracker living for each request shared by both handler and reverse proxy tripperwares.
 // This is thanks of reverse proxy preserving request's context.
 type Tracker struct {
-	lastSeenErr     error
-	lastSeenErrType errtypes.Type
+	mu sync.Mutex
+
+	err     error
+	errType errtypes.Type
 }
 
 // ReportError reports kedge proxy error.
 func (t *Tracker) ReportError(errType errtypes.Type, err error) {
-	t.lastSeenErr = err
-	t.lastSeenErrType = errType
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.err != nil {
+		logrus.Warn("Reporting %q error ignored, hidden by existing %q", string(errType), string(t.errType))
+		return
+	}
+
+	t.err = err
+	t.errType = errType
 }
 
 func (t *Tracker) ErrType() errtypes.Type {
-	if t.lastSeenErr != nil {
-		return t.lastSeenErrType
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.err == nil {
+		return errtypes.OK
 	}
-	return errtypes.OK
+	return t.errType
+}
+
+func (t *Tracker) Error() (errtypes.Type, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.err == nil {
+		return errtypes.OK, nil
+	}
+	return t.errType, t.err
 }
 
 // ExtractInbound returns existing tracker or does lazy creation of new one to be used.
@@ -92,7 +114,8 @@ func Middleware(logger logrus.FieldLogger) httpwares.Middleware {
 // incMetricOnFinish increments metric with backend_name and err type labels in ERROR case only.
 func incMetricOnFinish(inboundReq *http.Request) {
 	t := Extract(inboundReq)
-	if t.lastSeenErr == nil {
+	errType := t.ErrType()
+	if t.err == errtypes.OK {
 		// No metric to report.
 		return
 	}
@@ -100,7 +123,7 @@ func incMetricOnFinish(inboundReq *http.Request) {
 	tags := http_ctxtags.ExtractInbound(inboundReq).Values()
 
 	backendName, _ := tags[http_ctxtags.TagForHandlerName].(string)
-	metrics.KedgeProxyErrors.WithLabelValues(backendName, string(t.lastSeenErrType)).Inc()
+	metrics.KedgeProxyErrors.WithLabelValues(backendName, string(errType)).Inc()
 }
 
 // logOnFinish prints a log line in ERROR case only, in DEBUG level.
@@ -112,7 +135,8 @@ func logOnFinish(logger logrus.FieldLogger, inboundReq *http.Request) {
 	t := Extract(inboundReq)
 	tags := http_ctxtags.ExtractInbound(inboundReq).Values()
 	forceLoggingHeaderVal := inboundReq.Header.Get(header.RequestKedgeForceInfoLogs)
-	if t.lastSeenErr == nil {
+	errType, err := t.Error()
+	if err == nil {
 		// Nothing to report, but caller might want to have still the OK log line.
 		if forceLoggingHeaderVal != "" {
 			logger.WithFields(tags).
@@ -123,39 +147,37 @@ func logOnFinish(logger logrus.FieldLogger, inboundReq *http.Request) {
 	}
 
 	if forceLoggingHeaderVal == "" {
-		logger.WithFields(tags).WithError(t.lastSeenErr).
-			Debugf("Failed to proxy request inside cluster. %v", t.lastSeenErrType)
+		logger.WithFields(tags).WithError(err).
+			Debugf("Failed to proxy request inside cluster. %v", errType)
 		return
 	}
 
 	// Caller requested these errors in INFO log request. Since it is error, we will log it as ERROR.
-	logger.WithFields(tags).WithError(t.lastSeenErr).
+	logger.WithFields(tags).WithError(err).
 		WithField("force-info-log-header", forceLoggingHeaderVal).
-		Errorf("Failed to proxy request inside cluster. %v", t.lastSeenErrType)
+		Errorf("Failed to proxy request inside cluster. %v", errType)
 }
 
-// Tripperware ensures that we are consisent in kedge response: If request was not proxied (error inside kedge flow),
-// we add response Headers saying what happened.
-func Tripperware(next http.RoundTripper) http.RoundTripper {
-	return httpwares.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		t := Extract(req)
-		resp, err := next.RoundTrip(req)
-		if resp != nil && t.lastSeenErr != nil {
-			SetErrorHeaders(resp.Header, t)
-		}
-
-		return resp, err
-	})
-}
-
-// SetErrorHeaders adds Kedge Error headers useful to immediately see kedge error on HTTP response.
+// SetKedgeErrorHeaders adds Kedge Error headers useful to immediately see kedge error on HTTP response.
 // NOTE: This method can be invoked only before resp.WriteHeader(...)
-func SetErrorHeaders(headerMap http.Header, t *Tracker) {
-	if t.lastSeenErr == nil {
+func SetKedgeErrorHeaders(headerMap http.Header, t *Tracker) {
+	errType, err := t.Error()
+	if err == nil {
 		return
 	}
-	headerMap.Set(header.ResponseKedgeError, t.lastSeenErr.Error())
-	headerMap.Set(header.ResponseKedgeErrorType, string(t.lastSeenErrType))
+	headerMap.Set(header.ResponseKedgeError, err.Error())
+	headerMap.Set(header.ResponseKedgeErrorType, string(errType))
+}
+
+// SetWinchErrorHeaders adds winch Error headers useful to immediately see winch error on HTTP response.
+// NOTE: This method can be invoked only before resp.WriteHeader(...)
+func SetWinchErrorHeaders(headerMap http.Header, t *Tracker) {
+	errType, err := t.Error()
+	if err == nil {
+		return
+	}
+	headerMap.Set(header.ResponseKedgeError, err.Error())
+	headerMap.Set(header.ResponseKedgeErrorType, string(errType))
 }
 
 // TODO: Interceptor for GRPC

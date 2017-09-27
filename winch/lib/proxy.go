@@ -109,10 +109,10 @@ func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.
 				}
 			}
 			reporter.SetWinchErrorHeaders(resp.Header, t)
+			// Mimick reverse proxy err handling.
+			errLogger.Printf("http: proxy error: %v", err)
 		}
 
-		// Mimick reverse proxy err handling.
-		errLogger.Printf("http: proxy error: %v", err)
 		return resp, nil
 	})
 }

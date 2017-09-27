@@ -115,7 +115,7 @@ func Middleware(logger logrus.FieldLogger) httpwares.Middleware {
 func incMetricOnFinish(inboundReq *http.Request) {
 	t := Extract(inboundReq)
 	errType := t.ErrType()
-	if t.err == errtypes.OK {
+	if errType == errtypes.OK {
 		// No metric to report.
 		return
 	}

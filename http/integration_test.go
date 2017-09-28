@@ -51,6 +51,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/mwitkow/kedge/lib/http/header"
+	"io"
 )
 
 const (
@@ -80,6 +82,15 @@ var (
 			},
 			Security: &pb_be.Security{
 				InsecureSkipVerify: true, // TODO(mwitkow): Add config TLS once we do parsing of TLS configs.
+			},
+			Balancer: pb_be.Balancer_ROUND_ROBIN,
+		},
+		&pb_be.Backend{
+			Name: "killer",
+			Resolver: &pb_be.Backend_Srv{
+				Srv: &pb_res.SrvResolver{
+					DnsName: "_https._tcp.nonsecure.killerbackend.test.local",
+				},
 			},
 			Balancer: pb_be.Balancer_ROUND_ROBIN,
 		},
@@ -117,6 +128,11 @@ var (
 			BackendName: "secure",
 			HostMatcher: "secure.backends.test.local",
 			ProxyMode:   pb_route.ProxyMode_FORWARD_PROXY,
+		},
+		&pb_route.Route{
+			BackendName: "killer",
+			HostMatcher: "nonsecure.killerbackend.test.local",
+			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
 		},
 	}
 
@@ -160,13 +176,12 @@ type localBackends struct {
 func buildAndStartServer(t *testing.T, config *tls.Config) (net.Listener, *http.Server) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
-	if config != nil {
-		listener = tls.NewListener(listener, config)
-	}
 	prefix := "nonsecure backend: "
 	if config != nil {
 		prefix = "secure backend: "
+		listener = tls.NewListener(listener, config)
 	}
+
 	server := &http.Server{
 		Handler:  unknownPingbackHandler(listener.Addr().String()),
 		ErrorLog: log.New(os.Stderr, prefix, 0),
@@ -179,6 +194,37 @@ func buildAndStartServer(t *testing.T, config *tls.Config) (net.Listener, *http.
 
 func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
 	listener, server := buildAndStartServer(t, config)
+	l.mu.Lock()
+	l.servers = append(l.servers, server)
+	l.listeners = append(l.listeners, listener)
+	l.mu.Unlock()
+}
+
+func killConnectionHandler() http.Handler {
+	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		hi := resp.(http.Hijacker)
+		conn, _ , _ := hi.Hijack()
+		conn.Close() // EOF!
+	})
+}
+
+func (l *localBackends) addKillerServer(t *testing.T, config *tls.Config) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "must be able to allocate a port for localBackend")
+	prefix := "nonsecure backend: "
+	if config != nil {
+		prefix = "secure backend: "
+		listener = tls.NewListener(listener, config)
+	}
+
+	server := &http.Server{
+		Handler:  killConnectionHandler(),
+		ErrorLog: log.New(os.Stderr, prefix, 0),
+	}
+	go func() {
+		server.Serve(listener)
+	}()
+
 	l.mu.Lock()
 	l.servers = append(l.servers, server)
 	l.listeners = append(l.listeners, listener)
@@ -358,8 +404,8 @@ func (s *HttpProxyingIntegrationSuite) buildBackends() {
 	}
 	nonSecure.setResolvableCount(100)
 	s.localBackends["_http._tcp.nonsecure.backends.test.local"] = nonSecure
-	secure := &localBackends{}
 
+	secure := &localBackends{}
 	http2ServerTlsConfig, err := connhelpers.TlsConfigWithHttp2Enabled(s.tlsConfigForTest())
 	if err != nil {
 		s.FailNow("cannot configure the tls config for http2")
@@ -369,6 +415,13 @@ func (s *HttpProxyingIntegrationSuite) buildBackends() {
 	}
 	secure.setResolvableCount(100)
 	s.localBackends["_https._tcp.secure.backends.test.local"] = secure
+
+	killers := &localBackends{}
+	for i := 0; i < 1; i++ {
+		killers.addKillerServer(s.T(), nil)
+	}
+	killers.setResolvableCount(100)
+	s.localBackends["_https._tcp.nonsecure.killerbackend.test.local"] = killers
 }
 
 func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, authValue string, err error) {
@@ -529,6 +582,19 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_NonSecureWithBad
 
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "routing should fail")
 	assert.Equal(s.T(), "unknown route to service", resp.Header.Get("x-kedge-error"), "routing error should be in the header")
+}
+
+func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_BackendEOF() {
+	req := testRequest("http://nonsecure.killerbackend.test.local/something", "", testProxyAuthValue)
+	resp, err := s.reverseProxyClient(s.proxyListenerPlain).Do(req)
+	require.NoError(s.T(), err, "dialing should not fail")
+
+	_, err = ioutil.ReadAll(resp.Body)
+	s.Require().NoError(err, "no error on read all body")
+	resp.Body.Close()
+
+	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "EOF on backend")
+	assert.Equal(s.T(), io.EOF.Error(), resp.Header.Get(header.ResponseKedgeError), "EOF error should be in the header")
 }
 
 func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToSecureBackend() {

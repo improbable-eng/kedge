@@ -1,8 +1,10 @@
 package winch
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -105,6 +107,8 @@ func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.
 			t.ReportError(errtypes.TransportUnknownError, err)
 			if resp == nil {
 				resp = &http.Response{
+					Header:     http.Header{},
+					Body:       ioutil.NopCloser(&bytes.Buffer{}),
 					StatusCode: http.StatusBadGateway,
 				}
 			}

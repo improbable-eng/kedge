@@ -28,6 +28,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
 	"github.com/mwitkow/kedge/lib/reporter"
+	"github.com/mwitkow/kedge/lib/tls"
 )
 
 var (
@@ -67,7 +68,7 @@ func main() {
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
-	tlsConfig, err := buildTLSConfigFromFlags()
+	tlsConfig, err := kedge_tls.BuildTLSConfigFromFlags()
 	if err != nil {
 		log.WithError(err).Fatal("failed building TLS config from flags")
 	}
@@ -83,6 +84,7 @@ func main() {
 	}
 	log.SetLevel(lvl)
 	logEntry := log.NewEntry(log.StandardLogger())
+	logEntry.Warn("Make sure you have enough file descriptors on your machine. Run ulimit -n <value> to set it for this terminal.")
 
 	var httpPlainListener net.Listener
 	httpPlainListener = buildListenerOrFail("http_plain", *flagHttpPort)

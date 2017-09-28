@@ -1,4 +1,4 @@
-package main
+package kedge_tls
 
 import (
 	"crypto/tls"
@@ -28,7 +28,7 @@ var (
 			" In this mode, TLS is susceptible to man-in-the-middle attacks. This should be used only for testing.")
 )
 
-func buildTLSConfigFromFlags() (*tls.Config, error) {
+func BuildTLSConfigFromFlags() (*tls.Config, error) {
 	var tlsConfig *tls.Config
 
 	// Add client certs if specified.

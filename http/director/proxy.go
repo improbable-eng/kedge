@@ -1,7 +1,9 @@
 package director
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -203,6 +205,8 @@ func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.
 		if err != nil {
 			if resp == nil {
 				resp = &http.Response{
+					Header:     http.Header{},
+					Body:       ioutil.NopCloser(&bytes.Buffer{}),
 					StatusCode: http.StatusBadGateway,
 				}
 			}
@@ -210,7 +214,6 @@ func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.
 			// Mimick reverse proxy err handling.
 			errLogger.Printf("http: proxy error: %v", err)
 		}
-
 
 		return resp, nil
 	})

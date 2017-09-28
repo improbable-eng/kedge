@@ -5,15 +5,25 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/mwitkow/go-flagz"
+	"github.com/mwitkow/go-flagz/protobuf"
 	"github.com/mwitkow/go-httpwares/metrics"
+	"github.com/mwitkow/go-proto-validators"
+	pb_config "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/http/header"
+	"github.com/mwitkow/kedge/lib/http/tripperware"
+	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/mwitkow/kedge/lib/tls"
+	"github.com/mwitkow/kedge/winch/lib"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -23,12 +33,35 @@ var (
 	flagScenario = sharedflags.Set.String("scenario_yaml", "", "Required flag. Scenario yaml content describing the test.")
 
 	flagWinchURL = sharedflags.Set.String("winch_url", "http://127.0.0.1:8070", "If specified, "+
-		"provided winch URL will be used on every load testing call. Currently the only supported load test flow is via winch.")
+		"provided winch URL will be used on every load testing call.")
+
+	flagKedgeURL = sharedflags.Set.String("kedge_url", "", "If specified and winch_url is empty, "+
+		"provided will be used to target all request as kedge endpoint.")
+	flagHttpPort   = sharedflags.Set.Int("server_http_port", 8111, "TCP port to listen on for OIDC callback when non-winch mode is enabled.")
+	flagAuthConfig = protoflagz.DynProto3(sharedflags.Set,
+		"auth_config",
+		&pb_config.AuthConfig{},
+		"Contents of the Winch Auth configuration. Content or read from file if _path suffix. Required to authorize kedge").
+		WithFileFlag("../../misc/winch_auth.json").WithValidator(validateMapper)
+	flagAuthSourceName = sharedflags.Set.String("auth_source_name", "", "Actual auth source name to use from --auth_config")
 )
+
+func validateMapper(msg proto.Message) error {
+	if val, ok := msg.(validator.Validator); ok {
+		if err := val.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func main() {
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
 		logrus.WithError(err).Fatal("failed parsing flags")
+	}
+
+	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
+		logrus.WithError(err).Fatal("failed reading flagz from files")
 	}
 
 	lvl, err := logrus.ParseLevel(*flagLogLevel)
@@ -48,8 +81,32 @@ func main() {
 		logrus.WithError(err).Fatalf("Cannot parse --scenario_yaml flag: %s", *flagScenario)
 	}
 	logrus.Warn("Make sure you have enough file descriptors on your machine. Run ulimit -n <value> to set it. Same for winch")
+
+	var t *tester
+	if val := *flagKedgeURL; val != "" {
+		logrus.Infof("Performing test directly to kedge on %s", val)
+
+		var authSource *pb_config.AuthSource
+		for _, source := range flagAuthConfig.Get().(*pb_config.AuthConfig).AuthSources {
+			if source.GetName() == *flagAuthSourceName {
+				authSource = source
+				break
+			}
+		}
+		if authSource == nil {
+			logrus.Fatalf("%s auth source not found in given authConfig", *flagAuthSourceName)
+		}
+		t, err = newLoadTesterDirectlyKedge(logrus.StandardLogger(), val, *flagHttpPort, authSource)
+		if err != nil {
+			logrus.WithError(err).Fatal("Failed to prepare load tester")
+		}
+	} else {
+		val = *flagWinchURL
+		logrus.Infof("Performing test via Winch on %s", val)
+		t = newLoadTesterThroughWinch(logrus.StandardLogger(), val)
+	}
+
 	// Perform Load Test.
-	t := newLoadTesterThroughWinch(logrus.StandardLogger(), *flagWinchURL)
 	t.loadTest(context.Background(), s)
 	logrus.Infof("Performed %s", *flagScenario)
 }
@@ -74,6 +131,49 @@ func newLoadTesterThroughWinch(logger logrus.FieldLogger, winchURL string) *test
 	}
 }
 
+func newLoadTesterDirectlyKedge(
+	logger logrus.FieldLogger, kedgeURL string, listenPort int, authSource *pb_config.AuthSource,
+) (*tester, error) {
+	config, err := kedge_tls.BuildTLSConfigFromFlags()
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := url.Parse(kedgeURL)
+	if err != nil {
+		return nil, err
+	}
+
+	addr := fmt.Sprintf("%s:%d", "127.0.0.1", listenPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	mux := http.NewServeMux()
+	source, err := winch.NewAuthFactory(listener.Addr().String(), mux).Get(authSource)
+	if err != nil {
+		return nil, err
+	}
+
+	parentTransport := tripperware.Default(config)
+	parentTransport = tripperware.WrapForProxyAuth(parentTransport)
+	parentTransport = tripperware.WrapForBackendAuth(parentTransport)
+	parentTransport = tripperware.WrapForRouting(parentTransport)
+	parentTransport = tripperware.WrapForMapping(
+		kedge_map.SingleWithProxyAuth(u, source),
+		parentTransport,
+	)
+
+	cl := &http.Client{
+		Transport: http_metrics.Tripperware(&reporter{proxyAddress: kedgeURL})(parentTransport),
+	}
+	return &tester{
+		logger: logger,
+		client: cl,
+	}, nil
+}
+
 type scenario struct {
 	TargetURL         string        `yaml:"target_url"`
 	TestDuration      time.Duration `yaml:"duration"`
@@ -83,7 +183,7 @@ type scenario struct {
 }
 
 func (t *tester) loadTest(ctx context.Context, sc scenario) {
-	ctx, cancel := context.WithTimeout(ctx, sc.TestDuration+ 1 * time.Second)
+	ctx, cancel := context.WithTimeout(ctx, sc.TestDuration+1*time.Second)
 	defer cancel()
 
 	calls := uint(math.Ceil(float64(sc.TestDuration) / float64(sc.TickOnEvery)))
@@ -128,7 +228,7 @@ func (t *tester) scheduleWorkers(
 				select {
 				case <-ctx.Done():
 					return
-				default:
+				case <-ticker.C:
 				}
 
 				req, err := http.NewRequest("GET", targetURL, nil)
@@ -195,15 +295,4 @@ func (a *errAggregator) Print() {
 		msg += fmt.Sprintf("%s = %v\n", err, num)
 	}
 	a.logger.Error(msg)
-}
-
-func parseKedgeAndWinchResp(r *http.Response) map[string]interface{} {
-	m := map[string]interface{}{}
-	if val := r.Header.Get(header.ResponseKedgeErrorType); val != "" {
-		m[header.ResponseKedgeErrorType] = val
-	}
-	if val := r.Header.Get(header.ResponseWinchErrorType); val != "" {
-		m[header.ResponseWinchErrorType] = val
-	}
-	return m
 }

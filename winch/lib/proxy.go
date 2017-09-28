@@ -74,7 +74,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 }
 
 // Proxy is a forward/reverse proxy that implements Mapper+Kedge forwarding.
-// Mux is for routes that directed to winch directly.
+// Mux is for routes that are directed to winch directly (debug endpoints).
 type Proxy struct {
 	kedgeReverseProxy *httputil.ReverseProxy
 	mux               *http.ServeMux

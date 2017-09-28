@@ -180,6 +180,10 @@ func AuthMiddleware(authorizer authorize.Authorizer) httpwares.Middleware {
 				respondWithUnauthorized(err, req, resp)
 				return
 			}
+
+			// Strip out ProxyAuth header.
+			req.Header.Del(tripperware.ProxyAuthHeader)
+
 			// Request authorized - continue.
 			nextHandler.ServeHTTP(resp, req)
 		})

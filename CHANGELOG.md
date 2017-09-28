@@ -1,5 +1,13 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.3](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.3)
+Kedge service:
+* [x] added stripping out proxy auth header after using it.
+* [x] fixed error handling causing in particular cases.
+
+Winch (kedge client):
+* [x] better error handling (adding response headers to indicate what error happen)
+
 ### [v1.0.0-beta.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.2)
 Kedge service:
 * [x] added reported helping to determine proxy errors from backend errors (producing log and inc metric)

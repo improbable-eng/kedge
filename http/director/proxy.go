@@ -28,6 +28,7 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
+	"github.com/mwitkow/kedge/lib/http/header"
 )
 
 var (
@@ -68,14 +69,14 @@ func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser,
 	p := &Proxy{
 		backendReverseProxy: &httputil.ReverseProxy{
 			Director:      func(*http.Request) {},
-			Transport:     reverseProxyErrHandler(backendTripper, backendErrLog),
+			Transport:     reverseProxyErrHandler(backendTripper, logEntry.WithField("caller", "backend reverseProxy error handler")),
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 			ErrorLog:      backendErrLog,
 		},
 		adhocReverseProxy: &httputil.ReverseProxy{
 			Director:      func(*http.Request) {},
-			Transport:     reverseProxyErrHandler(adhocTripper, adhocErrLog),
+			Transport:     reverseProxyErrHandler(adhocTripper, logEntry.WithField("caller", "adhoc reverseProxy error handler")),
 			FlushInterval: *flagFlushingInterval,
 			BufferPool:    bufferpool,
 			ErrorLog:      adhocErrLog,
@@ -202,7 +203,7 @@ func respondWithUnauthorized(err error, req *http.Request, resp http.ResponseWri
 	fmt.Fprintln(resp, "Unauthorized")
 }
 
-func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.RoundTripper {
+func reverseProxyErrHandler(next http.RoundTripper, logEntry logrus.FieldLogger) http.RoundTripper {
 	return httpwares.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		t := reporter.Extract(req)
 		resp, err := next.RoundTrip(req)
@@ -217,7 +218,8 @@ func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.
 			}
 			reporter.SetKedgeErrorHeaders(resp.Header, t)
 			// Mimick reverse proxy err handling.
-			errLogger.Printf("http: proxy error: %v", err)
+			tags := http_ctxtags.ExtractInbound(req).Values()
+			logEntry.WithFields(tags).WithError(err).Warn("HTTP roundTrip failed")
 		}
 
 		return resp, nil

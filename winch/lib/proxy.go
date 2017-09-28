@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"time"
@@ -48,7 +47,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 	parentTransport = tripperware.WrapForRouting(parentTransport)
 	parentTransport = tripperware.WrapForMapping(mapper, parentTransport)
 	parentTransport = tripperware.WrapForRequestID("winch-", parentTransport)
-	parentTransport = reverseProxyErrHandler(parentTransport, http_logrus.AsHttpLogger(logEntry.WithField("caller", "winch.ReverseProxy")))
+	parentTransport = reverseProxyErrHandler(parentTransport, logEntry)
 
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	return &Proxy{
@@ -99,7 +98,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	p.kedgeReverseProxy.ServeHTTP(resp, normReq)
 }
 
-func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.RoundTripper {
+func reverseProxyErrHandler(next http.RoundTripper, logEntry logrus.FieldLogger) http.RoundTripper {
 	return httpwares.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		t := reporter.Extract(req)
 		resp, err := next.RoundTrip(req)
@@ -115,7 +114,8 @@ func reverseProxyErrHandler(next http.RoundTripper, errLogger *log.Logger) http.
 			}
 			reporter.SetWinchErrorHeaders(resp.Header, t)
 			// Mimick reverse proxy err handling.
-			errLogger.Printf("http: proxy error: %v", err)
+			tags := http_ctxtags.ExtractInbound(req).Values()
+			logEntry.WithFields(tags).WithError(err).Warn("HTTP roundTrip failed")
 		}
 
 		return resp, nil

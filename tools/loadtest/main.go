@@ -1,10 +1,10 @@
-// Copyright (c) Improbable Worlds Ltd, All Rights Reserved
-
 package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	flagLogLevel = sharedflags.Set.String("log_level", "debug", "Log level")
+	flagLogLevel = sharedflags.Set.String("log_level", "info", "Log level")
 	flagScenario = sharedflags.Set.String("scenario_yaml", "", "Required flag. Scenario yaml content describing the test.")
 
 	flagWinchURL = sharedflags.Set.String("winch_url", "http://127.0.0.1:8070", "If specified, "+
@@ -48,10 +48,10 @@ func main() {
 		logrus.WithError(err).Fatalf("Cannot parse --scenario_yaml flag: %s", *flagScenario)
 	}
 	logrus.Warn("Make sure you have enough file descriptors on your machine. Run ulimit -n <value> to set it. Same for winch")
-	logrus.Infof("Performing %s", *flagScenario)
 	// Perform Load Test.
 	t := newLoadTesterThroughWinch(logrus.StandardLogger(), *flagWinchURL)
 	t.loadTest(context.Background(), s)
+	logrus.Infof("Performed %s", *flagScenario)
 }
 
 type tester struct {
@@ -78,38 +78,59 @@ type scenario struct {
 	TargetURL         string        `yaml:"target_url"`
 	TestDuration      time.Duration `yaml:"duration"`
 	TickOnEvery       time.Duration `yaml:"tick_on"`
-	ConcurrentWorkers []uint        `yaml:"workers"`
-	CallsPerWorker    uint          `yaml:"calls"`
+	ConcurrentWorkers uint          `yaml:"workers"`
 	ExpectedRes       string        `yaml:"expected_response"`
 }
 
 func (t *tester) loadTest(ctx context.Context, sc scenario) {
-	for _, workers := range sc.ConcurrentWorkers {
-		for i := uint(0); i < sc.Repetitions; i++ {
-			start, test := t.scheduleRequests(ctx, sc.TargetURL, workers, sc.CallsPerWorker, sc.ExpectedRes)
-			t.logger.Infof("Starting %v concurrent requests against target %s [%v/%v]", workers, sc.TargetURL, i, sc.Repetitions)
-			start.Done()
-			test.Wait()
-			t.logger.Info("Test Done")
+	ctx, cancel := context.WithTimeout(ctx, sc.TestDuration+ 1 * time.Second)
+	defer cancel()
 
-			time.Sleep(sc.Pause)
-		}
+	calls := uint(math.Ceil(float64(sc.TestDuration) / float64(sc.TickOnEvery)))
+	qps := float64(sc.ConcurrentWorkers) / sc.TickOnEvery.Seconds()
+	t.logger.Infof("Starting %v concurrent workers against target %s. Targeting %v QPS",
+		sc.ConcurrentWorkers, sc.TargetURL, qps)
+	now := time.Now()
+	wg, errAggr := t.scheduleWorkers(ctx, sc.TargetURL, sc.ConcurrentWorkers, calls, sc.ExpectedRes, sc.TickOnEvery)
+	wg.Wait()
+	duration := time.Since(now)
+	t.logger.Infof("Test Done in %s", duration.String())
 
-		// Print metrics
-		printStats()
-	}
+	// Print found errors.
+	errAggr.Print()
+
+	// Print metrics
+	printStats(duration)
 }
 
-func (t *tester) scheduleRequests(ctx context.Context, targetURL string, workers uint, calls uint, expectedRes string) (*sync.WaitGroup, *sync.WaitGroup) {
-	start := &sync.WaitGroup{}
-	start.Add(1)
-
+func (t *tester) scheduleWorkers(
+	ctx context.Context,
+	targetURL string,
+	workers uint,
+	calls uint,
+	expectedRes string,
+	tickOnEvery time.Duration,
+) (*sync.WaitGroup, *errAggregator) {
 	test := &sync.WaitGroup{}
+	aggr := &errAggregator{
+		m:      map[string]uint{},
+		logger: t.logger,
+	}
+
 	for i := uint(0); i < workers; i++ {
 		test.Add(1)
+
 		go func() {
 			defer test.Done()
+			ticker := time.NewTicker(tickOnEvery)
+			defer ticker.Stop()
 			for i := uint(0); i < calls; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
 				req, err := http.NewRequest("GET", targetURL, nil)
 				if err != nil {
 					t.logger.WithError(err).Error("Failed to prepare request")
@@ -117,40 +138,63 @@ func (t *tester) scheduleRequests(ctx context.Context, targetURL string, workers
 				}
 				req = req.WithContext(ctx)
 
-				// Wait for simultaneous (kind of) start (only first one)
-				start.Wait()
-
 				resp, err := t.client.Do(req)
 				if err != nil {
-					// too spammy?
-					t.logger.WithError(err).Debug("Failed to do request")
-					return
+					aggr.Report(err, "Failed to do request")
+					continue
 				}
 
 				b, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
-					t.logger.WithError(err).Debug("Failed read resp body")
+					aggr.Report(err, "Failed read resp body")
 				} else if string(b) == "" {
-					t.logger.WithFields(parseKedgeAndWinchResp(resp)).
-						Debugf(
-							"Empty response. ProxyError. KedgeErr: %s, WinchErr: %s",
-							resp.Header.Get(header.ResponseKedgeError),
-							resp.Header.Get(header.ResponseWinchError),
-						)
+					aggr.Report(err, fmt.Sprintf(
+						"Empty response. ProxyError. KedgeErr(%s): %s, WinchErr(%s): %s",
+						resp.Header.Get(header.ResponseKedgeErrorType),
+						resp.Header.Get(header.ResponseKedgeError),
+						resp.Header.Get(header.ResponseWinchErrorType),
+						resp.Header.Get(header.ResponseWinchError),
+					))
 				} else if string(b) != expectedRes {
-					t.logger.Debugf("Wrong response. Expected '%s', got %s", expectedRes, string(b))
+					aggr.Report(nil, fmt.Sprintf("Wrong response. Expected '%s', got %s", expectedRes, string(b)))
 				}
 
 				err = resp.Body.Close()
 				if err != nil {
-					t.logger.WithError(err).Debug("Failed close resp body")
-					return
+					aggr.Report(err, "Failed close resp body")
 				}
 			}
 		}()
 	}
 
-	return start, test
+	return test, aggr
+}
+
+type errAggregator struct {
+	sync.Mutex
+	m map[string]uint
+
+	logger logrus.FieldLogger
+}
+
+func (a *errAggregator) Report(err error, msg string) {
+	a.Lock()
+	defer a.Unlock()
+
+	a.m[fmt.Sprintf("%s: %v", msg, err)]++
+	a.logger.WithError(err).Debug(msg)
+}
+
+func (a *errAggregator) Print() {
+	if len(a.m) == 0 {
+		return
+	}
+
+	msg := ""
+	for err, num := range a.m {
+		msg += fmt.Sprintf("%s = %v\n", err, num)
+	}
+	a.logger.Error(msg)
 }
 
 func parseKedgeAndWinchResp(r *http.Response) map[string]interface{} {

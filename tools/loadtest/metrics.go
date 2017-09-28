@@ -11,6 +11,7 @@ import (
 	"github.com/mwitkow/go-httpwares/metrics"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
 
@@ -52,7 +53,7 @@ func init() {
 	prometheus.MustRegister(clientLatency)
 }
 
-func printStats() error {
+func printStats(testDuration time.Duration) error {
 	fmt.Println("LOAD-TEST STATS:")
 	metrics, err := prometheus.DefaultGatherer.Gather()
 	if err != nil {
@@ -73,7 +74,52 @@ func printStats() error {
 	}
 
 	fmt.Println(buf.String())
+
+	startedQPS := float64(0)
+	startedReqs := startedRequestsNum(metrics)
+	if startedReqs != 0 {
+		startedQPS = startedReqs / testDuration.Seconds()
+	}
+	fmt.Printf("Started requests QPS: %v\n", startedQPS)
+
+	okQPS := float64(0)
+	okReqs := okRequestsNum(metrics)
+	if okReqs != 0 {
+		okQPS = okReqs / testDuration.Seconds()
+	}
+	fmt.Printf("OK requests QPS: %v\n", okQPS)
+
 	return nil
+}
+
+func okRequestsNum(metrics []*dto.MetricFamily) float64 {
+	for _, mf := range metrics {
+		if mf.GetName() != "kedge_loadtest_http_tripper_completed_requests_total" {
+			continue
+		}
+		for _, metric := range mf.Metric {
+			for _, labelPair := range metric.Label {
+				if labelPair.GetName() != "status" || labelPair.GetValue() != "200" {
+					// We are interested only in OK requests.
+					continue
+				}
+				return metric.GetCounter().GetValue()
+			}
+		}
+	}
+	return float64(0)
+}
+
+func startedRequestsNum(metrics []*dto.MetricFamily) float64 {
+	for _, mf := range metrics {
+		if mf.GetName() != "kedge_loadtest_http_tripper_started_requests_total" {
+			continue
+		}
+		for _, metric := range mf.Metric {
+			return metric.GetCounter().GetValue()
+		}
+	}
+	return float64(0)
 }
 
 type reporter struct {

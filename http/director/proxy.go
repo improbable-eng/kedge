@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -28,7 +27,6 @@ import (
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
-	"github.com/mwitkow/kedge/lib/http/header"
 )
 
 var (

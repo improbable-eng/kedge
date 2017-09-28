@@ -158,7 +158,6 @@ func newLoadTesterDirectlyKedge(
 
 	parentTransport := tripperware.Default(config)
 	parentTransport = tripperware.WrapForProxyAuth(parentTransport)
-	parentTransport = tripperware.WrapForBackendAuth(parentTransport)
 	parentTransport = tripperware.WrapForRouting(parentTransport)
 	parentTransport = tripperware.WrapForMapping(
 		kedge_map.SingleWithProxyAuth(u, source),

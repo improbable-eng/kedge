@@ -176,8 +176,8 @@ func SetWinchErrorHeaders(headerMap http.Header, t *Tracker) {
 	if err == nil {
 		return
 	}
-	headerMap.Set(header.ResponseKedgeError, err.Error())
-	headerMap.Set(header.ResponseKedgeErrorType, string(errType))
+	headerMap.Set(header.ResponseWinchError, err.Error())
+	headerMap.Set(header.ResponseWinchErrorType, string(errType))
 }
 
 // TODO: Interceptor for GRPC

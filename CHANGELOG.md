@@ -8,6 +8,9 @@ Kedge service:
 Winch (kedge client):
 * [x] better error handling (adding response headers to indicate what error happen)
 
+Tools: 
+* [x] added load tester.
+
 ### [v1.0.0-beta.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.2)
 Kedge service:
 * [x] added reported helping to determine proxy errors from backend errors (producing log and inc metric)

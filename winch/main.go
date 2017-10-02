@@ -68,7 +68,7 @@ func main() {
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
-	tlsConfig, err := kedge_tls.BuildTLSConfigFromFlags()
+	tlsConfig, err := kedge_tls.BuildClientTLSConfigFromFlags()
 	if err != nil {
 		log.WithError(err).Fatal("failed building TLS config from flags")
 	}

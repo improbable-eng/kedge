@@ -30,4 +30,6 @@ ARG BUILD_VERSION
 RUN echo "Installing LoadTester"
 RUN go install github.com/mwitkow/kedge/tools/loadtest
 
+# This image is designed to be run e.g as a pod in separate k8s cluster to target some kedge for load test.
+# This container does not include winch, so make sure to configure loadtest against kedge directly.
 ENTRYPOINT ["bash"]

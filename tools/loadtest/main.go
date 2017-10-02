@@ -134,7 +134,7 @@ func newLoadTesterThroughWinch(logger logrus.FieldLogger, winchURL string) *test
 func newLoadTesterDirectlyKedge(
 	logger logrus.FieldLogger, kedgeURL string, listenPort int, authSource *pb_config.AuthSource,
 ) (*tester, error) {
-	config, err := kedge_tls.BuildTLSConfigFromFlags()
+	config, err := kedge_tls.BuildClientTLSConfigFromFlags()
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +156,7 @@ func newLoadTesterDirectlyKedge(
 		return nil, err
 	}
 
+	// Mimick winch.
 	parentTransport := tripperware.Default(config)
 	parentTransport = tripperware.WrapForProxyAuth(parentTransport)
 	parentTransport = tripperware.WrapForRouting(parentTransport)

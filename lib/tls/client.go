@@ -28,7 +28,9 @@ var (
 			" In this mode, TLS is susceptible to man-in-the-middle attacks. This should be used only for testing.")
 )
 
-func BuildTLSConfigFromFlags() (*tls.Config, error) {
+// BuildClientTLSConfigFromFlags creates TLS config for Kedge client.
+// Used by all clients that communicates with kedge (e.g Winch and LoadTest)
+func BuildClientTLSConfigFromFlags() (*tls.Config, error) {
 	var tlsConfig *tls.Config
 
 	// Add client certs if specified.

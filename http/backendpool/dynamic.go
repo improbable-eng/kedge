@@ -120,7 +120,7 @@ func (s *dynamic) Remove(backendName string) error {
 	s.mu.Unlock()
 	existing.Close()
 
-	s.logger.Infof("Removed grpc backend: %v", backendName)
+	s.logger.Infof("Removed http backend: %v", backendName)
 	metrics.BackendHTTPConfigurationCounter.WithLabelValues(backendName, metrics.ConfiguationActionDelete).Inc()
 	return nil
 }

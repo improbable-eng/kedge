@@ -99,11 +99,9 @@ func okRequestsNum(metrics []*dto.MetricFamily) float64 {
 		}
 		for _, metric := range mf.Metric {
 			for _, labelPair := range metric.Label {
-				if labelPair.GetName() != "status" || labelPair.GetValue() != "200" {
-					// We are interested only in OK requests.
-					continue
+				if labelPair.GetName() == "status" && labelPair.GetValue() == "200" {
+					return metric.GetCounter().GetValue()
 				}
-				return metric.GetCounter().GetValue()
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 hash: f4ae0280c4e03e3cf46f9b15f839c8ba24afa0bdcca553bd2bee45305079f044
-updated: 2017-09-20T13:31:18.742966356+01:00
+updated: 2017-10-03T10:41:26.949603733+01:00
 imports:
 - name: cloud.google.com/go
   version: fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0
@@ -150,6 +150,8 @@ imports:
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+- name: github.com/rs/cors
+  version: eabcc6af4bbe5ad3a949d36450326a2b0b9894b8
 - name: github.com/sirupsen/logrus
   version: 181d419aa9e2223811b824e8f0b4af96f9ba9302
   subpackages:

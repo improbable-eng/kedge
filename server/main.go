@@ -9,8 +9,11 @@ import (
 	"net/http/pprof"
 	"os"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -143,7 +146,7 @@ func main() {
 		http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
 		http_debug.Middleware(),                                                                     // Traces.
 		http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)),                        // Std Request/Response Logs.
-		http_metrics.Middleware(http_prometheus.ServerMetrics()),       // Std Request/Response Metrics.
+		http_metrics.Middleware(http_prometheus.ServerMetrics()),                                    // Std Request/Response Metrics.
 		reporter.Middleware(logEntry),                                                               // Kedge proxy metrics/logs
 	)
 
@@ -198,9 +201,12 @@ func main() {
 		httpTlsListener = tls.NewListener(httpTlsListener, http2TlsConfig)
 	}
 
+	var serveWg sync.WaitGroup
 	if grpcTlsListener != nil {
 		log.Infof("listening for gRPC TLS on: %v", grpcTlsListener.Addr().String())
+		serveWg.Add(1)
 		go func() {
+			defer serveWg.Done()
 			if err := grpcDirectorServer.Serve(grpcTlsListener); err != nil {
 				errChan <- fmt.Errorf("grpc_tls server error: %v", err)
 			}
@@ -208,7 +214,9 @@ func main() {
 	}
 	if httpTlsListener != nil {
 		log.Infof("listening for HTTP TLS on: %v", httpTlsListener.Addr().String())
+		serveWg.Add(1)
 		go func() {
+			defer serveWg.Done()
 			if err := httpsBouncerServer.Serve(httpTlsListener); err != nil {
 				errChan <- fmt.Errorf("http_tls server error: %v", err)
 			}
@@ -216,15 +224,46 @@ func main() {
 	}
 	if httpPlainListener != nil {
 		log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
+		serveWg.Add(1)
 		go func() {
+			defer serveWg.Done()
 			if err := httpDebugServer.Serve(httpPlainListener); err != nil {
 				errChan <- fmt.Errorf("http_plain server error: %v", err)
 			}
 		}()
 	}
 
-	err = <-errChan // this waits for some server breaking
-	log.WithError(err).Fatalf("Fail")
+	defer shutdown(ctx, httpsBouncerServer, grpcDirectorServer, httpDebugServer)
+
+	go func() {
+		serveWg.Wait()
+		close(errChan)
+	}()
+
+	go func() {
+		waitForAny(ctx, syscall.SIGTERM, os.Interrupt)
+		close(errChan)
+	}()
+
+	select {
+	// Graceful shutdown finished after signal.
+	case err, ok := <-errChan:
+		if ok {
+			log.WithError(err).Fatalf("Fail")
+		}
+	}
+	return
+}
+
+func shutdown(ctx context.Context, bouncer *http.Server, grpcDirector *grpc.Server, debugServer *http.Server) {
+	logrus.Info("Shutting down servers gracefully.")
+
+	innerCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	bouncer.Shutdown(innerCtx)
+	debugServer.Shutdown(innerCtx)
+	grpcDirector.GracefulStop()
 }
 
 // httpsBouncerHandler decides what kind of requests it is and redirects to GRPC if needed.
@@ -262,7 +301,7 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	m.Handle("/debug/pprof/trace", middlewares.HandlerFunc(pprof.Trace))
 
 	// Use Kedge auth.
-	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) { return true, true}
+	trace.AuthRequest = func(req *http.Request) (any, sensitive bool) { return true, true }
 	m.Handle("/debug/traces", middlewares.HandlerFunc(trace.Traces))
 	m.Handle("/debug/events", middlewares.HandlerFunc(trace.Events))
 

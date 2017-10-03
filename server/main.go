@@ -41,7 +41,6 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"github.com/Sirupsen/logrus"
 )
 
 var (

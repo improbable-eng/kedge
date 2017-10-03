@@ -22,13 +22,14 @@ import (
 	"github.com/mwitkow/go-proto-validators"
 	pb_config "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
+	"github.com/mwitkow/kedge/lib/reporter"
 	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/mwitkow/kedge/lib/tls"
 	"github.com/mwitkow/kedge/winch/lib"
 	"github.com/pressly/chi"
+	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
-	"github.com/mwitkow/kedge/lib/reporter"
-	"github.com/mwitkow/kedge/lib/tls"
 )
 
 var (
@@ -46,8 +47,9 @@ var (
 		&pb_config.AuthConfig{},
 		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
 		WithFileFlag("../../misc/winch_auth.json").WithValidator(validateMapper)
-	flagLogLevel  = sharedflags.Set.String("log_level", "info", "Log level")
-	flagDebugMode = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. "+
+	flagCORSAllowedOrigins = sharedflags.Set.StringSlice("cors_allowed_origin", []string{}, "CORS allowed origins for proxy endpoint.")
+	flagLogLevel           = sharedflags.Set.String("log_level", "info", "Log level")
+	flagDebugMode          = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. "+
 		"This will force DEBUG log level on winch and will append header to the request signaling Kedge to Log to INFO all debug"+
 		"level logs for this request, overriding the kedge log level setting.")
 )
@@ -125,8 +127,9 @@ func main() {
 		winchHandler.AddDebugTripperware()
 	}
 
-	proxyMux := http.NewServeMux()
-	proxyMux.Handle("/", winchHandler)
+	proxyMux := cors.New(cors.Options{
+		AllowedOrigins: *flagCORSAllowedOrigins,
+	}).Handler(winchHandler)
 	winchServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,

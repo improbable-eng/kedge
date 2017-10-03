@@ -4,6 +4,7 @@
 Kedge service:
 * [x] added stripping out proxy auth header after using it.
 * [x] fixed error handling causing in particular cases.
+* [x] added graceful shutdown 
 
 Winch (kedge client):
 * [x] better error handling (adding response headers to indicate what error happen)

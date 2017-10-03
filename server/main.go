@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -42,6 +41,7 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"github.com/Sirupsen/logrus"
 )
 
 var (
@@ -256,7 +256,7 @@ func main() {
 }
 
 func shutdown(ctx context.Context, bouncer *http.Server, grpcDirector *grpc.Server, debugServer *http.Server) {
-	logrus.Info("Shutting down servers gracefully.")
+	log.Info("Shutting down servers gracefully.")
 
 	innerCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()

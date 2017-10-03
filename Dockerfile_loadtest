@@ -11,7 +11,7 @@ ENV GOBIN=/go/bin
 
 RUN mkdir /etc/corp-auth
 
-RUN apt-get update && apt-get install -qq -y --no-install-recommends git wget curl ca-certificates openssh-client
+RUN apt-get update && apt-get install -qq -y --no-install-recommends git vim wget curl ca-certificates openssh-client
 
 RUN curl -fsSL "${GOLANG_DOWNLOAD_URL}" -o golang.tar.gz \
       && tar -C /usr/local -xzf golang.tar.gz \

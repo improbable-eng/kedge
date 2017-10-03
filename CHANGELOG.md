@@ -7,6 +7,7 @@ Kedge service:
 
 Winch (kedge client):
 * [x] better error handling (adding response headers to indicate what error happen)
+* [x] CORS
 
 Tools: 
 * [x] added load tester.

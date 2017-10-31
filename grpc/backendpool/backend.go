@@ -129,11 +129,12 @@ func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
 
 func chooseSecurityOpt(cnf *pb.Backend) grpc.DialOption {
 	if sec := cnf.GetSecurity(); sec != nil {
-		config := &tls.Config{InsecureSkipVerify: true}
+		tlsConfig := &tls.Config{InsecureSkipVerify: true}
 		if !sec.InsecureSkipVerify {
 			// TODO(mwitkow): add configuration TlsConfig fetching by name here.
+			panic("Not implemented") // Ugly but this matters.
 		}
-		return grpc.WithTransportCredentials(credentials.NewTLS(config))
+		return grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))
 	} else {
 		return grpc.WithInsecure()
 	}

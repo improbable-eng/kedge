@@ -39,6 +39,8 @@ type serviceRoutings struct {
 type serviceBackends struct {
 	httpDomainPorts map[backendName]string
 	grpcDomainPorts map[backendName]string
+
+	tlsConfigs map[backendName]struct{}
 }
 
 type serviceConf struct {
@@ -138,7 +140,9 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 	foundBackends := serviceBackends{
 		httpDomainPorts: make(map[backendName]string),
 		grpcDomainPorts: make(map[backendName]string),
+		tlsConfigs:      make(map[backendName]struct{}),
 	}
+
 	for _, port := range serviceObj.Spec.Ports {
 		// NOTE: There is no check if this port actually is exposed by serviceObj.
 		portToExpose := port.TargetPort
@@ -156,26 +160,36 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 			portMatcher: port.Port,
 		}
 
-		// TODO(bplotka): Add support for TLS between (even insecure for now).
-		if port.Name == "http" || strings.HasPrefix(port.Name, "http-") {
+		scheme := getScheme(port.Name)
+		switch scheme {
+		case httpScheme:
+			fallthrough
+		case httptlsScheme:
 			if hostMatcherOverride != "" {
 				foundRoute.nameMatcher = hostMatcherOverride
 			}
 
 			// We need to avoid specific ports if possible, since Golang removes the port from request.URL.Port() for default ports,
-			// even when user specifies http://<host>:80 or https://<host>:443 explicitly. As a result we convert default
+			// even when user specifies httpScheme://<host>:80 or https://<host>:443 explicitly. As a result we convert default
 			// ports to NO port, which mean host-wide routing.
-			if port.Port == 80 {
+			if scheme == httpScheme && port.Port == 80 {
+				foundRoute.portMatcher = 0
+			}
+			if scheme == httptlsScheme && port.Port == 443 {
 				foundRoute.portMatcher = 0
 			}
 
 			foundRoutes.http[backendName] = append(foundRoutes.http[backendName], foundRoute)
 			// Since target port is the same we can use whatever domainPort we have here.
 			foundBackends.httpDomainPorts[backendName] = domainPort
-			continue
-		}
 
-		if port.Name == "grpc" || strings.HasPrefix(port.Name, "grpc-") {
+			if scheme == httptlsScheme {
+				// TODO(bplotka): Add support for customizing the TLS config (or setting it to actually verify!) using service annotations.
+				foundBackends.tlsConfigs[backendName] = struct{}{}
+			}
+		case grpcScheme:
+			fallthrough
+		case grpctlsScheme:
 			if serviceNameMatcherOverride != "" {
 				foundRoute.nameMatcher = serviceNameMatcherOverride
 			}
@@ -183,8 +197,13 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 			foundRoutes.grpc[backendName] = append(foundRoutes.grpc[backendName], foundRoute)
 			// Since target port is the same we can use whatever domainPort we have here.
 			foundBackends.grpcDomainPorts[backendName] = domainPort
-			continue
+
+			if scheme == grpctlsScheme {
+				// TODO(bplotka): Add support for customizing the TLS config (or setting it to actually verify!) using service annotations.
+				foundBackends.tlsConfigs[backendName] = struct{}{}
+			}
 		}
+
 	}
 
 	u.lastSeenServices[service] = serviceConf{
@@ -192,4 +211,34 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		backends: foundBackends,
 	}
 	return nil
+}
+
+type protocolType int
+
+const (
+	httpScheme    protocolType = iota
+	httptlsScheme
+	grpcScheme
+	grpctlsScheme
+	unknownScheme
+)
+
+func getScheme(portName string) protocolType {
+	if portName == "http" || strings.HasPrefix(portName, "http-") {
+		return httpScheme
+	}
+
+	if portName == "httptls" || strings.HasPrefix(portName, "httptls-") {
+		return httptlsScheme
+	}
+
+	if portName == "grpc" || strings.HasPrefix(portName, "grpc-") {
+		return grpcScheme
+	}
+
+	if portName == "grpctls" || strings.HasPrefix(portName, "grpctls-") {
+		return grpctlsScheme
+	}
+
+	return unknownScheme
 }

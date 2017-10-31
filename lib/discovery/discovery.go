@@ -164,7 +164,7 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 				break
 			}
 
-			d.logger.Infof("Setting director and backendpool configs with %d (http) and %d (grpc) backends.",
+			d.logger.Infof("Setting director and backendpool configs with %d (httpScheme) and %d (grpcScheme) backends.",
 				len(backendPool.Http.Backends), len(backendPool.Grpc.Backends))
 
 			// Only first update should aggregate that much, to not erase and create backend unnecessarily on watch endpoint EOF (which is every 15 minutes).

@@ -90,7 +90,7 @@ func main() {
 
 	if *flagDynamicRoutingDiscoveryEnabled {
 		log.Info("Flag 'kedge_dynamic_routings_enabled' is true. Enabling dynamic routing with base configuration fetched from provided" +
-			"directorConfig and backendpoolConfig.")
+			" directorConfig and backendpoolConfig.")
 		routingDiscovery, err := discovery.NewFromFlags(
 			log.StandardLogger(),
 			flagConfigDirector.Get().(*pb_config.DirectorConfig),

@@ -67,12 +67,6 @@ func (this *Middleware) Validate() error {
 func (this *Middleware_Retry) Validate() error {
 	return nil
 }
-
-var _regex_Security_ConfigName = regexp.MustCompile("^[a-z_.]{2,64}$")
-
 func (this *Security) Validate() error {
-	if !_regex_Security_ConfigName.MatchString(this.ConfigName) {
-		return github_com_mwitkow_go_proto_validators.FieldError("ConfigName", fmt.Errorf(`value '%v' must be a string conforming to regex "^[a-z_.]{2,64}$"`, this.ConfigName))
-	}
 	return nil
 }

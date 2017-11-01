@@ -1,5 +1,9 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.4](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.4)
+Kedge service:
+* [x] added dynamic routing discovery for TLS routes (insecure) 
+
 ### [v1.0.0-beta.3](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.3)
 Kedge service:
 * [x] added stripping out proxy auth header after using it.

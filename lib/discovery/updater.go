@@ -161,20 +161,18 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		}
 
 		scheme := getScheme(port.Name)
+
+		// We need to avoid specific ports if possible, since Golang removes the port from request.URL.Port() for default ports,
+		// even when user specifies http://<host>:80 or https://<host>:443 explicitly. As a result we convert default
+		// ports to NO port, which mean host-wide routing.
+		if isDefaultPort(scheme, port.Port) {
+			foundRoute.portMatcher = 0
+		}
+
 		switch scheme {
 		case httpScheme, httptlsScheme:
 			if hostMatcherOverride != "" {
 				foundRoute.nameMatcher = hostMatcherOverride
-			}
-
-			// We need to avoid specific ports if possible, since Golang removes the port from request.URL.Port() for default ports,
-			// even when user specifies http://<host>:80 or https://<host>:443 explicitly. As a result we convert default
-			// ports to NO port, which mean host-wide routing.
-			if scheme == httpScheme && port.Port == 80 {
-				foundRoute.portMatcher = 0
-			}
-			if scheme == httptlsScheme && port.Port == 443 {
-				foundRoute.portMatcher = 0
 			}
 
 			foundRoutes.http[backendName] = append(foundRoutes.http[backendName], foundRoute)
@@ -199,7 +197,6 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 				foundBackends.tlsConfigs[backendName] = struct{}{}
 			}
 		}
-
 	}
 
 	u.lastSeenServices[service] = serviceConf{
@@ -209,10 +206,20 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 	return nil
 }
 
+func isDefaultPort(scheme protocolType, port uint32) bool {
+	switch scheme {
+	case httpScheme:
+		return port == uint32(80)
+	case httptlsScheme:
+		return port == uint32(443)
+	}
+	return false
+}
+
 type protocolType int
 
 const (
-	httpScheme    protocolType = iota
+	httpScheme protocolType = iota
 	httptlsScheme
 	grpcScheme
 	grpctlsScheme

@@ -13,7 +13,7 @@ var BuildVersion = "unknown"
 func handleVersion(resp http.ResponseWriter, _ *http.Request) {
 	if BuildVersion == "unknown" {
 		// Current way of deploying does not allow to inject release version so we need to do it here manually to track version.
-		BuildVersion = "v1.0-beta.0"
+		BuildVersion = "v1.0-beta.3"
 	}
 
 	version := map[string]string{

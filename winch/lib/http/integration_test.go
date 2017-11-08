@@ -224,13 +224,14 @@ func (s *WinchIntegrationSuite) TearDownSuite() {
 func (s *WinchIntegrationSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, err error, kedgeID int) {
 	s.Require().NoError(err, "no error on a call to a winch")
 	s.Assert().Empty(resp.Header.Get("x-kedge-error"))
-	s.Require().Equal(http.StatusAccepted, resp.StatusCode)
+	s.Assert().Empty(resp.Header.Get("x-winch-error"))
+	s.Assert().Equal(http.StatusAccepted, resp.StatusCode)
 	s.Assert().Equal(req.URL.Path, resp.Header.Get("x-test-req-url"), "path seen on kedge must match requested path")
 	s.Assert().Equal(strconv.Itoa(kedgeID), resp.Header.Get("x-test-kedge-id"), "expected kedge must respond to our request")
 
 	s.Require().NotNil(resp.Body, "Body should not be empty")
 	b, err := ioutil.ReadAll(resp.Body)
-	s.Require().NoError(err, "no error on a readall body")
+	s.Require().NoError(err, "no error on a read all body")
 	defer resp.Body.Close()
 	s.Assert().Equal("TEST", string(b))
 }

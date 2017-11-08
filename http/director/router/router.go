@@ -58,6 +58,15 @@ func NewStatic(routes []*pb.Route) *static {
 }
 
 func (r *static) Route(req *http.Request) (backendName string, err error) {
+	port := req.URL.Port()
+	if port == "" {
+		if req.URL.Scheme == "http" {
+			port = "80"
+		} else if req.URL.Scheme == "httptls" {
+			port = "443"
+		}
+	}
+
 	for _, route := range r.routes {
 		if !r.urlMatches(req.URL, route.PathRules) {
 			continue
@@ -65,7 +74,7 @@ func (r *static) Route(req *http.Request) (backendName string, err error) {
 		if !r.hostMatches(req.URL.Hostname(), route.HostMatcher) {
 			continue
 		}
-		if !r.portMatches(req.URL.Port(), route.PortMatcher) {
+		if !r.portMatches(port, route.PortMatcher) {
 			continue
 		}
 		if !r.headersMatch(req.Header, route.HeaderMatcher) {

@@ -211,7 +211,6 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	)
 
 	go func() {
-		s.T().Logf("starting winch proxy without TLS at: %v", s.winchListenerPlain.Addr().String())
 		s.winch.Serve(s.winchListenerPlain)
 	}()
 }

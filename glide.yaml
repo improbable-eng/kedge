@@ -62,5 +62,6 @@ import:
   - tools/clientcmd
   - util/jsonpath
 - package: github.com/Bplotka/oidc
+- package: github.com/oklog/oklog
 testImport:
 - package: github.com/go-chi/chi

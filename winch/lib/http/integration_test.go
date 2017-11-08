@@ -1,5 +1,5 @@
 // Integration tests for winch.
-package winch_test
+package http_winch
 
 import (
 	"crypto/tls"
@@ -91,9 +91,6 @@ type WinchIntegrationSuite struct {
 	winch              *http.Server
 	winchListenerPlain net.Listener
 	routes             *winch.StaticRoutes
-
-	// Will be used to call winch.
-	winchMapper kedge_map.Mapper
 
 	localSecureKedges localKedges
 }
@@ -202,7 +199,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	s.routes, err = winch.NewStaticRoutes(winch.NewAuthFactory(s.winchListenerPlain.Addr().String(), m), testConfig, authConfig)
 	require.NoError(s.T(), err, "config must be parsable")
 
-	m.Handle("/", winch.New(kedge_map.RouteMapper(
+	m.Handle("/", New(kedge_map.RouteMapper(
 		s.routes.Get()),
 		s.tlsClientConfigForTest(),
 		logrus.NewEntry(logrus.New()),

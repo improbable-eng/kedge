@@ -1,6 +1,7 @@
 package grpc_integration
 
 import (
+	context2 "context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/improbable-eng/go-srvlb/srv"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/grpc-proxy/proxy"
@@ -26,6 +29,7 @@ import (
 	"github.com/mwitkow/kedge/grpc/director/router"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/resolvers/srv"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -33,6 +37,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/transport"
+	"github.com/fortytw2/leaktest"
 )
 
 var backendResolutionDuration = 10 * time.Millisecond
@@ -117,7 +122,8 @@ type localBackends struct {
 func (l *localBackends) addServer(t *testing.T, serverOpt ...grpc.ServerOption) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
-	// This is the point where we hook up the interceptor
+
+	// This is the point where we hook up the test interceptor.
 	serverOpt = append(serverOpt, grpc.UnknownServiceHandler(unknownPingbackHandler(l.name, listener.Addr().String())))
 	server := grpc.NewServer(serverOpt...)
 	l.mu.Lock()
@@ -157,6 +163,22 @@ func (l *localBackends) Close() error {
 	return nil
 }
 
+type testAuthorizer struct {
+	expectedToken string
+	returnErr     error
+}
+
+func (t *testAuthorizer) IsAuthorized(_ context2.Context, token string) error {
+	if t.returnErr != nil {
+		return t.returnErr
+	}
+
+	if token == t.expectedToken {
+		return nil
+	}
+	return errors.New("Unauthenticated")
+}
+
 type BackendPoolIntegrationTestSuite struct {
 	suite.Suite
 
@@ -169,9 +191,13 @@ type BackendPoolIntegrationTestSuite struct {
 	originalDialFunc    func(ctx context.Context, network, address string) (net.Conn, error)
 	originalSrvResolver srv.Resolver
 	localBackends       map[string]*localBackends
+
+	authorizer *testAuthorizer
 }
 
 func TestBackendPoolIntegrationTestSuite(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 10*time.Second)()
+
 	suite.Run(t, &BackendPoolIntegrationTestSuite{})
 }
 
@@ -183,6 +209,8 @@ func (s *BackendPoolIntegrationTestSuite) Lookup(domainName string) ([]*srv.Targ
 	}
 	return local.targets(), nil
 }
+
+const testToken = "test-token"
 
 func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	var err error
@@ -198,9 +226,12 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	router := router.NewStatic(routeConfigs)
 	dir := director.New(s.pool, router)
 
+	grpcAuth := director.NewGRPCAuthorizer(&testAuthorizer{expectedToken: testToken, returnErr: nil})
 	s.proxy = grpc.NewServer(
 		grpc.CustomCodec(proxy.Codec()),
 		grpc.UnknownServiceHandler(proxy.TransparentHandler(dir)),
+		grpc_middleware.WithUnaryServerChain(grpc_auth.UnaryServerInterceptor(grpcAuth)),
+		grpc_middleware.WithStreamServerChain(grpc_auth.StreamServerInterceptor(grpcAuth)),
 		grpc.Creds(credentials.NewTLS(s.tlsConfigForTest())),
 	)
 
@@ -213,6 +244,7 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	s.kedgeMapper = kedge_map.Single(proxyUrl)
 	s.proxyConn, err = grpc.Dial(fmt.Sprintf("localhost:%s", proxyPort),
 		grpc.WithTransportCredentials(credentials.NewTLS(s.tlsConfigForTest())),
+		grpc.WithPerRPCCredentials(&tokenCreds{token: testToken}),
 		grpc.WithBlock(),
 	)
 	require.NoError(s.T(), err, "dialing the proxy on a conn *must not* fail")
@@ -239,6 +271,20 @@ func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
 	return ctx
 }
 
+type tokenCreds struct {
+	token string
+}
+
+func (c *tokenCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{
+		"proxy-authorization": fmt.Sprintf("bearer %s", c.token),
+	}, nil
+}
+
+func (c *tokenCreds) RequireTransportSecurity() bool {
+	return false
+}
+
 func (s *BackendPoolIntegrationTestSuite) TestCallToNonSecureBackend() {
 	resp := &unknownResponse{}
 	err := grpc.Invoke(s.SimpleCtx(), "/hand_rolled.non_secure.SomeService/Method", &unknownResponse{}, resp, s.proxyConn)
@@ -257,7 +303,12 @@ func (s *BackendPoolIntegrationTestSuite) TestCallToSecureBackend() {
 
 func (s *BackendPoolIntegrationTestSuite) TestClientDialSecureToNonSecureBackend() {
 	// This tests whether the DialThroughKedge passes the authority correctly
-	cc, err := kedge_grpc.DialThroughKedge(context.TODO(), "secure.ext.test.local", s.tlsConfigForTest(), s.kedgeMapper)
+	cc, err := kedge_grpc.DialThroughKedge(
+		context.TODO(),
+		"secure.ext.test.local",
+		s.tlsConfigForTest(),
+		s.kedgeMapper, grpc.WithPerRPCCredentials(&tokenCreds{token: testToken}),
+	)
 	require.NoError(s.T(), err, "dialing through kedge must succeed")
 	defer cc.Close()
 	resp := s.invokeUnknownHandlerPingbackAndAssert("/hand_rolled.common.NonSpecificService/Method", cc)

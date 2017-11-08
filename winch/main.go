@@ -9,10 +9,14 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"sync"
+	"syscall"
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-flagz"
 	"github.com/mwitkow/go-flagz/protobuf"
@@ -20,20 +24,27 @@ import (
 	"github.com/mwitkow/go-httpwares/tags"
 	"github.com/mwitkow/go-httpwares/tracing/debug"
 	"github.com/mwitkow/go-proto-validators"
+	"github.com/mwitkow/grpc-proxy/proxy"
 	pb_config "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
 	"github.com/mwitkow/kedge/lib/reporter"
 	"github.com/mwitkow/kedge/lib/sharedflags"
 	"github.com/mwitkow/kedge/lib/tls"
 	"github.com/mwitkow/kedge/winch/lib"
+	"github.com/mwitkow/kedge/winch/lib/grpc"
+	"github.com/mwitkow/kedge/winch/lib/http"
+	"github.com/oklog/oklog/pkg/group"
+	"github.com/pkg/errors"
 	"github.com/pressly/chi"
 	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
+	"google.golang.org/grpc"
 )
 
 var (
 	flagHttpPort = sharedflags.Set.Int("server_http_port", 8070, "TCP port to listen on for HTTP1.1/REST calls.")
+	flagGrpcPort = sharedflags.Set.Int("server_grpc_port", 8071, "TCP non-TLS port to listen on for insecure gRPC calls.")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 15*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 15*time.Second, "HTTP server config, max read duration.")
@@ -92,6 +103,10 @@ func main() {
 	httpPlainListener = buildListenerOrFail("http_plain", *flagHttpPort)
 	log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
 
+	var grpcPlainListener net.Listener
+	grpcPlainListener = buildListenerOrFail("grpc_plain", *flagGrpcPort)
+	log.Infof("listening for gRPC Plain on: %v", grpcPlainListener.Addr().String())
+
 	mux := http.NewServeMux()
 	mux.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
@@ -117,20 +132,21 @@ func main() {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
 
-	winchHandler := winch.New(
-		kedge_map.RouteMapper(routes.Get()),
+	mapper := kedge_map.RouteMapper(routes.Get())
+	httpWinchHandler := http_winch.New(
+		mapper,
 		tlsConfig,
 		logEntry,
 		mux,
 	)
 	if *flagDebugMode {
-		winchHandler.AddDebugTripperware()
+		httpWinchHandler.AddDebugTripperware()
 	}
 
 	proxyMux := cors.New(cors.Options{
 		AllowedOrigins: *flagCORSAllowedOrigins,
-	}).Handler(winchHandler)
-	winchServer := &http.Server{
+	}).Handler(httpWinchHandler)
+	httpWinchServer := &http.Server{
 		WriteTimeout: *flagHttpMaxWriteTimeout,
 		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     http_logrus.AsHttpLogger(logEntry),
@@ -142,29 +158,70 @@ func main() {
 		).Handler(proxyMux),
 	}
 
-	cleanupWG := &sync.WaitGroup{}
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
+	grpcWinchHandler := grpc_winch.New(mapper, tlsConfig)
 
-	go func() {
-		<-signalChan
-		cleanupWG.Add(1)
-		defer cleanupWG.Done()
-		log.Infof("\nReceived an interrupt, stopping services...\n")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := winchServer.Shutdown(ctx)
-		if err != nil {
-			log.WithError(err).Errorf("Failed to gracefully shutdown server.")
-		}
-		cancel()
-		httpPlainListener.Close()
-	}()
+	grpcWinchServer := grpc.NewServer(
+		grpc.CustomCodec(proxy.Codec()), // needed for winch to function.
+		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcWinchHandler)),
+		grpc_middleware.WithUnaryServerChain(
+			grpc_ctxtags.UnaryServerInterceptor(),
+			grpc_logrus.UnaryServerInterceptor(logEntry),
+			grpc_prometheus.UnaryServerInterceptor,
+		),
+		grpc_middleware.WithStreamServerChain(
+			grpc_ctxtags.StreamServerInterceptor(),
+			grpc_logrus.StreamServerInterceptor(logEntry),
+			grpc_prometheus.StreamServerInterceptor,
+		),
+	)
 
-	// Serve.
-	if err := winchServer.Serve(httpPlainListener); err != nil {
-		log.WithError(err).Errorf("http_plain server error")
+	var g group.Group
+	{
+		g.Add(func() error {
+			err := httpWinchServer.Serve(httpPlainListener)
+			if err != nil {
+				return errors.Wrap(err, "http_plain server error")
+			}
+			return nil
+		}, func(error) {
+			log.Infof("\nReceived an interrupt, stopping services...\n")
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			err := httpWinchServer.Shutdown(ctx)
+			if err != nil {
+				log.WithError(err).Errorf("Failed to gracefully shutdown server.")
+			}
+			cancel()
+			httpPlainListener.Close()
+		})
 	}
-	cleanupWG.Wait()
+	{
+		g.Add(func() error {
+			err := grpcWinchServer.Serve(grpcPlainListener)
+			if err != nil {
+				return errors.Wrap(err, "grpc_plain server error")
+			}
+			return nil
+		}, func(error) {
+			log.Infof("\nReceived an interrupt, stopping services...\n")
+
+			// TODO(bplotka): Add timeout to these.
+			grpcWinchServer.GracefulStop()
+			grpcPlainListener.Close()
+		})
+	}
+	{
+		cancel := make(chan struct{})
+		g.Add(func() error {
+			return interrupt(cancel)
+		}, func(error) {
+			close(cancel)
+		})
+	}
+
+	// Serve all.
+	if err := g.Run(); err != nil {
+		log.WithError(err).Fatal("winch failed")
+	}
 }
 
 func buildListenerOrFail(name string, port int) net.Listener {
@@ -184,4 +241,15 @@ func buildListenerOrFail(name string, port int) net.Listener {
 // was backend/user error that's why all logs are DEBUG.
 func allAsDebug(_ int) log.Level {
 	return log.DebugLevel
+}
+
+func interrupt(cancel <-chan struct{}) error {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case <-c:
+		return nil
+	case <-cancel:
+		return errors.New("canceled")
+	}
 }

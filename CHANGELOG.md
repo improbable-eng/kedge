@@ -1,5 +1,12 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.5](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.5)
+Kedge service:
+* [x] added OIDC support to gRPC flow
+
+Winch (kedge client):
+* [x] added gRPC support to winch
+
 ### [v1.0.0-beta.4](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.4)
 Kedge service:
 * [x] added dynamic routing discovery for TLS routes (insecure) 

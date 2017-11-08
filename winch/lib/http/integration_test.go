@@ -16,7 +16,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/fortytw2/leaktest"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	pb "github.com/mwitkow/kedge/_protogen/winch/config"
 	"github.com/mwitkow/kedge/lib/map"
@@ -25,8 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/fortytw2/leaktest"
-	"time"
 )
 
 func unknownPingbackHandler(id int) http.Handler {
@@ -345,7 +345,7 @@ func (s *WinchIntegrationSuite) tlsClientConfigForTest() *tls.Config {
 
 func getTestingCertsPath() string {
 	_, callerPath, _, _ := runtime.Caller(0)
-	return path.Join(path.Dir(callerPath), "../..", "misc")
+	return path.Join(path.Dir(callerPath), "..", "..", "..", "misc")
 }
 
 func urlMustParse(uStr string) *url.URL {

@@ -16,7 +16,7 @@ import (
 var (
 	// DefaultALookup is the lookup resolver for DNS A records.
 	// You can override it for caching or testing.
-	DefaultALookup = net.LookupAddr
+	DefaultALookup = net.LookupHost
 )
 
 // Addresser implements logic that decides what "ad-hoc" ip:port to dial for a backend, if any.

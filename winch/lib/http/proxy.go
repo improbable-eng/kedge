@@ -1,4 +1,4 @@
-package winch
+package http_winch
 
 import (
 	"bytes"

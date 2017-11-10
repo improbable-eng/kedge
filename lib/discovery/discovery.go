@@ -18,7 +18,6 @@ import (
 const (
 	selectorKeySuffix                  = "kedge-exposed"
 	hostMatcherAnnotationSuffix        = "host-matcher"
-	serviceNameMatcherAnnotationSuffix = "service-name-matcher"
 )
 
 var (

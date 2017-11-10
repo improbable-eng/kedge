@@ -9,7 +9,7 @@ import (
 )
 
 type route struct {
-	// Host (HTTP) or Service (gRPC).
+	// Host (HTTP) or Authority (gRPC).
 	nameMatcher string
 	// If 0 it means just name matcher only.
 	portMatcher uint32
@@ -107,10 +107,6 @@ func (u *updater) hostMatcherAnnotation() string {
 	return fmt.Sprintf("%s%s", u.labelAnnotationPrefix, hostMatcherAnnotationSuffix)
 }
 
-func (u *updater) serviceNameMatcherAnnotation() string {
-	return fmt.Sprintf("%s%s", u.labelAnnotationPrefix, serviceNameMatcherAnnotationSuffix)
-}
-
 // onModifiedOrAddedEvent creates new serviceConfig and places it in lastSeenServices map.
 func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey, eType eventType) error {
 	_, ok := u.lastSeenServices[service]
@@ -127,10 +123,6 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 	var hostMatcherOverride string
 	if serviceObj.Metadata.Annotations != nil {
 		hostMatcherOverride = serviceObj.Metadata.Annotations[u.hostMatcherAnnotation()]
-	}
-	var serviceNameMatcherOverride string
-	if serviceObj.Metadata.Annotations != nil {
-		serviceNameMatcherOverride = serviceObj.Metadata.Annotations[u.serviceNameMatcherAnnotation()]
 	}
 
 	foundRoutes := serviceRoutings{
@@ -162,19 +154,12 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 
 		scheme := getScheme(port.Name)
 
-		// We need to avoid specific ports if possible, since Golang removes the port from request.URL.Port() for default ports,
-		// even when user specifies http://<host>:80 or https://<host>:443 explicitly. As a result we convert default
-		// ports to NO port, which mean host-wide routing.
-		if isDefaultPort(scheme, port.Port) {
-			foundRoute.portMatcher = 0
+		if hostMatcherOverride != "" {
+			foundRoute.nameMatcher = hostMatcherOverride
 		}
 
 		switch scheme {
 		case httpScheme, httptlsScheme:
-			if hostMatcherOverride != "" {
-				foundRoute.nameMatcher = hostMatcherOverride
-			}
-
 			foundRoutes.http[backendName] = append(foundRoutes.http[backendName], foundRoute)
 			// Since target port is the same we can use whatever domainPort we have here.
 			foundBackends.httpDomainPorts[backendName] = domainPort
@@ -184,10 +169,6 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 				foundBackends.tlsConfigs[backendName] = struct{}{}
 			}
 		case grpcScheme, grpctlsScheme:
-			if serviceNameMatcherOverride != "" {
-				foundRoute.nameMatcher = serviceNameMatcherOverride
-			}
-
 			foundRoutes.grpc[backendName] = append(foundRoutes.grpc[backendName], foundRoute)
 			// Since target port is the same we can use whatever domainPort we have here.
 			foundBackends.grpcDomainPorts[backendName] = domainPort

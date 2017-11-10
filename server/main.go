@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -123,23 +124,6 @@ func main() {
 	httpDirector := http_director.New(httpBackendPool, httpRouter, httpAddresser, logEntry)
 	grpcDirector := grpc_director.New(grpcBackendPool, grpcRouter)
 
-	// GRPC kedge.
-	grpcDirectorServer := grpc.NewServer(
-		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
-		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcDirector)),
-		grpc_middleware.WithUnaryServerChain(
-			grpc_ctxtags.UnaryServerInterceptor(),
-			grpc_logrus.UnaryServerInterceptor(logEntry),
-			grpc_prometheus.UnaryServerInterceptor,
-		),
-		grpc_middleware.WithStreamServerChain(
-			grpc_ctxtags.StreamServerInterceptor(),
-			grpc_logrus.StreamServerInterceptor(logEntry),
-			grpc_prometheus.StreamServerInterceptor,
-		),
-		grpc.Creds(credentials.NewTLS(tlsConfig)),
-	)
-
 	// HTTPS proxy chain.
 	httpDirectorChain := chi.Chain(
 		http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
@@ -162,10 +146,35 @@ func main() {
 		log.WithError(err).Fatal("failed to create authorizer.")
 	}
 
+	grpcUnaryInterceptors := []grpc.UnaryServerInterceptor{
+		grpc_ctxtags.UnaryServerInterceptor(),
+		grpc_logrus.UnaryServerInterceptor(logEntry),
+		grpc_prometheus.UnaryServerInterceptor,
+	}
+	grpcStreamInterceptors := []grpc.StreamServerInterceptor{
+		grpc_ctxtags.StreamServerInterceptor(),
+		grpc_logrus.StreamServerInterceptor(logEntry),
+		grpc_prometheus.StreamServerInterceptor,
+	}
+
 	if authorizer != nil {
 		httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(authorizer))
-		logEntry.Info("configured OIDC authorization for HTTPS proxy.")
+
+		grpcAuth := grpc_director.NewGRPCAuthorizer(authorizer)
+		grpcUnaryInterceptors = append(grpcUnaryInterceptors, grpc_auth.UnaryServerInterceptor(grpcAuth))
+		grpcStreamInterceptors = append(grpcStreamInterceptors, grpc_auth.StreamServerInterceptor(grpcAuth))
+
+		logEntry.Info("configured OIDC authorization for HTTPS proxy and TLS gRPC.")
 	}
+
+	// GRPC kedge.
+	grpcDirectorServer := grpc.NewServer(
+		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
+		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcDirector)),
+		grpc_middleware.WithUnaryServerChain(grpcUnaryInterceptors...),
+		grpc_middleware.WithStreamServerChain(grpcStreamInterceptors...),
+		grpc.Creds(credentials.NewTLS(tlsConfig)),
+	)
 
 	// Bouncer.
 	httpsBouncerServer := httpsBouncerServer(grpcDirectorServer, httpDirectorChain.Handler(httpDirector), logEntry)

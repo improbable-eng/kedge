@@ -10,6 +10,7 @@ It is generated from these files:
 It has these top-level messages:
 	SrvResolver
 	K8SResolver
+	HostResolver
 */
 package kedge_config_common_resolvers
 
@@ -26,5 +27,8 @@ func (this *SrvResolver) Validate() error {
 	return nil
 }
 func (this *K8SResolver) Validate() error {
+	return nil
+}
+func (this *HostResolver) Validate() error {
 	return nil
 }

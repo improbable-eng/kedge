@@ -60,9 +60,10 @@ func NewStatic(routes []*pb.Route) *static {
 func (r *static) Route(req *http.Request) (backendName string, err error) {
 	port := req.URL.Port()
 	if port == "" {
-		if req.URL.Scheme == "http" {
+		switch strings.ToLower(req.URL.Scheme) {
+		case "", "http":
 			port = "80"
-		} else if req.URL.Scheme == "httptls" {
+		case "https":
 			port = "443"
 		}
 	}

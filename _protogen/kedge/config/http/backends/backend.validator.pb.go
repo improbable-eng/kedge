@@ -52,6 +52,13 @@ func (this *Backend) Validate() error {
 			}
 		}
 	}
+	if oneOfNester, ok := this.GetResolver().(*Backend_Host); ok {
+		if oneOfNester.Host != nil {
+			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(oneOfNester.Host); err != nil {
+				return github_com_mwitkow_go_proto_validators.FieldError("Host", err)
+			}
+		}
+	}
 	return nil
 }
 func (this *Middleware) Validate() error {

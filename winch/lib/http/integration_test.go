@@ -1,5 +1,5 @@
 // Integration tests for winch.
-package winch_test
+package http_winch
 
 import (
 	"crypto/tls"
@@ -16,7 +16,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/fortytw2/leaktest"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	pb "github.com/improbable-eng/kedge/_protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
@@ -25,8 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/fortytw2/leaktest"
-	"time"
 )
 
 func unknownPingbackHandler(id int) http.Handler {
@@ -91,9 +91,6 @@ type WinchIntegrationSuite struct {
 	winch              *http.Server
 	winchListenerPlain net.Listener
 	routes             *winch.StaticRoutes
-
-	// Will be used to call winch.
-	winchMapper kedge_map.Mapper
 
 	localSecureKedges localKedges
 }
@@ -202,7 +199,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	s.routes, err = winch.NewStaticRoutes(winch.NewAuthFactory(s.winchListenerPlain.Addr().String(), m), testConfig, authConfig)
 	require.NoError(s.T(), err, "config must be parsable")
 
-	m.Handle("/", winch.New(kedge_map.RouteMapper(
+	m.Handle("/", New(kedge_map.RouteMapper(
 		s.routes.Get()),
 		s.tlsClientConfigForTest(),
 		logrus.NewEntry(logrus.New()),
@@ -227,13 +224,14 @@ func (s *WinchIntegrationSuite) TearDownSuite() {
 func (s *WinchIntegrationSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, err error, kedgeID int) {
 	s.Require().NoError(err, "no error on a call to a winch")
 	s.Assert().Empty(resp.Header.Get("x-kedge-error"))
-	s.Require().Equal(http.StatusAccepted, resp.StatusCode)
+	s.Assert().Empty(resp.Header.Get("x-winch-error"))
+	s.Assert().Equal(http.StatusAccepted, resp.StatusCode)
 	s.Assert().Equal(req.URL.Path, resp.Header.Get("x-test-req-url"), "path seen on kedge must match requested path")
 	s.Assert().Equal(strconv.Itoa(kedgeID), resp.Header.Get("x-test-kedge-id"), "expected kedge must respond to our request")
 
 	s.Require().NotNil(resp.Body, "Body should not be empty")
 	b, err := ioutil.ReadAll(resp.Body)
-	s.Require().NoError(err, "no error on a readall body")
+	s.Require().NoError(err, "no error on a read all body")
 	defer resp.Body.Close()
 	s.Assert().Equal("TEST", string(b))
 }
@@ -348,7 +346,7 @@ func (s *WinchIntegrationSuite) tlsClientConfigForTest() *tls.Config {
 
 func getTestingCertsPath() string {
 	_, callerPath, _, _ := runtime.Caller(0)
-	return path.Join(path.Dir(callerPath), "../..", "misc")
+	return path.Join(path.Dir(callerPath), "..", "..", "..", "misc")
 }
 
 func urlMustParse(uStr string) *url.URL {

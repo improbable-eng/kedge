@@ -8,7 +8,7 @@ import "github.com/mwitkow/go-proto-validators/validator.proto";
 /// Route is a mapping between invoked gRPC requests and backends that should serve it.
 message Route {
     /// backend_name is the string identifying the backend to send data to.
-    string backend_name = 1 [(validator.field) = {regex: "^[a-z_0-9.]{2,64}$"}];;
+    string backend_name = 1 [(validator.field) = {regex: "^[a-z_0-9.]{2,64}$"}];
 
     /// service_name_matcher is a globbing expression that matches a full gRPC service name.
     /// For example a method call to 'com.example.MyService/Create' would be matched by:

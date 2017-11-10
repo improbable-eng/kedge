@@ -3,7 +3,7 @@ package directauth
 import (
 	"context"
 
-	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/lib/tokenauth"
 )
 
 type source struct {

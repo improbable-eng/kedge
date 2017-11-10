@@ -1,10 +1,10 @@
 # Kedge & Winch Release Notes
 
-### [v1.0.0-beta.4](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.4)
+### [v1.0.0-beta.4](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.4)
 Kedge service:
 * [x] added dynamic routing discovery for TLS routes (insecure) 
 
-### [v1.0.0-beta.3](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.3)
+### [v1.0.0-beta.3](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.3)
 Kedge service:
 * [x] added stripping out proxy auth header after using it.
 * [x] fixed error handling causing in particular cases.
@@ -17,7 +17,7 @@ Winch (kedge client):
 Tools: 
 * [x] added load tester.
 
-### [v1.0.0-beta.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.2)
+### [v1.0.0-beta.2](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.2)
 Kedge service:
 * [x] added reported helping to determine proxy errors from backend errors (producing log and inc metric)
 * [x] added support winch debug mode
@@ -31,13 +31,13 @@ Winch (kedge client):
 * [x] added debug mode
 * [x] added request ID
 
-### [v1.0.0-beta.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.1)
+### [v1.0.0-beta.1](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.1)
 Kedge service:
 * [x] added metrics for backend configuration change
 * [x] added metrics for HTTP requests/response to middleware and from tripperware
 * [x] updated go-httpares dep  
 
-### [v1.0.0-beta.0](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-beta.0)
+### [v1.0.0-beta.0](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.0)
 Kedge service:
 * [x] added support for K8S auto-discovery of service backends based off metadata (no need to actually specify routes manually!)
 * [x] fixed retry backoff bug in lbtransport
@@ -47,7 +47,7 @@ Kedge service:
 Winch (kedge client):
 * [x]  fixed handling of debug endpoints.
 
-### [v1.0.0-alpha.3](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.3)
+### [v1.0.0-alpha.3](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-alpha.3)
 Kedge Service:
 * [x] - fixed remote logging
 * [x] - moved to glide as vendoring tool
@@ -63,18 +63,18 @@ Winch (kedge client):
 * [x] - added port matching on winch
 * [x] - various fixes for templating
 
-### [v1.0.0-alpha.2](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.2)
+### [v1.0.0-alpha.2](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-alpha.2)
 Kedge Service:
 * [x] - add support for specifying whitelist or required permissions in ID Token for OpenID provider. 
 
 Winch (kedge client):
 * [x] - support more auth providers and kinds (bearertoken & gcp from kube/config)
 
-### [v1.0.0-alpha.1](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.1)
+### [v1.0.0-alpha.1](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-alpha.1)
 Kedge Service:
 * [x] - added optional remote logging to logstash
 
-### [v1.0.0-alpha.0](https://github.com/mwitkow/kedge/releases/tag/v1.0.0-alpha.0)
+### [v1.0.0-alpha.0](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-alpha.0)
 Initial release to start testing on real clusters.
 
 Kedge Service:

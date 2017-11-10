@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/lib/sharedflags"
 )
 
 var (

@@ -3,7 +3,7 @@ package kedge_map
 import (
 	"net/url"
 
-	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/lib/tokenauth"
 )
 
 type single struct {

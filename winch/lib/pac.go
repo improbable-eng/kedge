@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/mwitkow/go-httpwares/tags"
-	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/lib/sharedflags"
 )
 
 var (

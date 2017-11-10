@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
-	"github.com/mwitkow/kedge/http/director/proxyreq"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/routes"
+	"github.com/improbable-eng/kedge/http/director/proxyreq"
 	"google.golang.org/grpc/metadata"
 )
 

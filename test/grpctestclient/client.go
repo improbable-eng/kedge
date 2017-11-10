@@ -8,9 +8,9 @@ import (
 	"time"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	pb_base "github.com/mwitkow/kedge/_protogen/base"
-	"github.com/mwitkow/kedge/grpc/client"
-	"github.com/mwitkow/kedge/lib/map"
+	pb_base "github.com/improbable-eng/kedge/_protogen/base"
+	"github.com/improbable-eng/kedge/grpc/client"
+	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )

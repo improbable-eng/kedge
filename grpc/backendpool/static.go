@@ -3,7 +3,7 @@ package backendpool
 import (
 	"fmt"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/grpc/backends"
 	"google.golang.org/grpc"
 )
 

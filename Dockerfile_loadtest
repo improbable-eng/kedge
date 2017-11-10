@@ -23,12 +23,12 @@ ENV PATH ${PATH}:${GOBIN}
 RUN mkdir -p /go/bin
 RUN curl https://glide.sh/get | sh
 # Copy local to not clone everything.
-ADD . ${GOPATH}/src/github.com/mwitkow/kedge
-RUN cd ${GOPATH}/src/github.com/mwitkow/kedge && glide install --skip-test
+ADD . ${GOPATH}/src/github.com/improbable-eng/kedge
+RUN cd ${GOPATH}/src/github.com/improbable-eng/kedge && glide install --skip-test
 
 ARG BUILD_VERSION
 RUN echo "Installing LoadTester"
-RUN go install github.com/mwitkow/kedge/tools/loadtest
+RUN go install github.com/improbable-eng/kedge/tools/loadtest
 
 # This image is designed to be run e.g as a pod in separate k8s cluster to target some kedge for load test.
 # This container does not include winch, so make sure to configure loadtest against kedge directly.

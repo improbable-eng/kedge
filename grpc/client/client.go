@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 
-	"github.com/mwitkow/kedge/lib/map"
+	"github.com/improbable-eng/kedge/lib/map"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

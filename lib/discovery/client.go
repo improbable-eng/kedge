@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/mwitkow/kedge/lib/k8s"
+	"github.com/improbable-eng/kedge/lib/k8s"
 	"github.com/pkg/errors"
 )
 

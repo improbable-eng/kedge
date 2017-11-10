@@ -3,8 +3,8 @@ package k8s
 import (
 	"net/http"
 	"crypto/tls"
-	"github.com/mwitkow/kedge/lib/tokenauth"
-	"github.com/mwitkow/kedge/lib/tokenauth/http"
+	"github.com/improbable-eng/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/lib/tokenauth/http"
 )
 
 type APIClient struct {

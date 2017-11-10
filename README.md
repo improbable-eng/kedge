@@ -1,7 +1,7 @@
 # :anchor: kedge - Kubernetes Edge Proxy
 
-[![Travis Build](https://travis-ci.org/mwitkow/kedge.svg?branch=master)](https://travis-ci.org/mwitkow/kedge)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mwitkow/kedge)](https://goreportcard.com/report/github.com/mwitkow/kedge)
+[![Travis Build](https://travis-ci.org/improbable-eng/kedge.svg?branch=master)](https://travis-ci.org/improbable-eng/kedge)
+[![Go Report Card](https://goreportcard.com/badge/github.com/improbable-eng/kedge)](https://goreportcard.com/report/github.com/improbable-eng/kedge)
 [![GoDoc](http://img.shields.io/badge/GoDoc-Reference-blue.svg)](https://godoc.org/github.com/mwitkow/grpc-proxy)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![quality: WIF](https://img.shields.io/badge/quality-BETA-blue.svg)](#status)

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"sync"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
-	"github.com/mwitkow/kedge/lib/metrics"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
+	"github.com/improbable-eng/kedge/lib/metrics"
 	"github.com/sirupsen/logrus"
 )
 

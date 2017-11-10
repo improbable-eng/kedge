@@ -5,7 +5,7 @@ import (
 
 	"net/http"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
 	"github.com/sirupsen/logrus"
 )
 

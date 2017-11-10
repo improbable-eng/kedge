@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/lib/tokenauth"
 	"github.com/pkg/errors"
 )
 

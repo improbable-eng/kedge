@@ -3,7 +3,7 @@ package router
 import "testing"
 import (
 	"github.com/golang/protobuf/jsonpb"
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"

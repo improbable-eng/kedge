@@ -23,11 +23,11 @@ ENV PATH ${PATH}:${GOBIN}
 RUN mkdir -p /go/bin
 RUN curl https://glide.sh/get | sh
 # Copy local to not clone everything.
-ADD . ${GOPATH}/src/github.com/mwitkow/kedge
-RUN cd ${GOPATH}/src/github.com/mwitkow/kedge && glide install --skip-test
+ADD . ${GOPATH}/src/github.com/improbable-eng/kedge
+RUN cd ${GOPATH}/src/github.com/improbable-eng/kedge && glide install --skip-test
 
 ARG BUILD_VERSION
 RUN echo "Installing Kedge with version ${BUILD_VERSION}"
-RUN go install -ldflags "-X main.BuildVersion=${BUILD_VERSION}" github.com/mwitkow/kedge/server
+RUN go install -ldflags "-X main.BuildVersion=${BUILD_VERSION}" github.com/improbable-eng/kedge/server
 
 ENTRYPOINT ["/go/bin/server"]

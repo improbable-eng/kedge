@@ -3,8 +3,8 @@ package director
 import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	"github.com/mwitkow/kedge/grpc/backendpool"
-	"github.com/mwitkow/kedge/grpc/director/router"
+	"github.com/improbable-eng/kedge/grpc/backendpool"
+	"github.com/improbable-eng/kedge/grpc/director/router"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )

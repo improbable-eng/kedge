@@ -9,8 +9,8 @@ import (
 
 	"sync"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/routes"
-	"github.com/mwitkow/kedge/http/director/router"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/routes"
+	"github.com/improbable-eng/kedge/http/director/router"
 )
 
 var (

@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mwitkow/go-httpwares/tags"
-	"github.com/mwitkow/kedge/lib/http/ctxtags"
-	"github.com/mwitkow/kedge/lib/http/header"
+	"github.com/improbable-eng/kedge/lib/http/ctxtags"
+	"github.com/improbable-eng/kedge/lib/http/header"
 	"os"
 )
 

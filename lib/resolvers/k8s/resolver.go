@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
-	"github.com/mwitkow/kedge/lib/k8s"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/common/resolvers"
+	"github.com/improbable-eng/kedge/lib/k8s"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/naming"
 )

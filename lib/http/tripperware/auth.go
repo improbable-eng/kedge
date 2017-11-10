@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/mwitkow/go-httpwares/tags"
-	"github.com/mwitkow/kedge/lib/http/ctxtags"
-	"github.com/mwitkow/kedge/lib/map"
-	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/lib/http/ctxtags"
+	"github.com/improbable-eng/kedge/lib/map"
+	"github.com/improbable-eng/kedge/lib/tokenauth"
 	"github.com/pkg/errors"
 )
 

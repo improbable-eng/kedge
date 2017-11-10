@@ -11,16 +11,16 @@ import (
 
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-httpwares"
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/http/backends"
-	"github.com/mwitkow/kedge/http/lbtransport"
-	"github.com/mwitkow/kedge/lib/resolvers/k8s"
-	"github.com/mwitkow/kedge/lib/resolvers/srv"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
+	"github.com/improbable-eng/kedge/http/lbtransport"
+	"github.com/improbable-eng/kedge/lib/resolvers/k8s"
+	"github.com/improbable-eng/kedge/lib/resolvers/srv"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
-	"github.com/mwitkow/kedge/lib/reporter"
-	"github.com/mwitkow/kedge/lib/reporter/errtypes"
+	"github.com/improbable-eng/kedge/lib/reporter"
+	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
 )
 
 var (

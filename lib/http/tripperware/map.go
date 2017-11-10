@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/mwitkow/go-httpwares/tags"
-	"github.com/mwitkow/kedge/lib/http/ctxtags"
-	"github.com/mwitkow/kedge/lib/map"
+	"github.com/improbable-eng/kedge/lib/http/ctxtags"
+	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/pkg/errors"
 )
 

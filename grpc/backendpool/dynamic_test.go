@@ -3,8 +3,8 @@ package backendpool
 import (
 	"testing"
 
-	pb_resolvers "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/grpc/backends"
+	pb_resolvers "github.com/improbable-eng/kedge/_protogen/kedge/config/common/resolvers"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/grpc/backends"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

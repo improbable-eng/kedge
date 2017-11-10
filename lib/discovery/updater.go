@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	pb_config "github.com/mwitkow/kedge/_protogen/kedge/config"
+	pb_config "github.com/improbable-eng/kedge/_protogen/kedge/config"
 	"github.com/pkg/errors"
 )
 

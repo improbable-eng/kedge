@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/Bplotka/oidc/authorize"
-	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/lib/sharedflags"
 	"github.com/sirupsen/logrus"
 )
 

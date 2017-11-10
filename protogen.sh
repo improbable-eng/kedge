@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROTOBUF_DIR=${PROTOBUF_DIR-${SCRIPT_DIR}/proto}
 PROTOGEN_DIR=_protogen
 GENERATION_DIR=${GENERATION_DIR-${SCRIPT_DIR}/${PROTOGEN_DIR}}
-IMPORT_PREFIX="github.com/mwitkow/kedge/${PROTOGEN_DIR}"
+IMPORT_PREFIX="github.com/improbable-eng/kedge/${PROTOGEN_DIR}"
 
 echo "Installing plugins"
 go get github.com/mwitkow/go-proto-validators/protoc-gen-govalidators

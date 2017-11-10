@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	"github.com/mwitkow/kedge/lib/http/tripperware"
-	"github.com/mwitkow/kedge/lib/map"
+	"github.com/improbable-eng/kedge/lib/http/tripperware"
+	"github.com/improbable-eng/kedge/lib/map"
 	"golang.org/x/net/http2"
 )
 

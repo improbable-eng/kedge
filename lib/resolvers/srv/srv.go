@@ -5,7 +5,7 @@ import (
 
 	"github.com/improbable-eng/go-srvlb/grpc"
 	"github.com/improbable-eng/go-srvlb/srv"
-	pb "github.com/mwitkow/kedge/_protogen/kedge/config/common/resolvers"
+	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/common/resolvers"
 	"google.golang.org/grpc/naming"
 	"strings"
 	"net"

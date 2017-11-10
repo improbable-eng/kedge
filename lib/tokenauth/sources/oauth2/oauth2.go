@@ -3,7 +3,7 @@ package oauth2auth
 import (
 	"context"
 
-	"github.com/mwitkow/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/lib/tokenauth"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 )

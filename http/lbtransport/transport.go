@@ -9,9 +9,9 @@ import (
 
 	"github.com/jpillora/backoff"
 	"github.com/mwitkow/go-httpwares/tags"
-	"github.com/mwitkow/kedge/lib/http/ctxtags"
-	"github.com/mwitkow/kedge/lib/reporter"
-	"github.com/mwitkow/kedge/lib/reporter/errtypes"
+	"github.com/improbable-eng/kedge/lib/http/ctxtags"
+	"github.com/improbable-eng/kedge/lib/reporter"
+	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"

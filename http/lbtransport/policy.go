@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mwitkow/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/lib/sharedflags"
 )
 
 var (

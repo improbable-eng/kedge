@@ -6,7 +6,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/mwitkow/go-httpwares/tags"
+	"github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
 )
 

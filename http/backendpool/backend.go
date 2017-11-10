@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/mwitkow/go-conntrack"
-	"github.com/mwitkow/go-httpwares"
+	"github.com/improbable-eng/go-httpwares"
 	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
 	"github.com/improbable-eng/kedge/http/lbtransport"
 	"github.com/improbable-eng/kedge/lib/resolvers/k8s"

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mwitkow/go-httpwares/metrics"
+	"github.com/improbable-eng/go-httpwares/metrics"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"

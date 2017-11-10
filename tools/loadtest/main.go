@@ -15,7 +15,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/mwitkow/go-flagz"
 	"github.com/mwitkow/go-flagz/protobuf"
-	"github.com/mwitkow/go-httpwares/metrics"
+	"github.com/improbable-eng/go-httpwares/metrics"
 	"github.com/mwitkow/go-proto-validators"
 	pb_config "github.com/improbable-eng/kedge/_protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/http/header"

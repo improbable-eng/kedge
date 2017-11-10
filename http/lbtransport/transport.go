@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jpillora/backoff"
-	"github.com/mwitkow/go-httpwares/tags"
+	"github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/lib/http/ctxtags"
 	"github.com/improbable-eng/kedge/lib/reporter"
 	"github.com/improbable-eng/kedge/lib/reporter/errtypes"

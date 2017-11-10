@@ -102,8 +102,8 @@ imports:
   version: 12def25b6a92a8ea1017af73121f6322f62c59be
   subpackages:
   - protobuf
-- name: github.com/mwitkow/go-httpwares
-  version: b4db44c6691bb87b6d207ee2d2e62121e4aec910
+- name: github.com/improbable-eng/go-httpwares
+  version: d1341ef6621b4cd9b75ca0a1c08ef4b95ffd265a
   subpackages:
   - logging
   - logging/logrus

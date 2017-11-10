@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/mwitkow/go-httpwares/tags"
+	"github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/lib/http/ctxtags"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/pkg/errors"

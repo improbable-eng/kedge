@@ -22,7 +22,7 @@ import:
 - package: github.com/mwitkow/go-flagz
   subpackages:
   - protobuf
-- package: github.com/mwitkow/go-httpwares
+- package: github.com/improbable-eng/go-httpwares
   subpackages:
   - logging/logrus
   - tags

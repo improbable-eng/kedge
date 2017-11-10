@@ -110,6 +110,13 @@ var (
 		&pb_route.Route{
 			BackendName: "non_secure",
 			PathRules:   []string{"/some/strict/path"},
+			HostMatcher: "nonsecure.ext.withoutport.example.com",
+			PortMatcher: 80,
+			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+		},
+		&pb_route.Route{
+			BackendName: "non_secure",
+			PathRules:   []string{"/some/strict/path"},
 			HostMatcher: "nonsecure.ext.example.com",
 			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
 		},
@@ -642,13 +649,26 @@ func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
 }
 
 func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_MatchWithGenericRoute() {
-	req := testRequest("http://nonsecure.ext.example.com:80/some/strict/path", "bearer abc8", testProxyAuthValue)
+	req := testRequest("http://nonsecure.ext.example.com:845350/some/strict/path", "bearer abc8", testProxyAuthValue)
 	resp, err := s.kedgeClient.Do(req)
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
 }
 
 func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_SpecialRoute() {
+	fmt.Println("lol")
 	req := testRequest("http://nonsecure.ext.withport.example.com:81/some/strict/path", "bearer abc8", testProxyAuthValue)
+	resp, err := s.kedgeClient.Do(req)
+	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+}
+
+func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithoutPort_SpecialRoute() {
+	req := testRequest("http://nonsecure.ext.withoutport.example.com/some/strict/path", "bearer abc8", testProxyAuthValue)
+	resp, err := s.kedgeClient.Do(req)
+	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+}
+
+func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithoutPort2_SpecialRoute() {
+	req := testRequest("http://nonsecure.ext.withoutport.example.com:80/some/strict/path", "bearer abc8", testProxyAuthValue)
 	resp, err := s.kedgeClient.Do(req)
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
 }

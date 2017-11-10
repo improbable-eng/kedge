@@ -54,41 +54,42 @@ var (
 // sent to. The backends in the Pool have pre-dialed connections and are load balanced.
 //
 // If Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
-func New(pool backendpool.Pool, router router.Router, addresser adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
-	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
-	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
+func New(pool backendpool.Pool, router router.Router, adhocRouter adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
+	p := &Proxy{
+		router:    router,
+		adhocRouter: adhocRouter,
+	}
 
 	clientMetrics := http_prometheus.ClientMetrics()
-	backendTripper := http_metrics.Tripperware(clientMetrics)(&backendPoolTripper{pool: pool})
-	adhocTripper := http_metrics.Tripperware(clientMetrics)(AdhocTransport)
+	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 
+	backendTripper := http_metrics.Tripperware(clientMetrics)(&backendPoolTripper{pool: pool})
 	backendErrLog := http_logrus.AsHttpLogger(logEntry.WithField("caller", "backend reverseProxy"))
+	p.backendReverseProxy = &httputil.ReverseProxy{
+		Director:      func(*http.Request) {},
+		Transport:     reverseProxyErrHandler(backendTripper, logEntry.WithField("caller", "backend reverseProxy error handler")),
+		FlushInterval: *flagFlushingInterval,
+		BufferPool:    bufferpool,
+		ErrorLog:      backendErrLog,
+	}
+
+	AdhocTransport.DialContext = conntrack.NewDialContextFunc(conntrack.DialWithName("adhoc"), conntrack.DialWithTracing())
+	adhocTripper := http_metrics.Tripperware(clientMetrics)(AdhocTransport)
 	adhocErrLog := http_logrus.AsHttpLogger(logEntry.WithField("caller", "adhoc reverseProxy"))
-	p := &Proxy{
-		backendReverseProxy: &httputil.ReverseProxy{
-			Director:      func(*http.Request) {},
-			Transport:     reverseProxyErrHandler(backendTripper, logEntry.WithField("caller", "backend reverseProxy error handler")),
-			FlushInterval: *flagFlushingInterval,
-			BufferPool:    bufferpool,
-			ErrorLog:      backendErrLog,
-		},
-		adhocReverseProxy: &httputil.ReverseProxy{
-			Director:      func(*http.Request) {},
-			Transport:     reverseProxyErrHandler(adhocTripper, logEntry.WithField("caller", "adhoc reverseProxy error handler")),
-			FlushInterval: *flagFlushingInterval,
-			BufferPool:    bufferpool,
-			ErrorLog:      adhocErrLog,
-		},
-		router:    router,
-		addresser: addresser,
+	p.adhocReverseProxy = &httputil.ReverseProxy{
+		Director:      func(*http.Request) {},
+		Transport:     reverseProxyErrHandler(adhocTripper, logEntry.WithField("caller", "adhoc reverseProxy error handler")),
+		FlushInterval: *flagFlushingInterval,
+		BufferPool:    bufferpool,
+		ErrorLog:      adhocErrLog,
 	}
 	return p
 }
 
 // Proxy is a forward/reverse proxy that implements Route+Backend and Adhoc Rules forwarding.
 type Proxy struct {
-	router    router.Router
-	addresser adhoc.Addresser
+	router      router.Router
+	adhocRouter adhoc.Addresser
 
 	backendReverseProxy *httputil.ReverseProxy
 	adhocReverseProxy   *httputil.ReverseProxy
@@ -116,8 +117,10 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if err == router.ErrRouteNotFound {
 		// Try adhoc.
 		var addr string
-		addr, err = p.addresser.Address(req)
+		addr, err = p.adhocRouter.Address(req)
 		if err == nil {
+			// We need to explicitly overwrite scheme to plain HTTP.
+			normReq.URL.Scheme = "http"
 			normReq.URL.Host = addr
 			tags.Set(ctxtags.TagForProxyAdhoc, addr)
 			tags.Set(http_ctxtags.TagForHandlerName, "_adhoc")

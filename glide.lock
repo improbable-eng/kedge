@@ -1,5 +1,5 @@
-hash: f4ae0280c4e03e3cf46f9b15f839c8ba24afa0bdcca553bd2bee45305079f044
-updated: 2017-10-03T10:41:26.949603733+01:00
+hash: 9414ee95dc8c144ae384b776e561b39c609dba157483506dd43556242d34896c
+updated: 2017-11-08T13:25:56.741979517Z
 imports:
 - name: cloud.google.com/go
   version: fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0
@@ -63,6 +63,7 @@ imports:
 - name: github.com/grpc-ecosystem/go-grpc-middleware
   version: f63a7dfb64c138bd93d5c5b896d8b33c4b08e000
   subpackages:
+  - auth
   - logging
   - logging/logrus
   - tags
@@ -117,6 +118,10 @@ imports:
   version: 97396d94749c00db659393ba5123f707062f829f
   subpackages:
   - proxy
+- name: github.com/oklog/oklog
+  version: f857583a70c345341d679b3f27aa542c8db70a21
+  subpackages:
+  - pkg/group
 - name: github.com/oxtoacart/bpool
   version: 4e1c5567d7c2dd59fa4c7c83d34c2f3528b025d6
 - name: github.com/pkg/errors

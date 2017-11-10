@@ -85,7 +85,7 @@ func TestAdhocMatches(t *testing.T) {
 		{
 			name:        "fails port check outside the boundary",
 			hostPort:    "1-2-3-4.namespace.pods.cluster.local:11201",
-			expectedErr: "port 11201 is not allowed",
+			expectedErr: "adhoc: port 11201 is not allowed",
 		},
 		{
 			name:         "matches non default allowed in list",
@@ -100,7 +100,7 @@ func TestAdhocMatches(t *testing.T) {
 		{
 			name:        "fails dial errors",
 			hostPort:    "otherbackend.somenamespace.svc.cluster.local:8081",
-			expectedErr: "cannot resolve host",
+			expectedErr: "adhoc: cannot resolve otherbackend.somenamespace.svc.cluster.local host: test lookup error",
 		},
 	} {
 		t.Run(tcase.name, func(t *testing.T) {

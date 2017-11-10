@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
 	"sync"
 
 	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/routes"
@@ -62,7 +61,7 @@ func NewStaticAddresser(rules []*pb.Adhoc) *static {
 }
 
 func (a *static) Address(req *http.Request) (string, error) {
-	hostName, port, err := a.extractHostPort(req.URL.Host)
+	hostName, port, err := extractHostPort(req.URL.Host)
 	if err != nil {
 		return "", err
 	}
@@ -79,9 +78,9 @@ func (a *static) Address(req *http.Request) (string, error) {
 			}
 		}
 		if !a.portAllowed(portForRule, rule.Port) {
-			return "", router.NewError(http.StatusBadRequest, fmt.Sprintf("port %d is not allowed", portForRule))
+			return "", router.NewError(http.StatusBadRequest, fmt.Sprintf("adhoc: port %d is not allowed", portForRule))
 		}
-		ipAddr, err := a.resolveHost(hostName)
+		ipAddr, err := resolveHost(hostName)
 		if err != nil {
 			return "", err
 		}
@@ -91,15 +90,15 @@ func (a *static) Address(req *http.Request) (string, error) {
 	return "", router.ErrRouteNotFound
 }
 
-func (*static) resolveHost(hostStr string) (string, error) {
+func resolveHost(hostStr string) (string, error) {
 	addrs, err := DefaultALookup(hostStr)
 	if err != nil {
-		return "", router.NewError(http.StatusBadGateway, "cannot resolve host")
+		return "", router.NewError(http.StatusBadGateway, fmt.Sprintf("adhoc: cannot resolve %s host: %v", hostStr, err))
 	}
 	return addrs[0], nil
 }
 
-func (*static) extractHostPort(hostStr string) (hostName string, port int, err error) {
+func extractHostPort(hostStr string) (hostName string, port int, err error) {
 	// Using SplitHostPort is a pain due to opaque error messages. Let's assume we only do hostname matches, they fall
 	// through later anyway.
 	portOffset := strings.LastIndex(hostStr, ":")
@@ -109,7 +108,7 @@ func (*static) extractHostPort(hostStr string) (hostName string, port int, err e
 	portPart := hostStr[portOffset+1:]
 	pNum, err := strconv.ParseInt(portPart, 10, 32)
 	if err != nil {
-		return "", 0, router.NewError(http.StatusBadRequest, fmt.Sprintf("malformed port number: %v", err))
+		return "", 0, router.NewError(http.StatusBadRequest, fmt.Sprintf("adhoc: malformed port number: %v", err))
 	}
 	return hostStr[:portOffset], int(pNum), nil
 }

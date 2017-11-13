@@ -1,5 +1,3 @@
-// Copyright (c) Improbable Worlds Ltd, All Rights Reserved
-
 package common
 
 import (
@@ -88,4 +86,12 @@ func PortAllowed(port int, portRule *pb.Adhoc_Port) bool {
 		}
 	}
 	return false
+}
+
+func ResolveHost(hostStr string) (string, error) {
+	addrs, err := DefaultALookup(hostStr)
+	if err != nil {
+		return "", err
+	}
+	return addrs[0], nil
 }

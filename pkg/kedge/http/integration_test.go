@@ -318,7 +318,7 @@ func (s *HttpProxyingIntegrationSuite) Lookup(domainName string) ([]*srv.Target,
 }
 
 // implements A resolver that always resolves local host.
-func (s *HttpProxyingIntegrationSuite) LookupAddr(addr string) (names []string, err error) {
+func lookupAddr(addr string) (names []string, err error) {
 	return []string{"127.0.0.1"}, nil
 }
 
@@ -337,7 +337,7 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 	srvresolver.ParentSrvResolver = s
 	// Make ourselves the A resolver for backends for the Addresser.
 	s.originalAResolver = common.DefaultALookup
-	common.DefaultALookup = s.LookupAddr
+	common.DefaultALookup = lookupAddr
 
 	s.buildBackends()
 

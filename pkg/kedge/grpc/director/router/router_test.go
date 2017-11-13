@@ -117,7 +117,7 @@ func TestRouteMatches(t *testing.T) {
 			name:            "MatchesFailsCompletely_NoBackend",
 			fullServiceName: "noncom.else.MyService",
 			md:              metadata.Pairs(":authority", "authority_else.service.local"),
-			expectedErr:     routeNotFound,
+			expectedErr:     ErrRouteNotFound,
 		},
 	} {
 		t.Run(tcase.name, func(t *testing.T) {

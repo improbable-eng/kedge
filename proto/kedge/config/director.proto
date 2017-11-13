@@ -12,6 +12,7 @@ import "kedge/config/http/routes/routes.proto";
 message DirectorConfig {
     message Grpc {
         repeated kedge.config.grpc.routes.Route routes = 1;
+        repeated kedge.config.common.Adhoc adhoc_rules = 2;
     }
     message Http {
         repeated kedge.config.http.routes.Route routes = 1;

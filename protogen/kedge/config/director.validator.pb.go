@@ -44,6 +44,13 @@ func (this *DirectorConfig_Grpc) Validate() error {
 			}
 		}
 	}
+	for _, item := range this.AdhocRules {
+		if item != nil {
+			if err := go_proto_validators.CallValidatorIfExists(item); err != nil {
+				return go_proto_validators.FieldError("AdhocRules", err)
+			}
+		}
+	}
 	return nil
 }
 func (this *DirectorConfig_Http) Validate() error {

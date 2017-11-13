@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package kedge.config.grpc.routes;
+
+
+/// Adhoc describes an adhoc proxying method that is not backed by a backend, but dials a "free form" DNS record.
+message Adhoc {
+    /// authority_matcher matches the :authority header that will be resolved using A or SRV records.
+    /// The names are matched with a * prefix. For example:
+    /// - *.pod.cluster.local
+    /// - *.my_namespace.svc.cluster.local
+    /// - *.local
+    /// The first rule that matches a DNS name will be used, and its ports will be checked.
+    string authority_matcher = 1;
+
+    /// Port controls the :port behaviour of the gRPC endpoint requested.
+    Port port = 2;
+
+    /// Port controls how the :port part of the gRPC endpoint is processed.
+    message Port {
+        /// default is the default port used if no entry is present.
+        /// This defaults to 8888.
+        uint32 default = 1;
+
+        /// allowed ports is a list of whitelisted ports that this Adhoc rule will allow.
+        repeated uint32 allowed = 3;
+
+        /// allowed_ranges is a list of whitelisted port ranges that this Adhoc rule will allow.
+        repeated Range allowed_ranges = 4;
+        message Range {
+            /// from is an inclusive lower bound for the port range
+            uint32 from = 1;
+            /// to is an inclusive upper bound for the port range
+            uint32 to = 2;
+        }
+    }
+}

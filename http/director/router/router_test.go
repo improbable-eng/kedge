@@ -59,12 +59,14 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 		expectedErr     error
 	}{
 		{
+			// The default port should be appended and matched with 'a' backend route.
 			scheme: "http",
 			host:   "nopath.example.com",
 
 			expectedBackend: "a",
 		},
 		{
+			// The URL should be matched with 'a' backend route.
 			scheme: "http",
 			host:   "nopath.example.com",
 			port:   "80",
@@ -72,6 +74,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedBackend: "a",
 		},
 		{
+			// Specific path should not change anything, since we don't match on it.
 			scheme: "http",
 			host:   "nopath.example.com",
 			port:   "80",
@@ -80,6 +83,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedBackend: "a",
 		},
 		{
+			// Different port should match into more port generic 'b' backend route.
 			scheme: "http",
 			host:   "nopath.example.com",
 			port:   "83",
@@ -87,6 +91,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedBackend: "b",
 		},
 		{
+			// Specific host and port should be matched with 'c' backend route.
 			scheme: "http",
 			host:   "nopath.port.example.com",
 			port:   "8343",
@@ -94,6 +99,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedBackend: "c",
 		},
 		{
+			// Specific host, port and path should be matched with 'd' backend route.
 			scheme: "http",
 			host:   "path.port.example.com",
 			port:   "83",
@@ -102,6 +108,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedBackend: "d",
 		},
 		{
+			// Specific host, port and path should be matched with 'e' backend route.
 			scheme: "https",
 			host:   "path.httsdefport.example.com",
 			port:   "443",
@@ -110,15 +117,16 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedBackend: "e",
 		},
 		{
+			// Same host, port and path should be matched with 'e' backend route as well, since
+			// TLS default port will be appended and it exactly matches 'e' backend route.
 			scheme: "https",
 			host:   "path.httsdefport.example.com",
 			path: "/some/strict/path",
 
 			expectedBackend: "e",
 		},
-
-		// Err Cases
 		{
+			// Not matching host should be filtered out.
 			scheme: "http",
 			host:   "wrong.path.port.example.com",
 			port:   "83",
@@ -127,6 +135,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedErr: ErrRouteNotFound,
 		},
 		{
+			// Not matching port should be filtered out.
 			scheme: "http",
 			host:   "path.port.example.com",
 			port:   "84",
@@ -135,6 +144,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			expectedErr: ErrRouteNotFound,
 		},
 		{
+			// Not matching path should be filtered out.
 			scheme: "http",
 			host:   "path.port.example.com",
 			port:   "83",

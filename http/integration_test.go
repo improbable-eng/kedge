@@ -19,6 +19,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -35,7 +36,6 @@ import (
 	"github.com/fortytw2/leaktest"
 	"github.com/go-chi/chi"
 	"github.com/improbable-eng/go-srvlb/srv"
-	"github.com/mwitkow/go-conntrack/connhelpers"
 	pb_res "github.com/improbable-eng/kedge/_protogen/kedge/config/common/resolvers"
 	pb_be "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
 	pb_route "github.com/improbable-eng/kedge/_protogen/kedge/config/http/routes"
@@ -44,15 +44,15 @@ import (
 	"github.com/improbable-eng/kedge/http/director"
 	"github.com/improbable-eng/kedge/http/director/adhoc"
 	"github.com/improbable-eng/kedge/http/director/router"
+	"github.com/improbable-eng/kedge/lib/http/header"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/reporter"
 	"github.com/improbable-eng/kedge/lib/resolvers/srv"
+	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/improbable-eng/kedge/lib/http/header"
-	"io"
 )
 
 const (
@@ -210,7 +210,7 @@ func (l *localBackends) addServer(t *testing.T, config *tls.Config) {
 func killConnectionHandler() http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		hi := resp.(http.Hijacker)
-		conn, _ , _ := hi.Hijack()
+		conn, _, _ := hi.Hijack()
 		conn.Close() // EOF!
 	})
 }
@@ -434,7 +434,7 @@ func (s *HttpProxyingIntegrationSuite) buildBackends() {
 func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Request, resp *http.Response, authValue string, err error) {
 	require.NoError(s.T(), err, "no error on a call to a proxy addr")
 
-	require.NotNil(s.T(), resp.Body, "ody should not be empty")
+	require.NotNil(s.T(), resp.Body, "body should not be empty")
 	b, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	require.NoError(s.T(), err, "no error on a read all body")
@@ -649,13 +649,13 @@ func (s *HttpProxyingIntegrationSuite) TestCallOverClient() {
 }
 
 func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_MatchWithGenericRoute() {
-	req := testRequest("http://nonsecure.ext.example.com:845350/some/strict/path", "bearer abc8", testProxyAuthValue)
+	// No matter what port we put here, it should pass, since there is port matching on this route.
+	req := testRequest("http://nonsecure.ext.example.com:8435/some/strict/path", "bearer abc8", testProxyAuthValue)
 	resp, err := s.kedgeClient.Do(req)
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
 }
 
 func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithPort_SpecialRoute() {
-	fmt.Println("lol")
 	req := testRequest("http://nonsecure.ext.withport.example.com:81/some/strict/path", "bearer abc8", testProxyAuthValue)
 	resp, err := s.kedgeClient.Do(req)
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
@@ -671,6 +671,19 @@ func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WithoutPort2_SpecialRo
 	req := testRequest("http://nonsecure.ext.withoutport.example.com:80/some/strict/path", "bearer abc8", testProxyAuthValue)
 	resp, err := s.kedgeClient.Do(req)
 	s.assertSuccessfulPingback(req, resp, "bearer abc8", err)
+}
+
+func (s *HttpProxyingIntegrationSuite) TestCallOverClient_WrongPort_SpecialRoute() {
+	req := testRequest("http://nonsecure.ext.withoutport.example.com:82/some/strict/path", "bearer abc8", testProxyAuthValue)
+	resp, err := s.kedgeClient.Do(req)
+	require.NoError(s.T(), err, "no error on a call to a proxy addr")
+
+	require.NotNil(s.T(), resp.Body, "body should not be empty")
+	b, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	require.NoError(s.T(), err, "no error on a read all body")
+	s.Assert().Equal("unknown route to service", string(b))
+	s.Assert().Equal(http.StatusBadGateway, resp.StatusCode)
 }
 
 func (s *HttpProxyingIntegrationSuite) TearDownSuite() {

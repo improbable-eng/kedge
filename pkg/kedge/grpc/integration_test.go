@@ -20,12 +20,15 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/improbable-eng/go-srvlb/srv"
+	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/backendpool"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/client"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/director"
+	"github.com/improbable-eng/kedge/pkg/kedge/grpc/director/adhoc"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/director/router"
 	"github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/resolvers/srv"
+	"github.com/improbable-eng/kedge/protogen/kedge/config/common"
 	pb_res "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	pb_be "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
 	pb_route "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
@@ -42,56 +45,73 @@ import (
 	"google.golang.org/grpc/transport"
 )
 
-var backendResolutionDuration = 10 * time.Millisecond
+var (
+	backendResolutionDuration = 10 * time.Millisecond
 
-var backendConfigs = []*pb_be.Backend{
-	&pb_be.Backend{
-		Name: "non_secure",
-		Resolver: &pb_be.Backend_Srv{
-			Srv: &pb_res.SrvResolver{
-				DnsName: "_grpc._tcp.nonsecure.backends.test.local",
+	backendConfigs = []*pb_be.Backend{
+		&pb_be.Backend{
+			Name: "non_secure",
+			Resolver: &pb_be.Backend_Srv{
+				Srv: &pb_res.SrvResolver{
+					DnsName: "_grpc._tcp.nonsecure.backends.test.local",
+				},
 			},
 		},
-	},
-	&pb_be.Backend{
-		Name: "secure",
-		Resolver: &pb_be.Backend_Srv{
-			Srv: &pb_res.SrvResolver{
-				DnsName: "_grpctls._tcp.secure.backends.test.local",
+		&pb_be.Backend{
+			Name: "secure",
+			Resolver: &pb_be.Backend_Srv{
+				Srv: &pb_res.SrvResolver{
+					DnsName: "_grpctls._tcp.secure.backends.test.local",
+				},
+			},
+			Security: &pb_be.Security{
+				InsecureSkipVerify: true,
 			},
 		},
-		Security: &pb_be.Security{
-			InsecureSkipVerify: true,
+	}
+
+	defaultBackendCount = 5
+
+	routeConfigs = []*pb_route.Route{
+		&pb_route.Route{
+			BackendName:        "secure",
+			ServiceNameMatcher: "hand_rolled.secure.*", // testservice is mwitkow.testproto
 		},
-	},
-}
+		&pb_route.Route{
+			BackendName:        "non_secure",
+			ServiceNameMatcher: "hand_rolled.non_secure.*", // these will be used in unknownPingBackHandler-based tests
+		},
+		&pb_route.Route{
+			BackendName:        "unspecified_backend",
+			ServiceNameMatcher: "bad.backend.*", // bad.backend will match a bad tests
+		},
+		&pb_route.Route{
+			BackendName:          "secure",
+			ServiceNameMatcher:   "hand_rolled.common.*", // these will be used in unknownPingBackHandler-based tests
+			AuthorityHostMatcher: "secure.ext.test.local",
+		},
+		&pb_route.Route{
+			BackendName:          "non_secure",
+			ServiceNameMatcher:   "hand_rolled.common.*",
+			AuthorityHostMatcher: "non_secure.ext.test.local",
+		},
+	}
 
-var defaultBackendCount = 5
-
-var routeConfigs = []*pb_route.Route{
-	&pb_route.Route{
-		BackendName:        "secure",
-		ServiceNameMatcher: "hand_rolled.secure.*", // testservice is mwitkow.testproto
-	},
-	&pb_route.Route{
-		BackendName:        "non_secure",
-		ServiceNameMatcher: "hand_rolled.non_secure.*", // these will be used in unknownPingBackHandler-based tests
-	},
-	&pb_route.Route{
-		BackendName:        "unspecified_backend",
-		ServiceNameMatcher: "bad.backend.*", // bad.backend will match a bad tests
-	},
-	&pb_route.Route{
-		BackendName:          "secure",
-		ServiceNameMatcher:   "hand_rolled.common.*", // these will be used in unknownPingBackHandler-based tests
-		AuthorityHostMatcher: "secure.ext.test.local",
-	},
-	&pb_route.Route{
-		BackendName:          "non_secure",
-		ServiceNameMatcher:   "hand_rolled.common.*", // bad.backend will match a bad tests
-		AuthorityHostMatcher: "non_secure.ext.test.local",
-	},
-}
+	adhocConfig = []*kedge_config_common.Adhoc{
+		{
+			DnsNameMatcher: "*nonsecure.backends.adhoctest.local",
+			Port: &kedge_config_common.Adhoc_Port{
+				AllowedRanges: []*kedge_config_common.Adhoc_Port_Range{
+					{
+						// This will be started on localhost. God knows what port it will be.
+						From: 1024,
+						To:   65535,
+					},
+				},
+			},
+		},
+	}
+)
 
 type unknownResponse struct {
 	Addr               string `protobuf:"bytes,1,opt,name=addr,json=value"`
@@ -124,7 +144,7 @@ type localBackends struct {
 }
 
 func (l *localBackends) addServer(t *testing.T, serverOpt ...grpc.ServerOption) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", "127.0.0.1:")
 	require.NoError(t, err, "must be able to allocate a port for localBackend")
 
 	// This is the point where we hook up the test interceptor.
@@ -194,6 +214,7 @@ type BackendPoolIntegrationTestSuite struct {
 	kedgeMapper         kedge_map.Mapper
 	originalDialFunc    func(ctx context.Context, network, address string) (net.Conn, error)
 	originalSrvResolver srv.Resolver
+	originalAResolver   func(addr string) (names []string, err error)
 	localBackends       map[string]*localBackends
 
 	authorizer *testAuthorizer
@@ -238,12 +259,17 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 	// Make ourselves the resolver for SRV for our backends. See Lookup function.
 	s.originalSrvResolver = srvresolver.ParentSrvResolver
 	srvresolver.ParentSrvResolver = s
+
+	// Make ourselves the A resolver for backends for the Addresser.
+	s.originalAResolver, common.DefaultALookup = common.DefaultALookup, lookupAddr
+
 	s.buildBackends()
 
 	s.pool, err = backendpool.NewStatic(backendConfigs)
 	require.NoError(s.T(), err, "backend pool creation must not fail")
-	router := router.NewStatic(logrus.New(), routeConfigs)
-	dir := director.New(s.pool, router)
+	staticRouter := router.NewStatic(logrus.New(), routeConfigs)
+	adhocAddresser := adhoc.NewStaticAddresser(adhocConfig)
+	dir := director.New(s.pool, adhocAddresser, staticRouter)
 
 	grpcAuth := director.NewGRPCAuthorizer(&testAuthorizer{expectedToken: testToken, returnErr: nil})
 	s.proxy = grpc.NewServer(
@@ -277,16 +303,24 @@ func (s *BackendPoolIntegrationTestSuite) buildBackends() {
 	}
 	nonSecure.setResolvableCount(100)
 	s.localBackends["_grpc._tcp.nonsecure.backends.test.local"] = nonSecure
+
 	secure := &localBackends{name: "secure_localbackends"}
 	for i := 0; i < defaultBackendCount; i++ {
 		secure.addServer(s.T(), grpc.Creds(credentials.NewTLS(s.tlsConfigForTest())))
 	}
 	secure.setResolvableCount(100)
 	s.localBackends["_grpctls._tcp.secure.backends.test.local"] = secure
+
+	adhocBackends := &localBackends{name: "adhoc_localbackends"}
+	for i := 0; i < defaultBackendCount; i++ {
+		adhocBackends.addServer(s.T())
+	}
+	adhocBackends.setResolvableCount(100)
+	s.localBackends["_grpc._tcp.nonsecure.backends.adhoctest.local"] = adhocBackends
 }
 
 func (s *BackendPoolIntegrationTestSuite) SimpleCtx() context.Context {
-	ctx, _ := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	return ctx
 }
 
@@ -365,6 +399,22 @@ func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownRouteCausesError() {
 	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown route to service", "no error on simple call")
 }
 
+func (s *BackendPoolIntegrationTestSuite) TestClientDialToAdhocBackend() {
+	// This tests whether the DialThroughKedge passes the authority correctly
+	addr := s.localBackends["_grpc._tcp.nonsecure.backends.adhoctest.local"].targets()[0].DialAddr
+	port := addr[strings.LastIndex(addr, ":")+1:]
+	cc, err := kedge_grpc.DialThroughKedge(
+		s.SimpleCtx(),
+		fmt.Sprintf("nonsecure.backends.adhoctest.local:%v", port),
+		s.tlsConfigForTest(),
+		s.kedgeMapper, grpc.WithPerRPCCredentials(&tokenCreds{token: "bearer " + testToken, header: "proxy-authorization"}),
+	)
+	require.NoError(s.T(), err, "dialing through kedge must succeed")
+	defer cc.Close()
+	resp := s.invokeUnknownHandlerPingbackAndAssert("/hand_rolled.common.NonSpecificService/Method", cc)
+	assert.Equal(s.T(), "adhoc_localbackends", resp.Backend)
+}
+
 func (s *BackendPoolIntegrationTestSuite) TestCallToUnknownBackend() {
 	err := grpc.Invoke(s.SimpleCtx(), "/bad.backend.doesnt.exist/Method", &unknownResponse{}, &unknownResponse{}, s.proxyConn)
 	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = unknown backend", "no error on simple call")
@@ -376,6 +426,9 @@ func (s *BackendPoolIntegrationTestSuite) TearDownSuite() {
 	// Restore old resolver.
 	if s.originalSrvResolver != nil {
 		srvresolver.ParentSrvResolver = s.originalSrvResolver
+	}
+	if s.originalAResolver != nil {
+		common.DefaultALookup = s.originalAResolver
 	}
 	time.Sleep(10 * time.Millisecond)
 	if s.proxy != nil {
@@ -409,6 +462,11 @@ func (s *BackendPoolIntegrationTestSuite) tlsConfigForTest() *tls.Config {
 		s.FailNow("failed processing CA file")
 	}
 	return tlsConfig
+}
+
+// implements A resolver that always resolves local host.
+func lookupAddr(addr string) (names []string, err error) {
+	return []string{"127.0.0.1"}, nil
 }
 
 func getTestingCertsPath() string {

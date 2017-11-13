@@ -103,7 +103,7 @@ func TestAdhocMatches(t *testing.T) {
 		{
 			name:        "fails dial errors",
 			hostPort:    "otherbackend.somenamespace.svc.cluster.local:8081",
-			expectedErr: "adhoc: cannot resolve otherbackend.somenamespace.svc.cluster.local host: test lookup error",
+			expectedErr: "adhoc: cannot resolve otherbackend.somenamespace.svc.cluster.local:8081 host: test lookup error",
 		},
 	} {
 		t.Run(tcase.name, func(t *testing.T) {

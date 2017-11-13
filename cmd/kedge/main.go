@@ -158,7 +158,7 @@ func main() {
 
 	if *flagGrpcTlsPort != 0 {
 		// Setup gRPC handling.
-		grpcDirector := grpc_director.New(grpcBackendPool, grpcRouter)
+		grpcDirector := grpc_director.New(grpcBackendPool, grpcAddresser, grpcRouter)
 		grpcUnaryInterceptors := []grpc.UnaryServerInterceptor{
 			grpc_ctxtags.UnaryServerInterceptor(),
 			grpc_logrus.UnaryServerInterceptor(logEntry),

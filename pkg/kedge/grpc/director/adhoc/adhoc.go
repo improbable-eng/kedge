@@ -1,14 +1,14 @@
 package adhoc
 
 import (
-	"fmt"
 	"net"
-	"net/http"
 	"strconv"
 
 	"github.com/improbable-eng/kedge/pkg/kedge/common"
-	"github.com/improbable-eng/kedge/pkg/kedge/http/director/router"
+	"github.com/improbable-eng/kedge/pkg/kedge/grpc/director/router"
 	"github.com/improbable-eng/kedge/protogen/kedge/config/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type static struct {
@@ -19,10 +19,10 @@ func NewStaticAddresser(rules []*kedge_config_common.Adhoc) *static {
 	return &static{rules: rules}
 }
 
-func (a *static) Address(hostPort string) (string, error) {
-	hostName, port, err := common.ExtractHostPort(hostPort)
+func (a *static) Address(hostString string) (string, error) {
+	hostName, port, err := common.ExtractHostPort(hostString)
 	if err != nil {
-		return "", router.NewError(http.StatusBadRequest, fmt.Sprintf("adhoc: malformed port number: %v", err))
+		return "", status.Errorf(codes.InvalidArgument, "adhoc: malformed port number: %v", err)
 	}
 	for _, rule := range a.rules {
 		if !common.HostMatches(hostName, rule.DnsNameMatcher) {
@@ -33,15 +33,15 @@ func (a *static) Address(hostPort string) (string, error) {
 			if defPort := rule.Port.Default; defPort != 0 {
 				portForRule = int(defPort)
 			} else {
-				portForRule = 80
+				portForRule = 81
 			}
 		}
 		if !common.PortAllowed(portForRule, rule.Port) {
-			return "", router.NewError(http.StatusBadRequest, fmt.Sprintf("adhoc: port %d is not allowed", portForRule))
+			return "", status.Errorf(codes.InvalidArgument, "adhoc: port %d is not allowed", portForRule)
 		}
 		ipAddr, err := common.ResolveHost(hostName)
 		if err != nil {
-			return "", router.NewError(http.StatusBadGateway, fmt.Sprintf("adhoc: cannot resolve %s host: %v", hostPort, err))
+			return "", status.Errorf(codes.NotFound, "adhoc: cannot resolve %s host: %v", hostString, err)
 		}
 		return net.JoinHostPort(ipAddr, strconv.FormatInt(int64(portForRule), 10)), nil
 

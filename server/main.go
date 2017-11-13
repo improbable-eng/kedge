@@ -141,11 +141,6 @@ func main() {
 	// httpNonAuthDebugChain chain is shares the same base but will not include auth. It is for metrics and _healthz.
 	httpNonAuthDebugChain := httpDebugChain
 
-	authorizer, err := authorizerFromFlags(logEntry)
-	if err != nil {
-		log.WithError(err).Fatal("failed to create authorizer.")
-	}
-
 	grpcUnaryInterceptors := []grpc.UnaryServerInterceptor{
 		grpc_ctxtags.UnaryServerInterceptor(),
 		grpc_logrus.UnaryServerInterceptor(logEntry),
@@ -157,6 +152,10 @@ func main() {
 		grpc_prometheus.StreamServerInterceptor,
 	}
 
+	authorizer, err := authorizerFromFlags(logEntry)
+	if err != nil {
+		log.WithError(err).Fatal("failed to create authorizer.")
+	}
 	if authorizer != nil {
 		httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(authorizer))
 

@@ -50,7 +50,7 @@ func authFromMD(ctx context.Context) (string, error) {
 
 	}
 	splits := strings.SplitN(val, " ", 2)
-	if len(splits) < 2 {
+	if len(splits) !=2 {
 		return "", grpc.Errorf(codes.Unauthenticated, "Bad authorization string")
 	}
 	if strings.ToLower(splits[0]) != "bearer" {

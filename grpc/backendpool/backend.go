@@ -12,7 +12,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/grpc/backends"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
 	"github.com/improbable-eng/kedge/lib/resolvers/k8s"
 	"github.com/improbable-eng/kedge/lib/resolvers/srv"
 	"github.com/sirupsen/logrus"

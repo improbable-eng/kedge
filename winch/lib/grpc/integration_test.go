@@ -16,7 +16,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	pb "github.com/improbable-eng/kedge/_protogen/winch/config"
+	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/winch/lib"
 	"github.com/stretchr/testify/assert"

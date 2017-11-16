@@ -8,7 +8,7 @@ import (
 	"time"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	pb_base "github.com/improbable-eng/kedge/_protogen/base"
+	pb_base "github.com/improbable-eng/kedge/protogen/base"
 	"github.com/improbable-eng/kedge/grpc/client"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/sirupsen/logrus"

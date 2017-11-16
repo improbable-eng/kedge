@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	pb_config "github.com/improbable-eng/kedge/_protogen/kedge/config"
-	pb_resolvers "github.com/improbable-eng/kedge/_protogen/kedge/config/common/resolvers"
-	pb_grpcbackends "github.com/improbable-eng/kedge/_protogen/kedge/config/grpc/backends"
-	pb_grpcroutes "github.com/improbable-eng/kedge/_protogen/kedge/config/grpc/routes"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
+	pb_resolvers "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
+	pb_grpcbackends "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
+	pb_grpcroutes "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

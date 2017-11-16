@@ -7,7 +7,7 @@ import (
 
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
-	pb "github.com/improbable-eng/kedge/_protogen/winch/config"
+	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/tokenauth"
 	"github.com/improbable-eng/kedge/lib/tokenauth/sources/k8s"
 	"github.com/improbable-eng/kedge/lib/tokenauth/sources/oidc"

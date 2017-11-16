@@ -27,7 +27,7 @@ import (
 	"github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/go-httpwares/tracing/debug"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	pb_config "github.com/improbable-eng/kedge/_protogen/kedge/config"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	grpc_director "github.com/improbable-eng/kedge/grpc/director"
 	http_director "github.com/improbable-eng/kedge/http/director"
 	"github.com/improbable-eng/kedge/lib/discovery"

@@ -3,7 +3,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROTOBUF_DIR=${PROTOBUF_DIR-${SCRIPT_DIR}/proto}
-PROTOGEN_DIR=_protogen
+PROTOGEN_DIR=protogen
 GENERATION_DIR=${GENERATION_DIR-${SCRIPT_DIR}/${PROTOGEN_DIR}}
 IMPORT_PREFIX="github.com/improbable-eng/kedge/${PROTOGEN_DIR}"
 

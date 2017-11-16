@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/jpillora/backoff"
-	pb_config "github.com/improbable-eng/kedge/_protogen/kedge/config"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/improbable-eng/kedge/lib/k8s"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
 	"github.com/pkg/errors"

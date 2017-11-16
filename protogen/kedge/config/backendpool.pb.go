@@ -19,8 +19,8 @@ import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/mwitkow/go-proto-validators"
-import  kedge_config_grpc_backends "github.com/improbable-eng/kedge/_protogen/kedge/config/grpc/backends"
-import  kedge_config_http_backends "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
+import  kedge_config_grpc_backends "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
+import  kedge_config_http_backends "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

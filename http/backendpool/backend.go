@@ -11,7 +11,7 @@ import (
 
 	"github.com/mwitkow/go-conntrack"
 	"github.com/improbable-eng/go-httpwares"
-	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
 	"github.com/improbable-eng/kedge/http/lbtransport"
 	"github.com/improbable-eng/kedge/lib/resolvers/k8s"
 	"github.com/improbable-eng/kedge/lib/resolvers/srv"

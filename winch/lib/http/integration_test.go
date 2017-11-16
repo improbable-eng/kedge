@@ -20,7 +20,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	pb "github.com/improbable-eng/kedge/_protogen/winch/config"
+	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/winch/lib"
 	"github.com/sirupsen/logrus"

@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/mwitkow/go-flagz/protobuf"
 	"github.com/mwitkow/go-proto-validators"
-	pb_config "github.com/improbable-eng/kedge/_protogen/kedge/config"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	grpc_bp "github.com/improbable-eng/kedge/grpc/backendpool"
 	grpc_router "github.com/improbable-eng/kedge/grpc/director/router"
 	http_bp "github.com/improbable-eng/kedge/http/backendpool"

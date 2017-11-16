@@ -17,7 +17,7 @@ import (
 	"github.com/mwitkow/go-flagz/protobuf"
 	"github.com/improbable-eng/go-httpwares/metrics"
 	"github.com/mwitkow/go-proto-validators"
-	pb_config "github.com/improbable-eng/kedge/_protogen/winch/config"
+	pb_config "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/http/header"
 	"github.com/improbable-eng/kedge/lib/http/tripperware"
 	"github.com/improbable-eng/kedge/lib/map"

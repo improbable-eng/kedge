@@ -1,7 +1,7 @@
 package router
 
 import (
-	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/grpc/routes"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
 
 	"strings"
 

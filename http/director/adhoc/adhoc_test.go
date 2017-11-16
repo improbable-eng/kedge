@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/jsonpb"
-	pb "github.com/improbable-eng/kedge/_protogen/kedge/config"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

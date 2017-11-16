@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	pb_route "github.com/improbable-eng/kedge/_protogen/kedge/config/http/routes"
+	pb_route "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

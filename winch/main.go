@@ -17,7 +17,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
-	pb_config "github.com/improbable-eng/kedge/_protogen/winch/config"
+	pb_config "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/reporter"
 	"github.com/improbable-eng/kedge/lib/sharedflags"

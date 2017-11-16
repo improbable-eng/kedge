@@ -3,10 +3,10 @@ package discovery
 import (
 	"testing"
 
-	pb_config "github.com/improbable-eng/kedge/_protogen/kedge/config"
-	pb_resolvers "github.com/improbable-eng/kedge/_protogen/kedge/config/common/resolvers"
-	pb_httpbackends "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
-	pb_httproutes "github.com/improbable-eng/kedge/_protogen/kedge/config/http/routes"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
+	pb_resolvers "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
+	pb_httpbackends "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
+	pb_httproutes "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	pb_resolvers "github.com/improbable-eng/kedge/_protogen/kedge/config/common/resolvers"
-	pb "github.com/improbable-eng/kedge/_protogen/kedge/config/http/backends"
+	pb_resolvers "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

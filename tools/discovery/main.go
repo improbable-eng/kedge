@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	pb_config "github.com/improbable-eng/kedge/_protogen/kedge/config"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/improbable-eng/kedge/lib/discovery"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
 	"github.com/sirupsen/logrus"

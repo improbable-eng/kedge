@@ -7,10 +7,6 @@ PROTOGEN_DIR=protogen
 GENERATION_DIR=${GENERATION_DIR-${SCRIPT_DIR}/${PROTOGEN_DIR}}
 IMPORT_PREFIX="github.com/improbable-eng/kedge/${PROTOGEN_DIR}"
 
-echo "Installing plugins"
-go get github.com/mwitkow/go-proto-validators/protoc-gen-govalidators
-go get github.com/golang/protobuf/protoc-gen-go
-
 # Builds all .proto files in a given package directory.
 # NOTE: All .proto files in a given package must be processed *together*, otherwise the self-referencing
 # between files in the same proto package will not work.

@@ -36,26 +36,26 @@ Kedge can be accessed then:
 
 Following diagram shows POD to POD communication cross-cluster.
 
-![Kedge Cert Routing](./kedge_arch.png)
+![Kedge Cert Routing](./docs/kedge_arch.png)
 
 ### Using Winch (local proxy to kedges)
 
-Following diagram shows the routing done by forward proxy called [winch (client)](winch/README.md). In this example kedge OIDC auth is enabled to support
+Following diagram shows the routing done by forward proxy called [winch (client)](docs/winch.md). In this example kedge OIDC auth is enabled to support
 corp use cases (per backend access controlled by permissions stored in custom IDToked claim). It can be also switched to just 
 client certificate verification as in the diagram above.
 
 NOTE: Any auth which is required by Service/Pod B needs to configured on winch due to clients blocking sending auth headers via
  plain HTTP, even over local network (e.g kubectl). 
 
-![Kedge Winch Routing](./kedge_arch_with_winch.png)
+![Kedge Winch Routing](./docs/kedge_arch_with_winch.png)
 
 ## Usage
 
-Kedge package is using [glide](https://github.com/Masterminds/glide) for vendoring.
+Kedge package is using [dep](https://github.com/golang/dep) for vendoring.
 
 Please see 
-* the [server](server/README.md) for an actual guide.
-* the [winch (client)](winch/README.md) for a local forward proxy targeting kedge.
+* the [kedge](docs/kedge.md) for an actual guide.
+* the [winch (client)](docs/winch.md) for a local forward proxy targeting kedge.
 
 ## Status
 

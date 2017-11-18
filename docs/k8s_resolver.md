@@ -1,6 +1,6 @@
 # k8sresolver
 
-Kubernetes resolver based on [endpoint API](https://kubernetes.io/docs/api-reference/v1.7/#endpoints-v1-core)
+Kubernetes resolver is based on [endpoint API](https://kubernetes.io/docs/api-reference/v1.7/#endpoints-v1-core)
 
 Inspired by https://github.com/sercand/kuberesolver but more suitable for our needs.
 

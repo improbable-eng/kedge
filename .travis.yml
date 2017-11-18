@@ -2,17 +2,12 @@ sudo: false
 language: go
 go:
   - 1.8.x
+  - 1.9.x
+
+go_import_path: github.com/improbable-eng/thanos
 
 install:
-  # Get just particular release. Use curl https://glide.sh/get | sh when fixed (currently API request limits).
-  - mkdir -p $HOME/bin
-  - wget -O $HOME/bin/dep "https://github.com/golang/dep/releases/download/v0.3.2/dep-linux-amd64"
-  - chmod +x $HOME/bin/dep
-  - export PATH="$HOME/bin:$PATH"
-  - dep ensure
+- make deps
 
 script:
- - ./test_all.sh
-
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
+- make format test

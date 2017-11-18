@@ -18,7 +18,7 @@ import (
 	"github.com/mwitkow/grpc-proxy/proxy"
 	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
-	"github.com/improbable-eng/kedge/winch/lib"
+	"github.com/improbable-eng/kedge/lib/winch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

@@ -22,10 +22,10 @@ import (
 	pb_res "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	pb_be "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
 	pb_route "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
-	"github.com/improbable-eng/kedge/grpc/backendpool"
-	"github.com/improbable-eng/kedge/grpc/client"
-	"github.com/improbable-eng/kedge/grpc/director"
-	"github.com/improbable-eng/kedge/grpc/director/router"
+	"github.com/improbable-eng/kedge/lib/kedge/grpc/backendpool"
+	"github.com/improbable-eng/kedge/lib/kedge/grpc/client"
+	"github.com/improbable-eng/kedge/lib/kedge/grpc/director"
+	"github.com/improbable-eng/kedge/lib/kedge/grpc/director/router"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/resolvers/srv"
 	"github.com/mwitkow/go-conntrack/connhelpers"
@@ -392,5 +392,5 @@ func (s *BackendPoolIntegrationTestSuite) tlsConfigForTest() *tls.Config {
 
 func getTestingCertsPath() string {
 	_, callerPath, _, _ := runtime.Caller(0)
-	return path.Join(path.Dir(callerPath), "..", "misc")
+	return path.Join(path.Dir(callerPath), "..", "..", "..", "misc")
 }

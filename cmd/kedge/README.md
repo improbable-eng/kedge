@@ -1,6 +1,6 @@
-# Proof of concept Server
+# Kedge command
 
-This server starts up a gRPC reverse proxy.
+Kedges starts up a gRPC and reverse proxy.
 
 ## Configuration
 
@@ -81,8 +81,7 @@ Here's an example that runs the server listening on four ports (80 for debug HTT
 client side certs:
 
 ```bash
-go build 
-./server \
+go build ./cmd/kedge \
   --server_grpc_tls_port=444 \
   --server_http_port=80 \
   --server_http_tls_port=443 \ 
@@ -98,8 +97,7 @@ Optionally you can skip client's side cert requirement and perform authorization
 some OIDC provider running, that supports filling permissions into ID token claim):
 
 ```bash
-go build 
-./server \
+go build ./cmd/kedge \
   --server_grpc_tls_port=444 \
   --server_http_port=80 \
   --server_http_tls_port=443 \ 

@@ -23,7 +23,7 @@ import (
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
 	"github.com/improbable-eng/kedge/lib/tls"
-	"github.com/improbable-eng/kedge/winch/lib"
+	"github.com/improbable-eng/kedge/lib/winch"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )

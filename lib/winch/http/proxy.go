@@ -12,7 +12,7 @@ import (
 	"github.com/improbable-eng/go-httpwares"
 	"github.com/improbable-eng/go-httpwares/logging/logrus"
 	"github.com/improbable-eng/go-httpwares/tags"
-	"github.com/improbable-eng/kedge/http/director/proxyreq"
+	"github.com/improbable-eng/kedge/lib/kedge/http/director/proxyreq"
 	"github.com/improbable-eng/kedge/lib/http/header"
 	"github.com/improbable-eng/kedge/lib/http/tripperware"
 	"github.com/improbable-eng/kedge/lib/map"

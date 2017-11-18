@@ -11,7 +11,7 @@
 //
 // Tests consist of HTTP requests to different routes, and verification whether the proxy performed the expected operation.
 // This also tests the official dialing client.
-package http_integration_test
+package http_integration
 
 import (
 	"context"
@@ -39,11 +39,11 @@ import (
 	pb_res "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	pb_be "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
 	pb_route "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
-	"github.com/improbable-eng/kedge/http/backendpool"
-	"github.com/improbable-eng/kedge/http/client"
-	"github.com/improbable-eng/kedge/http/director"
-	"github.com/improbable-eng/kedge/http/director/adhoc"
-	"github.com/improbable-eng/kedge/http/director/router"
+	"github.com/improbable-eng/kedge/lib/kedge/http/backendpool"
+	"github.com/improbable-eng/kedge/lib/kedge/http/client"
+	"github.com/improbable-eng/kedge/lib/kedge/http/director"
+	"github.com/improbable-eng/kedge/lib/kedge/http/director/adhoc"
+	"github.com/improbable-eng/kedge/lib/kedge/http/director/router"
 	"github.com/improbable-eng/kedge/lib/http/header"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/reporter"
@@ -733,7 +733,7 @@ func (s *HttpProxyingIntegrationSuite) tlsConfigForTest() *tls.Config {
 
 func getTestingCertsPath() string {
 	_, callerPath, _, _ := runtime.Caller(0)
-	return path.Join(path.Dir(callerPath), "..", "misc")
+	return path.Join(path.Dir(callerPath), "..", "..", "..", "misc")
 }
 
 func urlMustParse(uStr string) *url.URL {

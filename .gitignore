@@ -29,3 +29,5 @@ _testmain.go
 *.prof
 
 vendor/*
+cmd/kedge/kedge
+cmd/winch/winch

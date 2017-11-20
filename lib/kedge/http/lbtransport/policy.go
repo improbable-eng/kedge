@@ -62,7 +62,7 @@ func RoundRobinPolicy(ctx context.Context, backoffDuration time.Duration, dialTi
 		blacklistBackoffDuration: backoffDuration,
 		blacklistedTargets:       make(map[Target]time.Time),
 		dialTimeout:              dialTimeout,
-		timeNow: time.Now,
+		timeNow:                  time.Now,
 	}
 
 	go func() {

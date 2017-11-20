@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/mwitkow/go-conntrack/connhelpers"
 )
 
 var (

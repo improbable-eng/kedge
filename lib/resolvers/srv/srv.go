@@ -3,13 +3,14 @@ package srvresolver
 import (
 	"time"
 
+	"fmt"
+	"net"
+	"strings"
+
 	"github.com/improbable-eng/go-srvlb/grpc"
 	"github.com/improbable-eng/go-srvlb/srv"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	"google.golang.org/grpc/naming"
-	"strings"
-	"net"
-	"fmt"
 )
 
 var (
@@ -29,13 +30,13 @@ func NewFromConfig(conf *pb.SrvResolver) (target string, namer naming.Resolver, 
 func newPortOverrideSRVResolver(port uint32, resolver srv.Resolver) srv.Resolver {
 	return &portOverrideSRVResolver{
 		parent: resolver,
-		port: port,
+		port:   port,
 	}
 }
 
 type portOverrideSRVResolver struct {
 	parent srv.Resolver
-	port uint32
+	port   uint32
 }
 
 func (r *portOverrideSRVResolver) Lookup(domainName string) ([]*srv.Target, error) {

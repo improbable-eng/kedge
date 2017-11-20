@@ -6,10 +6,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/improbable-eng/kedge/lib/tokenauth"
 	"github.com/Bplotka/oidc"
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
+	"github.com/improbable-eng/kedge/lib/tokenauth"
 	"github.com/pkg/errors"
 )
 

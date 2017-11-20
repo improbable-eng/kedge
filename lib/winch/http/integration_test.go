@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	"github.com/mwitkow/go-conntrack/connhelpers"
-	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/winch"
+	pb "github.com/improbable-eng/kedge/protogen/winch/config"
+	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/pkg/errors"
 	"io/ioutil"
+
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 

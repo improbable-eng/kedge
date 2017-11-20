@@ -10,21 +10,21 @@ import (
 	"time"
 
 	"github.com/Bplotka/oidc/authorize"
-	"github.com/mwitkow/go-conntrack"
 	"github.com/improbable-eng/go-httpwares"
 	"github.com/improbable-eng/go-httpwares/logging/logrus"
 	"github.com/improbable-eng/go-httpwares/metrics"
 	"github.com/improbable-eng/go-httpwares/metrics/prometheus"
 	"github.com/improbable-eng/go-httpwares/tags"
+	"github.com/improbable-eng/kedge/lib/http/ctxtags"
+	"github.com/improbable-eng/kedge/lib/http/tripperware"
 	"github.com/improbable-eng/kedge/lib/kedge/http/backendpool"
 	"github.com/improbable-eng/kedge/lib/kedge/http/director/adhoc"
 	"github.com/improbable-eng/kedge/lib/kedge/http/director/proxyreq"
 	"github.com/improbable-eng/kedge/lib/kedge/http/director/router"
-	"github.com/improbable-eng/kedge/lib/http/ctxtags"
-	"github.com/improbable-eng/kedge/lib/http/tripperware"
 	"github.com/improbable-eng/kedge/lib/reporter"
 	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/mwitkow/go-conntrack"
 	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 )
@@ -56,7 +56,7 @@ var (
 // If Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
 func New(pool backendpool.Pool, router router.Router, adhocRouter adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
 	p := &Proxy{
-		router:    router,
+		router:      router,
 		adhocRouter: adhocRouter,
 	}
 
@@ -112,6 +112,9 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	// - adhoc routing
 	// - unknown route to host
 	// - routing error
+
+	// From go 1.9 we need to add that manually.
+	req.URL.Host = req.Host
 
 	backend, err := p.router.Route(req)
 	if err == router.ErrRouteNotFound {

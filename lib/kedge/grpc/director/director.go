@@ -7,9 +7,9 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/improbable-eng/kedge/lib/kedge/grpc/backendpool"
 	"github.com/improbable-eng/kedge/lib/kedge/grpc/director/router"
+	"github.com/mwitkow/grpc-proxy/proxy"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -50,7 +50,7 @@ func authFromMD(ctx context.Context) (string, error) {
 
 	}
 	splits := strings.SplitN(val, " ", 2)
-	if len(splits) !=2 {
+	if len(splits) != 2 {
 		return "", grpc.Errorf(codes.Unauthenticated, "Bad authorization string")
 	}
 	if strings.ToLower(splits[0]) != "bearer" {

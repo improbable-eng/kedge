@@ -9,18 +9,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mwitkow/go-conntrack"
 	"github.com/improbable-eng/go-httpwares"
-	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
 	"github.com/improbable-eng/kedge/lib/kedge/http/lbtransport"
+	"github.com/improbable-eng/kedge/lib/reporter"
+	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
 	"github.com/improbable-eng/kedge/lib/resolvers/k8s"
 	"github.com/improbable-eng/kedge/lib/resolvers/srv"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
+	"github.com/mwitkow/go-conntrack"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/naming"
-	"github.com/improbable-eng/kedge/lib/reporter"
-	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
 )
 
 var (

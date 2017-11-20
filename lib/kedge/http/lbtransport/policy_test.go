@@ -5,16 +5,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fortytw2/leaktest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/fortytw2/leaktest"
 )
 
 var (
 	testFailBlacklistDuration = 2 * time.Second
 )
 
-func assertTargetsPickedInOrder(t *testing.T, picker LBPolicyPicker, testTargets []*Target, expectedTargets... *Target) {
+func assertTargetsPickedInOrder(t *testing.T, picker LBPolicyPicker, testTargets []*Target, expectedTargets ...*Target) {
 	req := httptest.NewRequest("GET", "http://does-not-matter", nil)
 
 	// Picking serially should give targets in exact order.
@@ -107,7 +107,7 @@ func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
 	rr := &roundRobinPolicy{
 		blacklistBackoffDuration: 0 * time.Millisecond, // No global blacklist!
 		blacklistedTargets:       make(map[Target]time.Time),
-		timeNow: time.Now,
+		timeNow:                  time.Now,
 	}
 
 	testTargets := []*Target{
@@ -128,7 +128,6 @@ func TestRoundRobinPolicy_PickWithLocalBlacklists(t *testing.T) {
 	rr.atomicCounter = 0
 	picker1.ExcludeTarget(testTargets[0])
 	assert.True(t, picker1.(*roundRobinPolicyPicker).isTargetLocallyBlacklisted(testTargets[0]))
-
 
 	// With target number 0 in local blacklist new picker should give targets in exact order without that failing one.
 	assertTargetsPickedInOrder(t, picker1, testTargets, testTargets[1], testTargets[2], testTargets[1])

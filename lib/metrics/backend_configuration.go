@@ -7,6 +7,7 @@ const (
 	ConfiguationActionChange = "update"
 	ConfiguationActionDelete = "delete"
 )
+
 var (
 	BackendHTTPConfigurationCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{

@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"net/http"
 
+	"os"
+
 	"github.com/google/uuid"
 	"github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/lib/http/ctxtags"
 	"github.com/improbable-eng/kedge/lib/http/header"
-	"os"
 )
-
 
 // setHeaderTripperware is a piece of tripperware that sets specified header value into request.
 // Optionally you can specify tag name that to put the header value into.
 type setHeaderTripperware struct {
-	headerName string
-	headerValueFn func()string
-	tagName string
+	headerName    string
+	headerValueFn func() string
+	tagName       string
 
 	parent http.RoundTripper
 }
@@ -38,11 +38,11 @@ func (t *setHeaderTripperware) RoundTrip(req *http.Request) (*http.Response, err
 func WrapForRequestID(prefix string, parentTransport http.RoundTripper) http.RoundTripper {
 	return &setHeaderTripperware{
 		headerName: header.RequestKedgeRequestID,
-		headerValueFn: func()string {
+		headerValueFn: func() string {
 			return fmt.Sprintf("%s%s", prefix, uuid.New().String())
 		},
 		tagName: ctxtags.TagRequestID,
-		parent: parentTransport,
+		parent:  parentTransport,
 	}
 }
 
@@ -50,7 +50,7 @@ func WrapForRequestID(prefix string, parentTransport http.RoundTripper) http.Rou
 func WrapForDebug(parentTransport http.RoundTripper) http.RoundTripper {
 	return &setHeaderTripperware{
 		headerName: header.RequestKedgeForceInfoLogs,
-		headerValueFn: func()string {
+		headerValueFn: func() string {
 			return os.ExpandEnv("winch-$USER")
 		},
 		parent: parentTransport,

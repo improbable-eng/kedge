@@ -4,15 +4,15 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/mwitkow/go-flagz/protobuf"
-	"github.com/mwitkow/go-proto-validators"
-	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	grpc_bp "github.com/improbable-eng/kedge/lib/kedge/grpc/backendpool"
 	grpc_router "github.com/improbable-eng/kedge/lib/kedge/grpc/director/router"
 	http_bp "github.com/improbable-eng/kedge/lib/kedge/http/backendpool"
 	http_adhoc "github.com/improbable-eng/kedge/lib/kedge/http/director/adhoc"
 	http_router "github.com/improbable-eng/kedge/lib/kedge/http/director/router"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
+	"github.com/mwitkow/go-flagz/protobuf"
+	"github.com/mwitkow/go-proto-validators"
 	"github.com/sirupsen/logrus"
 )
 

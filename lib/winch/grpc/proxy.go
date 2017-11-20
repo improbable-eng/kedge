@@ -3,19 +3,20 @@ package grpc_winch
 import (
 	"fmt"
 
+	"crypto/tls"
+	"net"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/tokenauth"
+	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"crypto/tls"
-	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/codes"
-	"net"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 )
 
 // New builds a StreamDirector based off a backend pool and a router.
@@ -42,7 +43,7 @@ func New(mapper kedge_map.Mapper, config *tls.Config) proxy.StreamDirector {
 		transportCreds = &proxiedTlsCredentials{TransportCredentials: transportCreds, authorityNameOverride: targetAuthority}
 
 		// NOTE: winch does not support non-TLS kedge explicitly.
-		dialOpts := []grpc.DialOption {
+		dialOpts := []grpc.DialOption{
 			grpc.WithCodec(proxy.Codec()), // needed for the winch to function at all.
 			grpc.WithBlock(),
 			grpc.WithTransportCredentials(transportCreds),

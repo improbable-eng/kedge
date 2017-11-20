@@ -4,8 +4,8 @@ import (
 	"hash/fnv"
 	"sync"
 
-	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
 	"github.com/improbable-eng/kedge/lib/metrics"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )

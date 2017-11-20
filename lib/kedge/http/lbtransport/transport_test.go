@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"io/ioutil"
+
 	"github.com/fortytw2/leaktest"
 	"github.com/improbable-eng/kedge/lib/reporter"
 	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
@@ -16,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/naming"
-	"io/ioutil"
 )
 
 var (
@@ -28,8 +29,8 @@ var (
 type BalancedRRTransportSuite struct {
 	suite.Suite
 
-	policy  *roundRobinPolicy
-	ctx context.Context
+	policy   *roundRobinPolicy
+	ctx      context.Context
 	cancelFn context.CancelFunc
 
 	lbTrans *tripper
@@ -174,7 +175,7 @@ func (s *BalancedRRTransportSuite) callLBTransportAndAssert(requestsPerBackend i
 			if err != nil {
 				s.T().Errorf("Encountered error on request %v: %v", id, err)
 			}
-			_, _  = ioutil.ReadAll(resp.Body)
+			_, _ = ioutil.ReadAll(resp.Body)
 			resp.Body.Close()
 			wg.Done()
 		}(i)

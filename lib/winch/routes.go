@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
 	"github.com/improbable-eng/kedge/lib/tokenauth"
+	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 )
 
 type StaticRoutes struct {

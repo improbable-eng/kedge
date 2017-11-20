@@ -98,7 +98,7 @@ type unknownResponse struct {
 }
 
 func (m *unknownResponse) Reset()         { *m = unknownResponse{} }
-func (m *unknownResponse) String() string { return fmt.Sprintf("%v", m) }
+func (m *unknownResponse) String() string { return fmt.Sprintf("%v", *m) }
 func (*unknownResponse) ProtoMessage()    {}
 
 func unknownPingbackHandler(backendName string, serverAddr string) grpc.StreamHandler {

@@ -171,6 +171,7 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 
 			err = d.setFlags(director, directorFlagz, backendPool, backendpoolFlagz)
 			if err != nil {
+				streamCancel()
 				// This is critical error, since retry will not help. Not much we can do, abort dynamic discovery.
 				return errors.Wrap(err, "discovery: Critical error on updating flags from director and backendpool configs. Discover will not work!")
 			}

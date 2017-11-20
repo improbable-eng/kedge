@@ -28,6 +28,7 @@ func startWatchingServicesChanges(
 	innerCtx, innerCancel := context.WithCancel(ctx)
 	stream, err := serviceClient.StartChangeStream(innerCtx, labelSelector)
 	if err != nil {
+		innerCancel()
 		return errors.Wrapf(err, "discovery stream: Failed to do start stream for label %s", labelSelector)
 	}
 

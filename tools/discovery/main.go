@@ -25,7 +25,7 @@ func main() {
 
 	lvl, err := logrus.ParseLevel(*flagLogLevel)
 	if err != nil {
-		logrus.WithError(err).Fatal("Cannot parse log level: %s", *flagLogLevel)
+		logrus.WithError(err).Fatalf("Cannot parse log level: %s", *flagLogLevel)
 	}
 	logrus.SetLevel(lvl)
 

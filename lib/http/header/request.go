@@ -5,5 +5,5 @@ const (
 	RequestKedgeRequestID = "X-Kedge-Request-ID"
 
 	// RequestKedgeForceInfoLogs header is used to signal kedge, to log on info proxy error or OK request.
-	RequestKedgeForceInfoLogs ="X-Kedge-Info-Logs"
+	RequestKedgeForceInfoLogs = "X-Kedge-Info-Logs"
 )

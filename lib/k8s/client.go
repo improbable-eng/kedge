@@ -1,8 +1,9 @@
 package k8s
 
 import (
-	"net/http"
 	"crypto/tls"
+	"net/http"
+
 	"github.com/improbable-eng/kedge/lib/tokenauth"
 	"github.com/improbable-eng/kedge/lib/tokenauth/http"
 )

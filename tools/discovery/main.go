@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
+	"time"
+
 	"github.com/improbable-eng/kedge/lib/discovery"
 	"github.com/improbable-eng/kedge/lib/sharedflags"
+	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 var (
@@ -44,7 +45,7 @@ func generateRoutings(ctx context.Context, logger logrus.FieldLogger) error {
 		return err
 	}
 
-	director, backendpool, err := backendDiscovery.DiscoverOnce(ctx, 3 * time.Second)
+	director, backendpool, err := backendDiscovery.DiscoverOnce(ctx, 3*time.Second)
 	if err != nil {
 		return err
 	}

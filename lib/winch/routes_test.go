@@ -3,8 +3,8 @@ package winch
 import (
 	"testing"
 
-	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/improbable-eng/kedge/lib/map"
+	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -103,7 +103,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			scheme: "http",
 			host:   "path.port.example.com",
 			port:   "83",
-			path: "/some/strict/path",
+			path:   "/some/strict/path",
 
 			expectedBackend: "d",
 		},
@@ -112,7 +112,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			scheme: "https",
 			host:   "path.httsdefport.example.com",
 			port:   "443",
-			path: "/some/strict/path",
+			path:   "/some/strict/path",
 
 			expectedBackend: "e",
 		},
@@ -121,7 +121,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			// TLS default port will be appended and it exactly matches 'e' backend route.
 			scheme: "https",
 			host:   "path.httsdefport.example.com",
-			path: "/some/strict/path",
+			path:   "/some/strict/path",
 
 			expectedBackend: "e",
 		},
@@ -130,7 +130,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			scheme: "http",
 			host:   "wrong.path.port.example.com",
 			port:   "83",
-			path: "/some/strict/path",
+			path:   "/some/strict/path",
 
 			expectedErr: ErrRouteNotFound,
 		},
@@ -139,7 +139,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			scheme: "http",
 			host:   "path.port.example.com",
 			port:   "84",
-			path: "/some/strict/path",
+			path:   "/some/strict/path",
 
 			expectedErr: ErrRouteNotFound,
 		},
@@ -148,7 +148,7 @@ func TestRoute_NoPathNoPort_PortExpanded(t *testing.T) {
 			scheme: "http",
 			host:   "path.port.example.com",
 			port:   "83",
-			path: "/some/strict/pathwrong",
+			path:   "/some/strict/pathwrong",
 
 			expectedErr: ErrRouteNotFound,
 		},

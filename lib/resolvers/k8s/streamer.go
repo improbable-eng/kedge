@@ -22,6 +22,7 @@ func startWatchingEndpointsChanges(
 	innerCtx, innerCancel := context.WithCancel(ctx)
 	stream, err := epClient.StartChangeStream(innerCtx, target)
 	if err != nil {
+		innerCancel()
 		return errors.Wrapf(err, "k8sresolver: Failed to do start stream for target %v", target)
 	}
 

@@ -122,7 +122,8 @@ func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
 		)
 	}
 	return grpc.WithDialer(func(addr string, t time.Duration) (net.Conn, error) {
-		ctx, _ := context.WithTimeout(context.Background(), t)
+		ctx, cancel := context.WithTimeout(context.Background(), t)
+		defer cancel()
 		return dialFunc(ctx, "tcp", addr)
 	})
 }

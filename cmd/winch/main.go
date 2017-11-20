@@ -92,7 +92,7 @@ func main() {
 	if !*flagDebugMode {
 		lvl, err = log.ParseLevel(*flagLogLevel)
 		if err != nil {
-			log.WithError(err).Fatal("Cannot parse log level: %s", *flagLogLevel)
+			log.WithError(err).Fatalf("Cannot parse log level: %s", *flagLogLevel)
 		}
 	}
 	log.SetLevel(lvl)

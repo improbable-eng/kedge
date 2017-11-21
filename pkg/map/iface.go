@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/url"
 
-	"github.com/improbable-eng/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/pkg/tokenauth"
 )
 
 var (

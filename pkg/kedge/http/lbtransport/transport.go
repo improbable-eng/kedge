@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/improbable-eng/go-httpwares/tags"
-	"github.com/improbable-eng/kedge/lib/http/ctxtags"
-	"github.com/improbable-eng/kedge/lib/reporter"
-	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
+	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
+	"github.com/improbable-eng/kedge/pkg/reporter"
+	"github.com/improbable-eng/kedge/pkg/reporter/errtypes"
 	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"

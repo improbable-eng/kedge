@@ -9,10 +9,10 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/improbable-eng/kedge/lib/sharedflags"
-	"github.com/improbable-eng/kedge/lib/tokenauth"
-	"github.com/improbable-eng/kedge/lib/tokenauth/sources/direct"
-	"github.com/improbable-eng/kedge/lib/tokenauth/sources/k8s"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
+	"github.com/improbable-eng/kedge/pkg/tokenauth"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
 	"github.com/pkg/errors"
 )
 

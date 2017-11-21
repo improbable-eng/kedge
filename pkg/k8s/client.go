@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	"github.com/improbable-eng/kedge/lib/tokenauth"
-	"github.com/improbable-eng/kedge/lib/tokenauth/http"
+	"github.com/improbable-eng/kedge/pkg/tokenauth"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/http"
 )
 
 type APIClient struct {

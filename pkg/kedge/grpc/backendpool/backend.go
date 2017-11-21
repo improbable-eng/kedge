@@ -10,8 +10,8 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/improbable-eng/kedge/lib/resolvers/k8s"
-	"github.com/improbable-eng/kedge/lib/resolvers/srv"
+	"github.com/improbable-eng/kedge/pkg/resolvers/k8s"
+	"github.com/improbable-eng/kedge/pkg/resolvers/srv"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/grpc-proxy/proxy"

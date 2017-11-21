@@ -8,8 +8,8 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/improbable-eng/kedge/lib/map"
-	"github.com/improbable-eng/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/pkg/map"
+	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"

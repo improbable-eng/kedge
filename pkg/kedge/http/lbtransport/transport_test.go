@@ -12,8 +12,8 @@ import (
 	"io/ioutil"
 
 	"github.com/fortytw2/leaktest"
-	"github.com/improbable-eng/kedge/lib/reporter"
-	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
+	"github.com/improbable-eng/kedge/pkg/reporter"
+	"github.com/improbable-eng/kedge/pkg/reporter/errtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

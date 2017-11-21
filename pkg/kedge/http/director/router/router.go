@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/improbable-eng/kedge/lib/kedge/http/director/proxyreq"
+	"github.com/improbable-eng/kedge/pkg/kedge/http/director/proxyreq"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 	"google.golang.org/grpc/metadata"
 )

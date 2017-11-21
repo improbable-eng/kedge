@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

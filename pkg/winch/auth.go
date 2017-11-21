@@ -7,10 +7,10 @@ import (
 
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
-	"github.com/improbable-eng/kedge/lib/tokenauth"
-	"github.com/improbable-eng/kedge/lib/tokenauth/sources/k8s"
-	"github.com/improbable-eng/kedge/lib/tokenauth/sources/oidc"
-	"github.com/improbable-eng/kedge/lib/tokenauth/sources/test"
+	"github.com/improbable-eng/kedge/pkg/tokenauth"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/oidc"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/test"
 	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/pkg/errors"
 )

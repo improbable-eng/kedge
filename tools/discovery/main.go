@@ -8,8 +8,8 @@ import (
 
 	"time"
 
-	"github.com/improbable-eng/kedge/lib/discovery"
-	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/pkg/discovery"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/sirupsen/logrus"
 )

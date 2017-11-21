@@ -8,9 +8,9 @@ import (
 
 	"github.com/improbable-eng/go-httpwares"
 	"github.com/improbable-eng/go-httpwares/tags"
-	"github.com/improbable-eng/kedge/lib/http/header"
-	"github.com/improbable-eng/kedge/lib/metrics"
-	"github.com/improbable-eng/kedge/lib/reporter/errtypes"
+	"github.com/improbable-eng/kedge/pkg/http/header"
+	"github.com/improbable-eng/kedge/pkg/metrics"
+	"github.com/improbable-eng/kedge/pkg/reporter/errtypes"
 	"github.com/sirupsen/logrus"
 )
 

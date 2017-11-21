@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 )
 

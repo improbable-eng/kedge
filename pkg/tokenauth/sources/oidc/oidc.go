@@ -9,7 +9,7 @@ import (
 	"github.com/Bplotka/oidc"
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
-	"github.com/improbable-eng/kedge/lib/tokenauth"
+	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/pkg/errors"
 )
 

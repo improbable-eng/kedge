@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/improbable-eng/kedge/lib/kedge/http/director/router"
+	"github.com/improbable-eng/kedge/pkg/kedge/http/director/router"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 )
 

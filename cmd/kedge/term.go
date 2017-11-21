@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/sirupsen/logrus"
 )
 

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/sirupsen/logrus"
 )
 

@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	"github.com/improbable-eng/kedge/lib/map"
-	"github.com/improbable-eng/kedge/lib/winch"
+	"github.com/improbable-eng/kedge/pkg/map"
+	"github.com/improbable-eng/kedge/pkg/winch"
 	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/sirupsen/logrus"

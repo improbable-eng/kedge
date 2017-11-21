@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/improbable-eng/go-httpwares/tags"
-	"github.com/improbable-eng/kedge/lib/http/ctxtags"
-	"github.com/improbable-eng/kedge/lib/http/header"
+	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
+	"github.com/improbable-eng/kedge/pkg/http/header"
 )
 
 // setHeaderTripperware is a piece of tripperware that sets specified header value into request.

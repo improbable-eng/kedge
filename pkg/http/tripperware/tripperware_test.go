@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/improbable-eng/kedge/lib/map"
-	"github.com/improbable-eng/kedge/lib/tokenauth/sources/direct"
+	"github.com/improbable-eng/kedge/pkg/map"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

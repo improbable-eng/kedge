@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/jsonpb"
-	"github.com/improbable-eng/kedge/lib/k8s"
-	"github.com/improbable-eng/kedge/lib/sharedflags"
+	"github.com/improbable-eng/kedge/pkg/k8s"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/jpillora/backoff"
 	"github.com/mwitkow/go-flagz/protobuf"

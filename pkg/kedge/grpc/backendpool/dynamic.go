@@ -4,7 +4,7 @@ import (
 	"hash/fnv"
 	"sync"
 
-	"github.com/improbable-eng/kedge/lib/metrics"
+	"github.com/improbable-eng/kedge/pkg/metrics"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/improbable-eng/kedge/pkg/kedge/http/director/matcher"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director/router"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 )
@@ -52,12 +53,24 @@ func (d *dynamic) Update(rules []*pb.Adhoc) {
 	d.mu.Unlock()
 }
 
+type route struct {
+	*matcher.Matcher
+	port *pb.Adhoc_Port
+}
+
 type static struct {
-	rules []*pb.Adhoc
+	rules []route
 }
 
 func NewStaticAddresser(rules []*pb.Adhoc) *static {
-	return &static{rules: rules}
+	var staticRules []route
+	for _, r := range rules {
+		staticRules = append(staticRules, route{
+			Matcher: matcher.New(r.Matcher),
+			port:    r.Port,
+		})
+	}
+	return &static{rules: staticRules}
 }
 
 func (a *static) Address(req *http.Request) (string, error) {
@@ -65,19 +78,19 @@ func (a *static) Address(req *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, rule := range a.rules {
-		if !a.hostMatches(hostName, rule.DnsNameMatcher) {
+	for _, r := range a.rules {
+		if !r.Match(req) {
 			continue
 		}
 		portForRule := port
 		if port == 0 {
-			if defPort := rule.Port.Default; defPort != 0 {
+			if defPort := r.port.Default; defPort != 0 {
 				portForRule = int(defPort)
 			} else {
 				portForRule = 80
 			}
 		}
-		if !a.portAllowed(portForRule, rule.Port) {
+		if !a.portAllowed(portForRule, r.port) {
 			return "", router.NewError(http.StatusBadRequest, fmt.Sprintf("adhoc: port %d is not allowed", portForRule))
 		}
 		ipAddr, err := resolveHost(hostName)
@@ -111,16 +124,6 @@ func extractHostPort(hostStr string) (hostName string, port int, err error) {
 		return "", 0, router.NewError(http.StatusBadRequest, fmt.Sprintf("adhoc: malformed port number: %v", err))
 	}
 	return hostStr[:portOffset], int(pNum), nil
-}
-
-func (*static) hostMatches(host string, matcher string) bool {
-	if matcher == "" {
-		return false
-	}
-	if matcher[0] != '*' {
-		return host == matcher
-	}
-	return strings.HasSuffix(host, matcher[1:])
 }
 
 func (*static) portAllowed(port int, portRule *pb.Adhoc_Port) bool {

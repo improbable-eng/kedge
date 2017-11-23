@@ -21,7 +21,6 @@ message BackendPoolConfig {
     repeated TlsServerConfig tls_server_configs = 1;
     Grpc grpc = 2;
     Http http = 3;
-
 }
 
 message TlsServerConfig {

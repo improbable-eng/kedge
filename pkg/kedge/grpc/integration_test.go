@@ -68,26 +68,36 @@ var defaultBackendCount = 5
 
 var routeConfigs = []*pb_route.Route{
 	&pb_route.Route{
-		BackendName:        "secure",
-		ServiceNameMatcher: "hand_rolled.secure.*", // testservice is mwitkow.testproto
+		BackendName: "secure",
+		Matcher: &pb_route.Matcher{
+			ServiceName: "hand_rolled.secure.*", // testservice is mwitkow.testproto
+		},
 	},
 	&pb_route.Route{
-		BackendName:        "non_secure",
-		ServiceNameMatcher: "hand_rolled.non_secure.*", // these will be used in unknownPingBackHandler-based tests
+		BackendName: "non_secure",
+		Matcher: &pb_route.Matcher{
+			ServiceName: "hand_rolled.non_secure.*", // these will be used in unknownPingBackHandler-based tests
+		},
 	},
 	&pb_route.Route{
-		BackendName:        "unspecified_backend",
-		ServiceNameMatcher: "bad.backend.*", // bad.backend will match a bad tests
+		BackendName: "unspecified_backend",
+		Matcher: &pb_route.Matcher{
+			ServiceName: "bad.backend.*", // bad.backend will match a bad tests
+		},
 	},
 	&pb_route.Route{
-		BackendName:        "secure",
-		ServiceNameMatcher: "hand_rolled.common.*", // these will be used in unknownPingBackHandler-based tests
-		AuthorityMatcher:   "secure.ext.test.local",
+		BackendName: "secure",
+		Matcher: &pb_route.Matcher{
+			ServiceName: "hand_rolled.common.*", // these will be used in unknownPingBackHandler-based tests
+			Authority:   "secure.ext.test.local",
+		},
 	},
 	&pb_route.Route{
-		BackendName:        "non_secure",
-		ServiceNameMatcher: "hand_rolled.common.*", // bad.backend will match a bad tests
-		AuthorityMatcher:   "non_secure.ext.test.local",
+		BackendName: "non_secure",
+		Matcher: &pb_route.Matcher{
+			ServiceName: "hand_rolled.common.*", // bad.backend will match a bad tests
+			Authority:   "non_secure.ext.test.local",
+		},
 	},
 }
 

@@ -102,50 +102,66 @@ var (
 	routeConfigs = []*pb_route.Route{
 		&pb_route.Route{
 			BackendName: "non_secure",
-			PathRules:   []string{"/some/strict/path"},
-			HostMatcher: "nonsecure.ext.withport.example.com",
-			PortMatcher: 81,
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				PathRules: []string{"/some/strict/path"},
+				Host:      "nonsecure.ext.withport.example.com",
+				Port:      81,
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "non_secure",
-			PathRules:   []string{"/some/strict/path"},
-			HostMatcher: "nonsecure.ext.withoutport.example.com",
-			PortMatcher: 80,
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				PathRules: []string{"/some/strict/path"},
+				Host:      "nonsecure.ext.withoutport.example.com",
+				Port:      80,
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "non_secure",
-			PathRules:   []string{"/some/strict/path"},
-			HostMatcher: "nonsecure.ext.example.com",
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				PathRules: []string{"/some/strict/path"},
+				Host:      "nonsecure.ext.example.com",
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "non_secure",
-			HostMatcher: "nonsecure.backends.test.local",
-			ProxyMode:   pb_route.ProxyMode_FORWARD_PROXY,
+			Matcher: &pb_route.Matcher{
+				Host:      "nonsecure.backends.test.local",
+				ProxyMode: pb_route.ProxyMode_FORWARD_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "secure",
-			PathRules:   []string{"/some/strict/path"},
-			HostMatcher: "secure.ext.example.com",
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				PathRules: []string{"/some/strict/path"},
+				Host:      "secure.ext.example.com",
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "secure",
-			HostMatcher: "secure.backends.test.local",
-			ProxyMode:   pb_route.ProxyMode_FORWARD_PROXY,
+			Matcher: &pb_route.Matcher{
+				Host:      "secure.backends.test.local",
+				ProxyMode: pb_route.ProxyMode_FORWARD_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "killer",
-			HostMatcher: "nonsecure.killerbackend.test.local",
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				Host:      "nonsecure.killerbackend.test.local",
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 	}
 
 	adhocConfig = []*pb_route.Adhoc{
 		{
-			DnsNameMatcher: "*.pods.test.local",
+			Matcher: &pb_route.Matcher{
+				Host: "*.pods.test.local",
+			},
 			Port: &pb_route.Adhoc_Port{
 				AllowedRanges: []*pb_route.Adhoc_Port_Range{
 					{

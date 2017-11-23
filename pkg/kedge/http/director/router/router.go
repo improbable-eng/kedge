@@ -2,19 +2,14 @@ package router
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 
-	"github.com/improbable-eng/kedge/pkg/kedge/http/director/proxyreq"
+	"github.com/improbable-eng/kedge/pkg/kedge/http/director/matcher"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
-	"google.golang.org/grpc/metadata"
 )
 
 var (
-	emptyMd          = metadata.Pairs()
 	ErrRouteNotFound = errors.New("unknown route to service")
 )
 
@@ -49,110 +44,31 @@ func (d *dynamic) Update(routes []*pb.Route) {
 	d.mu.Unlock()
 }
 
+type route struct {
+	*matcher.Matcher
+	backendName string
+}
+
 type static struct {
-	routes []*pb.Route
+	routes []route
 }
 
 func NewStatic(routes []*pb.Route) *static {
-	return &static{routes: routes}
+	var staticRoutes []route
+	for _, r := range routes {
+		staticRoutes = append(staticRoutes, route{
+			Matcher:     matcher.New(r.Matcher),
+			backendName: r.BackendName,
+		})
+	}
+	return &static{routes: staticRoutes}
 }
 
 func (r *static) Route(req *http.Request) (backendName string, err error) {
-	port := req.URL.Port()
-	if port == "" {
-		switch strings.ToLower(req.URL.Scheme) {
-		case "", "http":
-			port = "80"
-		case "https":
-			port = "443"
+	for _, r := range r.routes {
+		if r.Match(req) {
+			return r.backendName, nil
 		}
-	}
-
-	for _, route := range r.routes {
-		if !r.urlMatches(req.URL, route.PathRules) {
-			continue
-		}
-		if !r.hostMatches(req.URL.Hostname(), route.HostMatcher) {
-			continue
-		}
-		if !r.portMatches(port, route.PortMatcher) {
-			continue
-		}
-		if !r.headersMatch(req.Header, route.HeaderMatcher) {
-			continue
-		}
-		if !r.requestTypeMatch(proxyreq.GetProxyMode(req), route.ProxyMode) {
-			continue
-		}
-		return route.BackendName, nil
 	}
 	return "", ErrRouteNotFound
-}
-
-func (r *static) urlMatches(u *url.URL, matchers []string) bool {
-	if len(matchers) == 0 {
-		return true
-	}
-	for _, m := range matchers {
-		if m == "" {
-			continue
-		}
-		if m[len(m)-1] == '*' {
-			if strings.HasPrefix(u.Path, m[0:len(m)-1]) {
-				return true
-			}
-		}
-		if m == u.Path {
-			return true
-		}
-	}
-	return false
-}
-
-func (r *static) hostMatches(host string, matcher string) bool {
-	if host == "" {
-		return false // we can't handle empty hosts
-	}
-	if matcher == "" {
-		return true // no matcher set, match all like a boss!
-	}
-	return host == matcher
-}
-
-func (r *static) portMatches(port string, matcher uint32) bool {
-	if matcher == 0 {
-		return true // no matcher set, match all like a boss!
-	}
-
-	if port == "" {
-		return false // we expect certain port.
-	}
-
-	return port == fmt.Sprintf("%v", matcher)
-}
-
-func (r *static) headersMatch(header http.Header, expectedKv map[string]string) bool {
-	for expK, expV := range expectedKv {
-		headerVal := header.Get(expK)
-		if headerVal == "" {
-			return false // key doesn't exist
-		}
-		if headerVal != expV {
-			return false
-		}
-	}
-	return true
-}
-
-func (r *static) requestTypeMatch(requestMode proxyreq.ProxyMode, routeMode pb.ProxyMode) bool {
-	if routeMode == pb.ProxyMode_ANY {
-		return true
-	}
-	if requestMode == proxyreq.MODE_FORWARD_PROXY && routeMode == pb.ProxyMode_FORWARD_PROXY {
-		return true
-	}
-	if requestMode == proxyreq.MODE_REVERSE_PROXY && routeMode == pb.ProxyMode_REVERSE_PROXY {
-		return true
-	}
-	return false
 }

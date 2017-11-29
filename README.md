@@ -2,7 +2,6 @@
 
 [![Travis Build](https://travis-ci.org/improbable-eng/kedge.svg?branch=master)](https://travis-ci.org/improbable-eng/kedge)
 [![Go Report Card](https://goreportcard.com/badge/github.com/improbable-eng/kedge)](https://goreportcard.com/report/github.com/improbable-eng/kedge)
-[![GoDoc](http://img.shields.io/badge/GoDoc-Reference-blue.svg)](https://godoc.org/github.com/mwitkow/grpc-proxy)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![quality: WIF](https://img.shields.io/badge/quality-BETA-blue.svg)](#status)
 
@@ -59,7 +58,7 @@ Please see
 
 ## Status
 
-The project is still in testing (alpha) state. APIs can change. 
+The project is still in beta state, however heavily tested and used on prod clusters.
 For status, see [CHANGELOG](CHANGELOG.md)
 
 ## Wishlist

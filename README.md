@@ -12,7 +12,7 @@ microservice communication simple to set up, and secure. All you need for it to 
 
 ## The pain of cross-cluster Kubernetes communication
 
-Kubernetes is great, if you have one cluster. If you want to have twoThis project stems from the frustration of setting up communication between two K8S clusters. This requires a couple of things:
+Kubernetes is great, if you have one cluster. If you want to have two or more.. you better avoid that. This project stems from the frustration of setting up communication between two K8S clusters. This requires a couple of things:
  - cross-cluster networking - usually a complex process of setting up and maintaining IPSec bridges
  - configuration of routing rules - each cluster needs to know about each other cluster's 3 (!) network ranges: host, pod and internal-service networks
  - providing federated service discovery - either through the alpha-grade [K8S Federation](https://kubernetes.io/docs/concepts/cluster-administration/federation/) or [CoreDNS](https://github.com/coredns/coredns) stub zones

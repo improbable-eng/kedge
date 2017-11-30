@@ -40,6 +40,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
+	"strings"
+	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
 )
 
 var (
@@ -175,10 +177,25 @@ func main() {
 		),
 	)
 
+	httpBounderHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
+			grpcWinchServer.ServeHTTP(w, req)
+			return
+		}
+		httpWinchServer.Handler.ServeHTTP(w, req)
+	}).ServeHTTP
+
+	httpBouncerServer := &http.Server{
+		WriteTimeout: *flagHttpMaxWriteTimeout,
+		ReadTimeout:  *flagHttpMaxReadTimeout,
+		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
+		Handler:      http.HandlerFunc(httpBounderHandler),
+	}
+
 	var g group.Group
 	{
 		g.Add(func() error {
-			err := httpWinchServer.Serve(httpPlainListener)
+			err := httpBouncerServer.Serve(httpPlainListener)
 			if err != nil {
 				return errors.Wrap(err, "http_plain server error")
 			}

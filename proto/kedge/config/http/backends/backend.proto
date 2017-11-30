@@ -5,9 +5,9 @@ package kedge.config.http.backends;
 import "github.com/mwitkow/go-proto-validators/validator.proto";
 import "kedge/config/common/resolvers/resolvers.proto";
 
-/// Backend is a pool of HTTP endpoints that are kept open
+/// Backend data will be used to set up pool of HTTP connection to specified endpoint that will be kept open.
 message Backend {
-    /// name is the string identifying the backend in all other conifgs.
+    /// name is the string identifying the backend in all other configs.
     string name = 1  [(validator.field) = {regex: "^[a-z_0-9.]{2,64}$"}];
 
     /// balancer decides which balancing policy to use.

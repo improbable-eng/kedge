@@ -28,6 +28,6 @@ RUN cd ${GOPATH}/src/github.com/improbable-eng/kedge && dep ensure
 
 ARG BUILD_VERSION
 RUN echo "Installing Kedge with version ${BUILD_VERSION}"
-RUN go install -ldflags "-X main.BuildVersion=${BUILD_VERSION}" github.com/improbable-eng/kedge/server
+RUN go install -ldflags "-X main.BuildVersion=${BUILD_VERSION}" github.com/improbable-eng/kedge/cmd/kedge
 
-ENTRYPOINT ["/go/bin/server"]
+ENTRYPOINT ["/go/bin/kedge"]

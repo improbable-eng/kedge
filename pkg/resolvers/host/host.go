@@ -16,9 +16,9 @@ var (
 	ParentHostResolver hostResolverFn = net.LookupHost
 )
 
-func NewFromConfig(conf *pb.SrvResolver) (target string, namer naming.Resolver, err error) {
+func NewFromConfig(conf *pb.HostResolver) (target string, namer naming.Resolver, err error) {
 	parent := ParentHostResolver
-	return conf.GetDnsName(), grpcsrvlb.New(newHostResolver(conf.PortOverride, parent)), nil
+	return conf.GetDnsName(), grpcsrvlb.New(newHostResolver(conf.Port, parent)), nil
 }
 
 type hostResolver struct {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/improbable-eng/kedge/pkg/resolvers/host"
 	"github.com/improbable-eng/kedge/pkg/resolvers/k8s"
 	"github.com/improbable-eng/kedge/pkg/resolvers/srv"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/backends"
@@ -160,8 +161,12 @@ func chooseInterceptors(cnf *pb.Backend) []grpc.DialOption {
 func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 	if s := cnf.GetSrv(); s != nil {
 		return srvresolver.NewFromConfig(s)
-	} else if k := cnf.GetK8S(); k != nil {
+	}
+	if k := cnf.GetK8S(); k != nil {
 		return k8sresolver.NewFromConfig(k)
+	}
+	if k := cnf.GetHost(); k != nil {
+		return hostresolver.NewFromConfig(k)
 	}
 	return "", nil, fmt.Errorf("unspecified naming resolver for %v", cnf.Name)
 }

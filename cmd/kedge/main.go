@@ -45,10 +45,11 @@ import (
 )
 
 var (
-	flagBindAddr    = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
-	flagGrpcTlsPort = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
-	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
-	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")
+	flagBindAddr       = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
+	flagMetricsAddress = sharedflags.Set.String("server_metrics_address", "/debug/metrics", "address on which to serve metrics")
+	flagGrpcTlsPort    = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
+	flagHttpTlsPort    = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
+	flagHttpPort       = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
@@ -294,7 +295,7 @@ func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logE
 func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlewares chi.Middlewares) (*http.Server, error) {
 	m := chi.NewMux()
 	m.Handle("/_healthz", noAuthMiddlewares.HandlerFunc(healthEndpoint))
-	m.Handle("/debug/metrics", noAuthMiddlewares.Handler(promhttp.Handler()))
+	m.Handle(*flagMetricsAddress, noAuthMiddlewares.Handler(promhttp.Handler()))
 
 	m.Handle("/_version", middlewares.HandlerFunc(versionEndpoint))
 

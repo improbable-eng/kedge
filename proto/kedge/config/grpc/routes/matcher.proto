@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package kedge.config.grpc.routes;
+
+import "github.com/mwitkow/go-proto-validators/validator.proto";
+
+/// Matcher describes a rule that matches any gRPC route.
+message Matcher {
+    /// service_name is a globbing expression that matches a full gRPC service name.
+    /// For example a method call to 'com.example.MyService/Create' would be matched by:
+    ///  - com.example.MyService
+    ///  - com.example.*
+    ///  - com.*
+    ///  - *
+    /// If not present, '*' is default.
+    string service_name = 2;
+
+    /// authority matches on the ':authority' header (a.k.a. Host header) enabling Virtual Host-like proxying.
+    /// The matching is done through lower-case string-equality.
+    /// If none are present, the route skips ':authority' checks.
+    /// Accepts regexp RE2 expression.
+    string authority = 3;
+
+    /// metadata matches any gRPC inbound request metadata.
+    /// Each key provided must find a match for the route to match.
+    /// The matching is done through lower-case key match and explicit string-equality of values.
+    /// If a given metadata entry has more than one string value, at least one of them needs to match.
+    /// If none are present, the route skips metadata checks.
+    map<string, string> metadata = 4;
+}

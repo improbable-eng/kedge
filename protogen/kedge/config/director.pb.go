@@ -7,9 +7,9 @@ import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/mwitkow/go-proto-validators"
-import  kedge_config_grpc_routes "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
-import  kedge_config_http_routes "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
+import  kedge_config_grpc_routes1 "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
 import  kedge_config_http_routes1 "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
+import  kedge_config_http_routes2 "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -42,7 +42,7 @@ func (m *DirectorConfig) GetHttp() *DirectorConfig_Http {
 }
 
 type DirectorConfig_Grpc struct {
-	Routes []*kedge_config_grpc_routes.Route `protobuf:"bytes,1,rep,name=routes" json:"routes,omitempty"`
+	Routes []*kedge_config_grpc_routes1.Route `protobuf:"bytes,1,rep,name=routes" json:"routes,omitempty"`
 }
 
 func (m *DirectorConfig_Grpc) Reset()                    { *m = DirectorConfig_Grpc{} }
@@ -50,7 +50,7 @@ func (m *DirectorConfig_Grpc) String() string            { return proto.CompactT
 func (*DirectorConfig_Grpc) ProtoMessage()               {}
 func (*DirectorConfig_Grpc) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0, 0} }
 
-func (m *DirectorConfig_Grpc) GetRoutes() []*kedge_config_grpc_routes.Route {
+func (m *DirectorConfig_Grpc) GetRoutes() []*kedge_config_grpc_routes1.Route {
 	if m != nil {
 		return m.Routes
 	}
@@ -58,8 +58,8 @@ func (m *DirectorConfig_Grpc) GetRoutes() []*kedge_config_grpc_routes.Route {
 }
 
 type DirectorConfig_Http struct {
-	Routes     []*kedge_config_http_routes1.Route `protobuf:"bytes,1,rep,name=routes" json:"routes,omitempty"`
-	AdhocRules []*kedge_config_http_routes.Adhoc  `protobuf:"bytes,2,rep,name=adhoc_rules,json=adhocRules" json:"adhoc_rules,omitempty"`
+	Routes     []*kedge_config_http_routes2.Route `protobuf:"bytes,1,rep,name=routes" json:"routes,omitempty"`
+	AdhocRules []*kedge_config_http_routes1.Adhoc `protobuf:"bytes,2,rep,name=adhoc_rules,json=adhocRules" json:"adhoc_rules,omitempty"`
 }
 
 func (m *DirectorConfig_Http) Reset()                    { *m = DirectorConfig_Http{} }
@@ -67,14 +67,14 @@ func (m *DirectorConfig_Http) String() string            { return proto.CompactT
 func (*DirectorConfig_Http) ProtoMessage()               {}
 func (*DirectorConfig_Http) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0, 1} }
 
-func (m *DirectorConfig_Http) GetRoutes() []*kedge_config_http_routes1.Route {
+func (m *DirectorConfig_Http) GetRoutes() []*kedge_config_http_routes2.Route {
 	if m != nil {
 		return m.Routes
 	}
 	return nil
 }
 
-func (m *DirectorConfig_Http) GetAdhocRules() []*kedge_config_http_routes.Adhoc {
+func (m *DirectorConfig_Http) GetAdhocRules() []*kedge_config_http_routes1.Adhoc {
 	if m != nil {
 		return m.AdhocRules
 	}

@@ -17,29 +17,39 @@ func TestRouteMatches(t *testing.T) {
 { "routes": [
 	{
 		"backendName": "backendA",
-		"serviceNameMatcher": "com.example.a.*"
+		"matcher": {
+		  "serviceName": "com.example.a.*"
+	    }
 	},
 	{
 		"backendName": "backendB_authorityA",
-		"serviceNameMatcher": "com.*",
-		"authorityMatcher": "authority_a.service.local"
+		"matcher": {
+		  "serviceName": "com.*",
+		  "authority": "authority_a.service.local"
+	    }
 	},
 	{
 		"backendName": "backendB_authorityB",
-		"serviceNameMatcher": "*",
-		"authorityMatcher": "authority_b.service.local"
+		"matcher": {
+		  "serviceName": "*",
+		  "authority": "authority_b.service.local"
+	    }
 	},
 	{
 		"backendName": "backendD",
-		"serviceNameMatcher": "com.example.",
-		"metadataMatcher": {
-			"keyOne": "valueOne",
-			"keyTwo": "valueTwo"
-		}
+		"matcher": {
+			"serviceName": "com.example.",
+			"metadata": {
+				"keyOne": "valueOne",
+				"keyTwo": "valueTwo"
+			}
+	    }
 	},
 	{
 		"backendName": "backendCatchAllCom",
-		"serviceNameMatcher": "com.*"
+		"matcher": {
+		  "serviceName": "com.*"
+	    }
 	}
 ]}`
 	config := &pb.DirectorConfig_Grpc{}

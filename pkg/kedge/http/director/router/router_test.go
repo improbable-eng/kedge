@@ -14,34 +14,44 @@ var (
 	routeConfigs = []*pb_route.Route{
 		&pb_route.Route{
 			BackendName: "a",
-			HostMatcher: "nopath.example.com",
-			PortMatcher: 80,
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				Host:      "nopath.example.com",
+				Port:      80,
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "b",
-			HostMatcher: "nopath.example.com",
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				Host:      "nopath.example.com",
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "c",
-			HostMatcher: "nopath.port.example.com",
-			PortMatcher: 8343,
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				Host:      "nopath.port.example.com",
+				Port:      8343,
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "d",
-			PathRules:   []string{"/some/strict/path"},
-			HostMatcher: "path.port.example.com",
-			PortMatcher: 83,
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				PathRules: []string{"/some/strict/path"},
+				Host:      "path.port.example.com",
+				Port:      83,
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 		&pb_route.Route{
 			BackendName: "e",
-			PathRules:   []string{"/some/strict/path"},
-			HostMatcher: "path.httsdefport.example.com",
-			PortMatcher: 443,
-			ProxyMode:   pb_route.ProxyMode_REVERSE_PROXY,
+			Matcher: &pb_route.Matcher{
+				PathRules: []string{"/some/strict/path"},
+				Host:      "path.httsdefport.example.com",
+				Port:      443,
+				ProxyMode: pb_route.ProxyMode_REVERSE_PROXY,
+			},
 		},
 	}
 )

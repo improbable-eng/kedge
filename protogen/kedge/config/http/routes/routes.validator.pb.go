@@ -21,6 +21,10 @@ func (this *Route) Validate() error {
 	if !_regex_Route_BackendName.MatchString(this.BackendName) {
 		return github_com_mwitkow_go_proto_validators.FieldError("BackendName", fmt.Errorf(`value '%v' must be a string conforming to regex "^[a-z_0-9.]{2,64}$"`, this.BackendName))
 	}
-	// Validation of proto3 map<> fields is unsupported.
+	if this.Matcher != nil {
+		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Matcher); err != nil {
+			return github_com_mwitkow_go_proto_validators.FieldError("Matcher", err)
+		}
+	}
 	return nil
 }

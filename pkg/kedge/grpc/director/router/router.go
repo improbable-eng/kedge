@@ -11,11 +11,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 )
 
 var (
-	emptyMd       = metadata.Pairs()
 	routeNotFound = grpc.Errorf(codes.Unimplemented, "unknown route to service")
 )
 
@@ -64,13 +62,15 @@ func (r *static) Route(ctx context.Context, fullMethodName string) (backendName 
 		fullMethodName = fullMethodName[1:]
 	}
 	for _, route := range r.routes {
-		if !r.serviceNameMatches(fullMethodName, route.ServiceNameMatcher) {
+		matcher := route.Matcher
+
+		if !r.serviceNameMatches(fullMethodName, matcher.ServiceName) {
 			continue
 		}
-		if !r.authorityMatches(md, route.AuthorityMatcher) {
+		if !r.authorityMatches(md, matcher.Authority) {
 			continue
 		}
-		if !r.metadataMatches(md, route.MetadataMatcher) {
+		if !r.metadataMatches(md, matcher.Metadata) {
 			continue
 		}
 		return route.BackendName, nil
@@ -92,6 +92,7 @@ func (r *static) authorityMatches(md metautils.NiceMD, matcher string) bool {
 	if matcher == "" {
 		return true
 	}
+	// TODO(bplotka): Enable regexp here.
 	auth := md.Get(":authority")
 	if auth == "" {
 		return false // there was no authority header and it was expected

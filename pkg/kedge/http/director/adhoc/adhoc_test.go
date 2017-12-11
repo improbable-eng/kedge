@@ -15,7 +15,9 @@ func TestAdhocMatches(t *testing.T) {
 	configJson := `
 { "adhoc_rules": [
 	{
-		"dnsNameMatcher": "*.somenamespace.svc.cluster.local",
+		"matcher": {
+			"host": "*.somenamespace.svc.cluster.local"
+	 	},
 		"port": {
 			"default": 8080,
 			"allowed": [8080, 8081],
@@ -28,7 +30,9 @@ func TestAdhocMatches(t *testing.T) {
 		}
 	},
 	{
-		"dnsNameMatcher": "*.pods.cluster.local",
+		"matcher": {
+			"host": "*.pods.cluster.local"
+	 	},
 		"port": {
 			"default": 80,
 			"allowed": [80],

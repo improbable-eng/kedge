@@ -6,10 +6,12 @@ Package kedge_config_http_routes is a generated protocol buffer package.
 
 It is generated from these files:
 	kedge/config/http/routes/adhoc.proto
+	kedge/config/http/routes/matcher.proto
 	kedge/config/http/routes/routes.proto
 
 It has these top-level messages:
 	Adhoc
+	Matcher
 	Route
 */
 package kedge_config_http_routes
@@ -25,6 +27,11 @@ var _ = fmt.Errorf
 var _ = math.Inf
 
 func (this *Adhoc) Validate() error {
+	if this.Matcher != nil {
+		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Matcher); err != nil {
+			return github_com_mwitkow_go_proto_validators.FieldError("Matcher", err)
+		}
+	}
 	if this.Port != nil {
 		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Port); err != nil {
 			return github_com_mwitkow_go_proto_validators.FieldError("Port", err)

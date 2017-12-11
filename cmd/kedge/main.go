@@ -46,7 +46,7 @@ import (
 
 var (
 	flagBindAddr       = sharedflags.Set.String("server_bind_address", "0.0.0.0", "address to bind the server to")
-	flagMetricsAddress = sharedflags.Set.String("server_metrics_address", "/debug/metrics", "address on which to serve metrics")
+	flagMetricsAddress = sharedflags.Set.String("server_metrics_path", "/debug/metrics", "path on which to serve metrics")
 	flagGrpcTlsPort    = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
 	flagHttpTlsPort    = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
 	flagHttpPort       = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")

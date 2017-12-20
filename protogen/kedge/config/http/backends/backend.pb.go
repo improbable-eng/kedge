@@ -18,7 +18,7 @@ import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/mwitkow/go-proto-validators"
-import  kedge_config_common_resolvers "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
+import kedge_config_common_resolvers "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -51,9 +51,9 @@ func (x Balancer) String() string {
 }
 func (Balancer) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
-// / Backend is a pool of HTTP endpoints that are kept open
+// / Backend data will be used to set up pool of HTTP connection to specified endpoint that will be kept open.
 type Backend struct {
-	// / name is the string identifying the backend in all other conifgs.
+	// / name is the string identifying the backend in all other configs.
 	Name string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	// / balancer decides which balancing policy to use.
 	Balancer Balancer `protobuf:"varint,2,opt,name=balancer,enum=kedge.config.http.backends.Balancer" json:"balancer,omitempty"`

@@ -1,10 +1,10 @@
 #!/bin/bash
 # Generates protobuf Go datastructures from the proto directory.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROTOBUF_DIR=${PROTOBUF_DIR-${SCRIPT_DIR}/proto}
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/.."
+PROTOBUF_DIR=${PROTOBUF_DIR-${ROOT_DIR}/proto}
 PROTOGEN_DIR=protogen
-GENERATION_DIR=${GENERATION_DIR-${SCRIPT_DIR}/${PROTOGEN_DIR}}
+GENERATION_DIR=${GENERATION_DIR-${ROOT_DIR}/${PROTOGEN_DIR}}
 IMPORT_PREFIX="github.com/improbable-eng/kedge/${PROTOGEN_DIR}"
 
 # Builds all .proto files in a given package directory.

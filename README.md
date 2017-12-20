@@ -40,7 +40,7 @@ They also specify authorization requirements for the route to be taken.
 
 Kedge can be accessed then: 
 
-### Using native kedge http.Client inside caller library
+### Using native gRPC Dialer/http.Client
 
 Following diagram shows POD to POD communication cross-cluster.
 
@@ -48,7 +48,7 @@ Following diagram shows POD to POD communication cross-cluster.
 
 ### Using Winch (local proxy to kedges)
 
-Following diagram shows the routing done by forward proxy called [winch (client)](docs/winch.md). In this example 
+Following diagram shows the routing done by forward proxy called [winch (client)](docs/winch.md). In this example
 kedge OIDC auth is enabled to support corp use cases (per backend access controlled by permissions stored in custom IDToked claim). 
 It can be also switched to just client certificate verification as in the diagram above.
 

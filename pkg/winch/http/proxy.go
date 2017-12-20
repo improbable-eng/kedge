@@ -33,7 +33,7 @@ type winchMapper interface {
 	kedge_map.Mapper
 }
 
-func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *http.ServeMux) *Proxy {
+func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *http.ServeMux, debugMode bool) *Proxy {
 	// Prepare chain of trippers for winch logic. (The last wrapped will be first in the chain of tripperwares)
 	// 5) Last, default transport for communication with our kedges.
 	// 4) Kedge auth tipper - injects auth for kedge based on route.
@@ -42,6 +42,10 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 	// 1) First, mapping tripper - maps dns to route and puts it to request context for rest of the tripperwares.
 
 	parentTransport := tripperware.Default(config)
+	if debugMode {
+		parentTransport = tripperware.WrapForDebug(parentTransport)
+	}
+
 	parentTransport = tripperware.WrapForProxyAuth(parentTransport)
 	parentTransport = tripperware.WrapForBackendAuth(parentTransport)
 	parentTransport = tripperware.WrapForRouting(parentTransport)
@@ -77,10 +81,6 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 type Proxy struct {
 	kedgeReverseProxy *httputil.ReverseProxy
 	mux               *http.ServeMux
-}
-
-func (p *Proxy) AddDebugTripperware() {
-	p.kedgeReverseProxy.Transport = tripperware.WrapForDebug(p.kedgeReverseProxy.Transport)
 }
 
 func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {

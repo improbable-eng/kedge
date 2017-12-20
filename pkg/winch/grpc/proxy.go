@@ -6,8 +6,12 @@ import (
 	"crypto/tls"
 	"net"
 
+	"os"
+
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
+	"github.com/improbable-eng/kedge/pkg/http/header"
 	"github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/mwitkow/grpc-proxy/proxy"
@@ -20,7 +24,7 @@ import (
 )
 
 // New builds a StreamDirector based off a backend pool and a router.
-func New(mapper kedge_map.Mapper, config *tls.Config) proxy.StreamDirector {
+func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.StreamDirector {
 	return func(ctx context.Context, fullMethodName string) (*grpc.ClientConn, error) {
 		md := metautils.ExtractIncoming(ctx)
 		targetAuthority := md.Get(":authority")
@@ -36,7 +40,15 @@ func New(mapper kedge_map.Mapper, config *tls.Config) proxy.StreamDirector {
 			return nil, err
 		}
 
-		grpc_ctxtags.Extract(ctx).Set("grpc.proxy.kedge", route.URL)
+		tags := grpc_ctxtags.Extract(ctx)
+		tags.Set("grpc.proxy.kedge", route.URL)
+		tags.Set("grpc.target.authority", targetAuthority)
+
+		// TODO(bplotka): Fix support for this on kedge side. Works only for HTTP for now.
+		tags.Set(header.RequestKedgeRequestID, fmt.Sprintf("winch-%s", uuid.New().String()))
+		if debugMode {
+			tags.Set(header.RequestKedgeForceInfoLogs, os.ExpandEnv("winch-$USER"))
+		}
 
 		transportCreds := credentials.NewTLS(config)
 		// Make sure authority is ok.

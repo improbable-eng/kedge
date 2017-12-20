@@ -95,12 +95,117 @@ To force an application to dial required URL through winch just set `HTTP_PROXY`
 
 ### Forwarding from Golang
 
-gRPC
+Example "through winch" gRPC dialer:
+```go
+// WinchDialer returns dialer function that gives you WinchDialer-enabled dialer:
+// If winch.GRPCURLFromKubeConfig() gives empty string it returns pure grpc.DialContext.
+// If winch.GRPCURLFromKubeConfig() gives non URL formatted string it returns error.
+// If winch.GRPCURLFromKubeConfig() gives proper winch URL it gRPC dialer that proxies traffic through winch.
+func WinchDialer() (dialContextFunc, error) {
+	winchURL := getWinchURL()
+	if winchURL == "" {
+		// Not specified - nothing to put in context.
+		return grpc.DialContext, nil
+	}
 
+	proxyURL, err := url.Parse(winchURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid winch URL address %q: %v", winchURL, err)
+	}
+
+	return func(ctx context.Context, targetAuthority string, grpcOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
+		// NOTE: This will conflict with TLS transport credential grpc options passed by argument, but we don't have the control to validate that.
+		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+		grpcOpts = append(grpcOpts, grpc.WithAuthority(targetAuthority))
+
+		return grpc.DialContext(ctx, proxyURL.Host, grpcOpts...)
+	}, nil
+}
+```
+in this example `getWinchURL()` gives you winch URL if you wish to use winch, or empty string, if you wish to have direct calls.
+
+
+Example HTTP proxy:
+```go
+type TransportProxy func(r *http.Request) (*url.URL, error)
+
+// wrapProxy returns proxy function that returns winch URL only when:
+// - given initial proxy will return nil (no proxy URL) or initial proxy function is nil.
+// - Request is just plain HTTP.
+// - Requested host is not localhost.
+func wrapProxy(initial TransportProxy, winchURL *url.URL) TransportProxy {
+	return func(req *http.Request) (*url.URL, error) {
+		if initial != nil {
+			proxyURL, err := initial(req)
+			if err != nil {
+				return nil, err
+			}
+			if proxyURL != nil {
+				return proxyURL, nil
+			}
+		}
+
+		if req.URL.Scheme == "https" {
+			// Winch does not support https yet, so we don't redirect these.
+			return nil, nil
+		}
+
+		if !useProxy(req.URL) {
+			// Don't redirect these.
+			return nil, nil
+		}
+
+		return winchURL, nil
+	}
+}
+
+// useProxy reports whether requests to addr should use a proxy,
+// according to the NO_PROXY or no_proxy environment variable.
+// addr is always a canonicalAddr with a host and port.
+func useProxy(url *url.URL) bool {
+	if len(url.Hostname()) == 0 {
+		return true
+	}
+
+	if url.Hostname() == "localhost" {
+		return false
+	}
+	if ip := net.ParseIP(url.Hostname()); ip != nil {
+		if ip.IsLoopback() {
+			return false
+		}
+	}
+
+	for _, no_proxy := range []string{
+		os.Getenv(noProxyUpperCaseEnv),
+		os.Getenv(noProxyLowerCaseEnv),
+	} {
+		if no_proxy == "*" {
+			return false
+		}
+
+		for _, p := range strings.Split(no_proxy, ",") {
+			p = strings.ToLower(strings.TrimSpace(p))
+			if len(p) == 0 {
+				continue
+			}
+			if url.Host == p {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+```
 
 ## Debugging
 
-Request ID
+All request going through have Request ID propagated, so you should be able to match request just seeing the logs from winch and kedge.
+
+Obviously DEBUG logging level is not recommended on production, however you can use `--debug-mode` flag on winch to print DEBUG logs for requests from this
+particular winch as INFO on kedge.
+
 ## Status
 
 See [CHANGELOG](../CHANGELOG.md)

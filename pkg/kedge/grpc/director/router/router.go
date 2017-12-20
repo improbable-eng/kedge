@@ -11,6 +11,7 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -29,13 +30,14 @@ type Router interface {
 }
 
 type dynamic struct {
+	logger       logrus.FieldLogger
 	mu           sync.RWMutex
 	staticRouter *static
 }
 
 // NewDynamic creates a new dynamic router that can be have its routes updated.
-func NewDynamic() *dynamic {
-	return &dynamic{staticRouter: NewStatic([]*pb.Route{})}
+func NewDynamic(logger logrus.FieldLogger) *dynamic {
+	return &dynamic{logger: logger, staticRouter: NewStatic(logger, []*pb.Route{})}
 }
 
 func (d *dynamic) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
@@ -47,18 +49,19 @@ func (d *dynamic) Route(ctx context.Context, fullMethodName string) (backendName
 
 // Update sets the routing table to the provided set of routes.
 func (d *dynamic) Update(routes []*pb.Route) {
-	staticRouter := NewStatic(routes)
+	staticRouter := NewStatic(d.logger, routes)
 	d.mu.Lock()
 	d.staticRouter = staticRouter
 	d.mu.Unlock()
 }
 
 type static struct {
+	logger logrus.FieldLogger
 	routes []*pb.Route
 }
 
-func NewStatic(routes []*pb.Route) *static {
-	return &static{routes: routes}
+func NewStatic(logger logrus.FieldLogger, routes []*pb.Route) *static {
+	return &static{logger: logger, routes: routes}
 }
 
 func (r *static) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
@@ -121,7 +124,8 @@ func (r *static) authorityPortMatches(md metautils.NiceMD, portMatcher uint32) b
 
 	portUint, err := strconv.ParseUint(portOnly(auth), 10, 32)
 	if err != nil {
-		return false // Unexpected authority port format.
+		r.logger.WithError(err).WithField("authority", auth).Error("Unexpected gRPC request :authority port format.")
+		return false
 	}
 
 	return uint32(portUint) == portMatcher

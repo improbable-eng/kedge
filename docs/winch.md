@@ -201,7 +201,7 @@ func useProxy(url *url.URL) bool {
 
 ## Debugging
 
-All request going through have Request ID propagated, so you should be able to match request just seeing the logs from winch and kedge.
+All requests going through winch have Request ID propagated, so you should be able to match request just seeing the logs from winch and kedge.
 
 Obviously DEBUG logging level is not recommended on production, however you can use `--debug-mode` flag on winch to print DEBUG logs for requests from this
 particular winch as INFO on kedge.

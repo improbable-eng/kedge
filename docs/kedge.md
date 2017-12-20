@@ -4,8 +4,10 @@ Kedges starts up a gRPC and reverse proxy.
 
 ## Configuration
 
-Driven through two config files: 
+Kedge is driven through two main configuration files that allows to add route -> backend pairs.
+Thanks of that Kedge knows how to route the request.
 
+Configuration for backends:
 `--kedge_config_backendpool_config` command line content or read from file using `--kedge_config_backendpool_config_path`:
 ```json
 {
@@ -20,7 +22,7 @@ Driven through two config files:
           }
         ],
         "srv": {
-          "dns_name": "controller.eu1-prod.internal.improbable.io"
+          "dns_name": "controller.eu-prod.internal.example.com"
         }
       }
     ]
@@ -30,15 +32,16 @@ Driven through two config files:
       {
         "name": "controller",
         "balancer": "ROUND_ROBIN",
-        "srv": {
-          "dns_name": "controller.metrics.eu1-prod.internal.improbable.io"
-        }
+        "k8s": {
+          "dns_port_name": "controller.default:http"
+        },
       }
     ]
   }
 }
 ```
 
+Configuration for routes:
 `--kedge_config_director_config` command line content or read from file using `--kedge_config_director_config_path`:
 ```json
 {
@@ -47,7 +50,7 @@ Driven through two config files:
       {
         "backend_name": "controller",
         "service_name_matcher": "*",
-        "authority_matcher": "controller.ext.cluster.local"
+        "authority_host_matcher": "controller.ext.cluster.local"
       }
     ]
   },
@@ -55,7 +58,8 @@ Driven through two config files:
     "routes": [
       {
         "backend_name": "controller",
-        "host_matcher": "controller.ext.cluster.local"
+        "host_matcher": "controller.ext.cluster.local",
+        "port_matcher": 8081
       }
     ],
     "adhoc_rules": [
@@ -75,41 +79,49 @@ Driven through two config files:
 }
 ```
 
-## Running
+See `go run cmd/kedge/*.go --help` for other flags to configure items like:
+- listen addresses
+- certs
+- OIDC
+- HTTP/gRPC options
+- dynamic discovery
+- logging
+
+## Examples
 
 Here's an example that runs the server listening on four ports (80 for debug HTTP, 443 for HTTPS+gRPCTLS, 444 for gRPCTLS), and requiring 
 client side certs:
 
 ```bash
-go build ./cmd/kedge \
+go run ./cmd/kedge/*.go \
   --server_grpc_tls_port=444 \
   --server_http_port=80 \
-  --server_http_tls_port=443 \ 
-  --server_tls_cert_file=../misc/localhost.crt \ 
-  --server_tls_key_file=../misc/localhost.key \
-  --server_tls_client_ca_files=../misc/ca.crt \ 
+  --server_http_tls_port=443 \
+  --server_tls_cert_file=misc/localhost.crt \
+  --server_tls_key_file=misc/localhost.key \
+  --server_tls_client_ca_files=misc/ca.crt \
   --server_tls_client_cert_required=true \
-  --kedge_config_director_config_path=../misc/director.json \
-  --kedge_config_backendpool_config_path=../misc/backendpool.json 
+  --kedge_config_director_config_path=misc/director.json \
+  --kedge_config_backendpool_config_path=misc/backendpool.json
 ```
 
 Optionally you can skip client's side cert requirement and perform authorization based on JWT OIDC ID token (in case you are already have 
 some OIDC provider running, that supports filling permissions into ID token claim):
 
 ```bash
-go build ./cmd/kedge \
+go run ./cmd/kedge/*.go \
   --server_grpc_tls_port=444 \
   --server_http_port=80 \
-  --server_http_tls_port=443 \ 
-  --server_tls_cert_file=../misc/localhost.crt \
-  --server_tls_key_file=../misc/localhost.key \
+  --server_http_tls_port=443 \
+  --server_tls_cert_file=misc/localhost.crt \
+  --server_tls_key_file=misc/localhost.key \
   --server_tls_client_cert_required=false \
-  --kedge_config_director_config_path=../misc/director.json \
-  --kedge_config_backendpool_config_path=../misc/backendpool.json \
-  --server_oidc_provider_url = "https://issuer.example.org" \
-  --server_oidc_client_id = "some-client-id" \
-  --server_oidc_perms_claim = "perms" \
-  --server_oidc_required_perm = "perms-prod-example"
+  --kedge_config_director_config_path=misc/director.json \
+  --kedge_config_backendpool_config_path=misc/backendpool.json \
+  --server_oidc_provider_url="<https://issuer.example.org>" \
+  --server_oidc_client_id="<some-client-id>" \
+  --server_oidc_perms_claim=perms \
+  --server_oidc_required_perm="perms-prod-example"
 ```
 
 ## Running locally with access to kubernetes cluster
@@ -130,7 +142,7 @@ Or user from you kube/config:
 --k8sclient_kubeconfig_user="<user from kubeconf>"
 ```
 
-Default values are designed to be working from the pod, so when deploying kedge should not require any flags for that.
+Default values are designed to be working from the pod, so when deploying, kedge should not require any flags for that.
 
 # Running with Dynaming Routing Discovery
 
@@ -181,7 +193,7 @@ If you wish to override host_matcher or service_name_matcher use annotations:
 
 NOTE:
 - backend name is always in form of `<service>_<namespace>_<port-name>`
-- if no name is provided or name is not in form of grpc- or http- it is silently ignored (!)
-- TargetPort can be in both port name or port number form.
-- no check for duplicated host_matchers in annotations or between autogenerated & base ones (!)\
+- if no port name is provided or port name is not in form of grpc- or http- it is silently ignored (!)
+- TargetPort can be in both (pod) port name or port number form.
+- no check for duplicated host_matchers in annotations or between autogenerated & base ones (!)
 - no check if the target port inside service actually exists.

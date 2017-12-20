@@ -1,7 +1,7 @@
 {
   "routes": [
     {
-      "backend_auth": "some-access1",
+      "backend_auth": "corp",
       "regexp": {
         "exp": "([a-z0-9-].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
         "url": "${cluster}.kedge.ext.example.com"

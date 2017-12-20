@@ -80,14 +80,14 @@ var routeConfigs = []*pb_route.Route{
 		ServiceNameMatcher: "bad.backend.*", // bad.backend will match a bad tests
 	},
 	&pb_route.Route{
-		BackendName:        "secure",
-		ServiceNameMatcher: "hand_rolled.common.*", // these will be used in unknownPingBackHandler-based tests
-		AuthorityMatcher:   "secure.ext.test.local",
+		BackendName:          "secure",
+		ServiceNameMatcher:   "hand_rolled.common.*", // these will be used in unknownPingBackHandler-based tests
+		AuthorityHostMatcher: "secure.ext.test.local",
 	},
 	&pb_route.Route{
-		BackendName:        "non_secure",
-		ServiceNameMatcher: "hand_rolled.common.*", // bad.backend will match a bad tests
-		AuthorityMatcher:   "non_secure.ext.test.local",
+		BackendName:          "non_secure",
+		ServiceNameMatcher:   "hand_rolled.common.*", // bad.backend will match a bad tests
+		AuthorityHostMatcher: "non_secure.ext.test.local",
 	},
 }
 

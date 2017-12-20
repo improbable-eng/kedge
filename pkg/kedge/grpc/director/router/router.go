@@ -7,6 +7,9 @@ import (
 
 	"sync"
 
+	"strconv"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -60,6 +63,10 @@ func NewStatic(routes []*pb.Route) *static {
 
 func (r *static) Route(ctx context.Context, fullMethodName string) (backendName string, err error) {
 	md := metautils.ExtractIncoming(ctx)
+
+	tags := grpc_ctxtags.Extract(ctx)
+	tags.Set("grpc.target.authority", md.Get(":authority"))
+
 	if strings.HasPrefix(fullMethodName, "/") {
 		fullMethodName = fullMethodName[1:]
 	}
@@ -67,7 +74,10 @@ func (r *static) Route(ctx context.Context, fullMethodName string) (backendName 
 		if !r.serviceNameMatches(fullMethodName, route.ServiceNameMatcher) {
 			continue
 		}
-		if !r.authorityMatches(md, route.AuthorityMatcher) {
+		if !r.authorityHostMatches(md, route.AuthorityHostMatcher) {
+			continue
+		}
+		if !r.authorityPortMatches(md, route.AuthorityPortMatcher) {
 			continue
 		}
 		if !r.metadataMatches(md, route.MetadataMatcher) {
@@ -88,15 +98,33 @@ func (r *static) serviceNameMatches(fullMethodName string, matcher string) bool 
 	return fullMethodName == matcher
 }
 
-func (r *static) authorityMatches(md metautils.NiceMD, matcher string) bool {
-	if matcher == "" {
+func (r *static) authorityHostMatches(md metautils.NiceMD, hostMatcher string) bool {
+	if hostMatcher == "" {
 		return true
 	}
 	auth := md.Get(":authority")
 	if auth == "" {
 		return false // there was no authority header and it was expected
 	}
-	return auth == matcher
+
+	return stripPort(auth) == hostMatcher
+}
+
+func (r *static) authorityPortMatches(md metautils.NiceMD, portMatcher uint32) bool {
+	if portMatcher == 0 {
+		return true
+	}
+	auth := md.Get(":authority")
+	if auth == "" {
+		return false // there was no authority header and it was expected
+	}
+
+	portUint, err := strconv.ParseUint(portOnly(auth), 10, 32)
+	if err != nil {
+		return false // Unexpected authority port format.
+	}
+
+	return uint32(portUint) == portMatcher
 }
 
 func (r *static) metadataMatches(md metautils.NiceMD, expectedKv map[string]string) bool {
@@ -117,4 +145,29 @@ func (r *static) metadataMatches(md metautils.NiceMD, expectedKv map[string]stri
 		}
 	}
 	return true
+}
+
+func stripPort(hostport string) string {
+	colon := strings.IndexByte(hostport, ':')
+	if colon == -1 {
+		return hostport
+	}
+	if i := strings.IndexByte(hostport, ']'); i != -1 {
+		return strings.TrimPrefix(hostport[:i], "[")
+	}
+	return hostport[:colon]
+}
+
+func portOnly(hostport string) string {
+	colon := strings.IndexByte(hostport, ':')
+	if colon == -1 {
+		return ""
+	}
+	if i := strings.Index(hostport, "]:"); i != -1 {
+		return hostport[i+len("]:"):]
+	}
+	if strings.Contains(hostport, "]") {
+		return ""
+	}
+	return hostport[colon+len(":"):]
 }

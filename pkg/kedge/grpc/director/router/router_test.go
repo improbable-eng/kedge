@@ -1,15 +1,15 @@
 package router
 
-import "testing"
 import (
+	"testing"
+
 	"github.com/golang/protobuf/jsonpb"
+	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
-
-	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRouteMatches(t *testing.T) {
@@ -22,12 +22,18 @@ func TestRouteMatches(t *testing.T) {
 	{
 		"backendName": "backendB_authorityA",
 		"serviceNameMatcher": "com.*",
-		"authorityMatcher": "authority_a.service.local"
+		"authorityHostMatcher": "authority_a.service.local"
 	},
 	{
 		"backendName": "backendB_authorityB",
 		"serviceNameMatcher": "*",
-		"authorityMatcher": "authority_b.service.local"
+		"authorityHostMatcher": "authority_b.service.local"
+	},
+	{
+		"backendName": "backendB_authorityC",
+		"serviceNameMatcher": "*",
+		"authorityHostMatcher": "authority_c.service.local",
+		"authorityPortMatcher": 1234
 	},
 	{
 		"backendName": "backendD",
@@ -58,55 +64,60 @@ func TestRouteMatches(t *testing.T) {
 			fullServiceName: "com.example.a.MyService",
 			md:              metadata.Pairs(),
 			expectedBackend: "backendA",
-			expectedErr:     nil,
 		},
 		{
 			name:            "MatchesAuthorityAndService",
 			fullServiceName: "com.example.blah.MyService",
 			md:              metadata.Pairs(":authority", "authority_a.service.local"),
 			expectedBackend: "backendB_authorityA",
-			expectedErr:     nil,
 		},
 		{
 			name:            "MatchesAuthorityAndServiceTakeTwo",
 			fullServiceName: "something.else.MyService",
 			md:              metadata.Pairs(":authority", "authority_b.service.local"),
 			expectedBackend: "backendB_authorityB",
-			expectedErr:     nil,
+		},
+		{
+			name:            "MatchesAuthorityAndPort",
+			fullServiceName: "something.else.MyService",
+			md:              metadata.Pairs(":authority", "authority_c.service.local:1234"),
+			expectedBackend: "backendB_authorityC",
 		},
 		{
 			name:            "MatchesMatchesMetadata",
 			fullServiceName: "com.example.whatever.MyService",
 			md:              metadata.Pairs("keyOne", "valueOne", "keyTwo", "valueTwo", "keyThree", "somethingUnmatched"),
 			expectedBackend: "backendCatchAllCom",
-			expectedErr:     nil,
 		},
 		{
 			name:            "MatchesFailsBackToCatchCom_OnBadMetadata",
 			fullServiceName: "com.example.whatever.MyService",
 			md:              metadata.Pairs("keyTwo", "valueTwo"),
 			expectedBackend: "backendCatchAllCom",
-			expectedErr:     nil,
 		},
 		{
 			name:            "MatchesFailsBackToCatchCom_OnBadAuthority",
 			fullServiceName: "com.example.blah.MyService",
 			md:              metadata.Pairs(":authority", "authority_else.service.local"),
 			expectedBackend: "backendCatchAllCom",
-			expectedErr:     nil,
 		},
 		{
 			name:            "MatchesFailsCompletely_NoBackend",
 			fullServiceName: "noncom.else.MyService",
 			md:              metadata.Pairs(":authority", "authority_else.service.local"),
-			expectedBackend: "",
-			expectedErr:     nil,
+			expectedErr:     routeNotFound,
 		},
 	} {
 		t.Run(tcase.name, func(t *testing.T) {
 			ctx := metautils.NiceMD(tcase.md).ToIncoming(context.TODO())
-			be, _ := r.Route(ctx, tcase.fullServiceName)
-			assert.Equal(t, be, tcase.expectedBackend, "must match expected backend")
+			be, err := r.Route(ctx, tcase.fullServiceName)
+			if tcase.expectedErr != nil {
+				assert.Equal(t, tcase.expectedErr, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tcase.expectedBackend, be, "must match expected backend")
 		})
 
 	}

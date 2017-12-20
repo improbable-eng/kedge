@@ -1,7 +1,7 @@
 #!/bin/bash
 # Generates protobuf Go datastructures from the proto directory.
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/.."
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 PROTOBUF_DIR=${PROTOBUF_DIR-${ROOT_DIR}/proto}
 PROTOGEN_DIR=protogen
 GENERATION_DIR=${GENERATION_DIR-${ROOT_DIR}/${PROTOGEN_DIR}}

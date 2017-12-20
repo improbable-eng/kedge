@@ -35,6 +35,12 @@ func TestRouteMatches(t *testing.T) {
 		"authorityHostMatcher": "authority_c.service.local",
 		"authorityPortMatcher": 1234
 	},
+    {
+		"backendName": "backendB_authorityD",
+		"serviceNameMatcher": "*",
+		"authorityHostMatcher": "2001:db8:1f70::999:de8:7648:6e8",
+		"authorityPortMatcher": 1234
+	},
 	{
 		"backendName": "backendD",
 		"serviceNameMatcher": "com.example.",
@@ -82,6 +88,12 @@ func TestRouteMatches(t *testing.T) {
 			fullServiceName: "something.else.MyService",
 			md:              metadata.Pairs(":authority", "authority_c.service.local:1234"),
 			expectedBackend: "backendB_authorityC",
+		},
+		{
+			name:            "MatchesAuthorityIPv6AndPort",
+			fullServiceName: "something.else.MyService",
+			md:              metadata.Pairs(":authority", "[2001:db8:1f70::999:de8:7648:6e8]:1234"),
+			expectedBackend: "backendB_authorityD",
 		},
 		{
 			name:            "MatchesMatchesMetadata",

@@ -35,7 +35,7 @@ var (
 
 	grpcBackendPool = grpc_bp.NewDynamic(logrus.StandardLogger())
 	httpBackendPool = http_bp.NewDynamic(logrus.StandardLogger())
-	grpcRouter      = grpc_router.NewDynamic()
+	grpcRouter      = grpc_router.NewDynamic(logrus.StandardLogger())
 	httpRouter      = http_router.NewDynamic()
 	httpAddresser   = http_adhoc.NewDynamic()
 

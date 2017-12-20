@@ -31,6 +31,7 @@ import (
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -223,7 +224,7 @@ func (s *BackendPoolIntegrationTestSuite) SetupSuite() {
 
 	s.pool, err = backendpool.NewStatic(backendConfigs)
 	require.NoError(s.T(), err, "backend pool creation must not fail")
-	router := router.NewStatic(routeConfigs)
+	router := router.NewStatic(logrus.New(), routeConfigs)
 	dir := director.New(s.pool, router)
 
 	grpcAuth := director.NewGRPCAuthorizer(&testAuthorizer{expectedToken: testToken, returnErr: nil})

@@ -8,9 +8,9 @@ import github_com_mwitkow_go_proto_validators "github.com/mwitkow/go-proto-valid
 import proto "github.com/golang/protobuf/proto"
 import math "math"
 import _ "github.com/mwitkow/go-proto-validators"
-import  _ "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
-import  _ "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
-import  _ "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
+import _ "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
+import _ "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
+import _ "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

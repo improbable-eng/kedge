@@ -55,6 +55,7 @@ var (
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
 	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 
+	flagLogLevel        = sharedflags.Set.String("log_level", "info", "Log level")
 	flagLogstashAddress = sharedflags.Set.String("logstash_hostport", "", "Host:port of logstash for remote logging. If empty remote logging is disabled.")
 
 	flagLogTestBackendpoolResolution = sharedflags.Set.Bool("log_backend_resolution_on_addition", false, "With this option "+
@@ -66,13 +67,18 @@ var (
 )
 
 func main() {
-	log.SetOutput(os.Stdout)
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
 		log.WithError(err).Fatalf("failed parsing flags")
 	}
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
 		log.WithError(err).Fatalf("failed reading flagz from files")
 	}
+
+	lvl, err := log.ParseLevel(*flagLogLevel)
+	if err != nil {
+		log.WithError(err).Fatalf("Cannot parse log level: %s", *flagLogLevel)
+	}
+	log.SetLevel(lvl)
 
 	if *flagLogstashAddress != "" {
 		formatter, err := logstash.NewFormatter()

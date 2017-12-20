@@ -86,8 +86,6 @@ func main() {
 		log.WithError(err).Fatal("failed building TLS config from flags")
 	}
 
-	log.SetOutput(os.Stdout)
-
 	lvl := log.DebugLevel
 	if !*flagDebugMode {
 		lvl, err = log.ParseLevel(*flagLogLevel)
@@ -138,10 +136,8 @@ func main() {
 		tlsConfig,
 		logEntry,
 		mux,
+		*flagDebugMode,
 	)
-	if *flagDebugMode {
-		httpWinchHandler.AddDebugTripperware()
-	}
 
 	proxyMux := cors.New(cors.Options{
 		AllowedOrigins: *flagCORSAllowedOrigins,
@@ -158,7 +154,7 @@ func main() {
 		).Handler(proxyMux),
 	}
 
-	grpcWinchHandler := grpc_winch.New(mapper, tlsConfig)
+	grpcWinchHandler := grpc_winch.New(mapper, tlsConfig, *flagDebugMode)
 
 	grpcWinchServer := grpc.NewServer(
 		grpc.CustomCodec(proxy.Codec()), // needed for winch to function.

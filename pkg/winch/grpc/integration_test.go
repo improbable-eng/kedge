@@ -206,7 +206,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	s.winch = grpc.NewServer(
 		grpc.CustomCodec(proxy.Codec()),
 		grpc.UnknownServiceHandler(proxy.TransparentHandler(
-			New(kedge_map.RouteMapper(s.routes.Get()), s.tlsConfigForTest())),
+			New(kedge_map.RouteMapper(s.routes.Get()), s.tlsConfigForTest(), false)),
 		),
 	)
 

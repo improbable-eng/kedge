@@ -203,7 +203,9 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 		s.routes.Get()),
 		s.tlsClientConfigForTest(),
 		logrus.NewEntry(logrus.New()),
-		nil),
+		nil,
+		false,
+	),
 	)
 	s.winch = &http.Server{
 		Handler: m,

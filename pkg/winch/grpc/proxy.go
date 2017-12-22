@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/improbable-eng/kedge/pkg/grpc/metadata"
+	"github.com/improbable-eng/kedge/pkg/grpcutils"
 	"github.com/improbable-eng/kedge/pkg/http/header"
 	"github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
@@ -51,7 +51,7 @@ func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.Stre
 			tags.Set(header.RequestKedgeForceInfoLogs, os.ExpandEnv("winch-$USER"))
 		}
 
-		ctx = grpc_metadata.CloneIncomingToOutgoing(ctx)
+		ctx = grpcutils.CloneIncomingToOutgoingMD(ctx)
 
 		transportCreds := credentials.NewTLS(config)
 		// Make sure authority is ok.

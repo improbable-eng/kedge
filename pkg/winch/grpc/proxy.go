@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
+	"github.com/improbable-eng/kedge/pkg/grpc/metadata"
 	"github.com/improbable-eng/kedge/pkg/http/header"
 	"github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
@@ -25,19 +26,19 @@ import (
 
 // New builds a StreamDirector based off a backend pool and a router.
 func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.StreamDirector {
-	return func(ctx context.Context, fullMethodName string) (*grpc.ClientConn, error) {
+	return func(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
 		md := metautils.ExtractIncoming(ctx)
 		targetAuthority := md.Get(":authority")
 		if targetAuthority == "" {
-			return nil, errors.New("No :authority header. Cannot find the host")
+			return ctx, nil, errors.New("No :authority header. Cannot find the host")
 		}
 
 		route, err := mapper.Map(targetAuthority, "")
 		if err != nil {
 			if err == kedge_map.ErrNotKedgeDestination {
-				return nil, status.Error(codes.Unimplemented, err.Error())
+				return ctx, nil, status.Error(codes.Unimplemented, err.Error())
 			}
-			return nil, err
+			return ctx, nil, err
 		}
 
 		tags := grpc_ctxtags.Extract(ctx)
@@ -49,6 +50,8 @@ func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.Stre
 		if debugMode {
 			tags.Set(header.RequestKedgeForceInfoLogs, os.ExpandEnv("winch-$USER"))
 		}
+
+		ctx = grpc_metadata.CloneIncomingToOutgoing(ctx)
 
 		transportCreds := credentials.NewTLS(config)
 		// Make sure authority is ok.
@@ -68,11 +71,12 @@ func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.Stre
 			dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(newTokenCredentials(route.BackendAuth, "authorization")))
 		}
 
-		return grpc.DialContext(
+		conn, err := grpc.DialContext(
 			ctx,
 			net.JoinHostPort(route.URL.Hostname(), route.URL.Port()),
 			dialOpts...,
 		)
+		return ctx, conn, err
 	}
 }
 

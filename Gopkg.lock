@@ -181,10 +181,9 @@
   revision = "a55ca57f374a8846924b030f534d8b8211508cf0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/mwitkow/grpc-proxy"
   packages = ["proxy"]
-  revision = "97396d94749c00db659393ba5123f707062f829f"
+  revision = "67591eb23c48346a480470e462289835d96f70da"
 
 [[projects]]
   name = "github.com/oklog/oklog"
@@ -341,6 +340,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b366f3abaeb2b92c01b5431b3f81d6a2db6b66a7be63cb024e4d45e339841399"
+  inputs-digest = "fd5a33604a4cd343f10bf4135b85545a401ce92687f029d472efda491c5a542a"
   solver-name = "gps-cdcl"
   solver-version = 1

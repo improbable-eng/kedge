@@ -1,4 +1,4 @@
-package grpc_metadata
+package grpcutils
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-func CloneIncomingToOutgoing(ctx context.Context) context.Context {
+func CloneIncomingToOutgoingMD(ctx context.Context) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return ctx

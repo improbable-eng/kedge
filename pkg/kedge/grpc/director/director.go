@@ -7,7 +7,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/improbable-eng/kedge/pkg/grpc/metadata"
+	"github.com/improbable-eng/kedge/pkg/grpcutils"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/backendpool"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/director/router"
 	"github.com/mwitkow/grpc-proxy/proxy"
@@ -24,7 +24,7 @@ func New(pool backendpool.Pool, router router.Router) proxy.StreamDirector {
 			return ctx, nil, err
 		}
 
-		ctx = grpc_metadata.CloneIncomingToOutgoing(ctx)
+		ctx = grpcutils.CloneIncomingToOutgoingMD(ctx)
 
 		grpc_ctxtags.Extract(ctx).Set("grpc.proxy.backend", beName)
 		cc, err := pool.Conn(beName)

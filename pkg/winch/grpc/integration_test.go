@@ -135,6 +135,14 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 				},
 			},
 			{
+				Type: &pb.Route_Direct{
+					Direct: &pb.DirectRoute{
+						Key: "resource1-authtest.ext.example.com",
+						Url: "https://" + moveToLocalhost(s.localSecureKedges.listeners[0].Addr().String()),
+					},
+				},
+			},
+			{
 				ProxyAuth: "proxy-access1",
 				Type: &pb.Route_Direct{
 					Direct: &pb.DirectRoute{
@@ -221,14 +229,18 @@ func (s *WinchIntegrationSuite) SimpleCtx() context.Context {
 }
 
 // dialThroughWinch creates plain, insecure, local connection to winch.
-func (s *WinchIntegrationSuite) dialThroughWinch(targetAuthority string) (*grpc.ClientConn, error) {
+func (s *WinchIntegrationSuite) dialThroughWinch(targetAuthority string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	proxyPort := s.winchListenerPlain.Addr().String()[strings.LastIndex(s.winchListenerPlain.Addr().String(), ":")+1:]
 
-	return grpc.Dial(
-		fmt.Sprintf("localhost:%s", proxyPort),
+	defaultOpts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
 		grpc.WithAuthority(targetAuthority),
+	}
+	opts = append(defaultOpts, opts...)
+	return grpc.Dial(
+		fmt.Sprintf("localhost:%s", proxyPort),
+		opts...,
 	)
 }
 
@@ -256,6 +268,45 @@ func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute_ValidAuth(
 
 	resp := &unknownResponse{}
 	err = grpc.Invoke(s.SimpleCtx(), "/test.SomeService/Method", &unknownResponse{}, resp, cc)
+	require.NoError(s.T(), err, "no error on simple call")
+	assert.Equal(s.T(), "/test.SomeService/Method", resp.Method)
+	assert.Equal(s.T(), "0", resp.Backend)
+	assert.Equal(s.T(), "", resp.ProxyAuth)
+	assert.Equal(s.T(), "bearer test-token", resp.BackendAuth)
+}
+
+type tokenCreds struct {
+	token  string
+	header string
+}
+
+func (c *tokenCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{
+		c.header: c.token,
+	}, nil
+}
+
+func (c *tokenCreds) RequireTransportSecurity() bool {
+	return false
+}
+
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute_WinchPassesValidAuth() {
+	cc, err := s.dialThroughWinch("resource1-authtest.ext.example.com")
+	require.NoError(s.T(), err, "dialing the winch *must not* fail")
+	defer func() {
+		cc.Close()
+		time.Sleep(10 * time.Millisecond)
+	}()
+
+	resp := &unknownResponse{}
+	err = grpc.Invoke(
+		s.SimpleCtx(),
+		"/test.SomeService/Method",
+		&unknownResponse{},
+		resp,
+		cc,
+		grpc.PerRPCCredentials(&tokenCreds{token: "bearer test-token", header: "authorization"}),
+	)
 	require.NoError(s.T(), err, "no error on simple call")
 	assert.Equal(s.T(), "/test.SomeService/Method", resp.Method)
 	assert.Equal(s.T(), "0", resp.Backend)

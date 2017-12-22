@@ -62,6 +62,7 @@
 
 [[constraint]]
   name = "github.com/mwitkow/grpc-proxy"
+  revision = "67591eb23c48346a480470e462289835d96f70da"
 
 [[constraint]]
   name = "github.com/oklog/oklog"

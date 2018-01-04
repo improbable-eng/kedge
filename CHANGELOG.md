@@ -1,5 +1,17 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.8](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.8)
+Kedge service:
+* [x] Fixed passing headers through gRPC proxies
+* [x] Updated Docs!
+* [x] Better error handling
+* [x] Fixed not working gRPC authority matcher
+* [x] Fixed and tested HostResolver
+* [x] Added way to change metric endpoint route
+
+Winch (kedge client):
+* [x] Updated Docs!
+
 ### [v1.0.0-beta.5](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.5)
 Kedge service:
 * [x] added OIDC support to gRPC flow

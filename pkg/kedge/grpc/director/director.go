@@ -24,9 +24,9 @@ func New(pool backendpool.Pool, router router.Router) proxy.StreamDirector {
 			return ctx, nil, err
 		}
 
+		grpc_ctxtags.Extract(ctx).Set("grpc.proxy.backend", beName)
 		ctx = grpcutils.CloneIncomingToOutgoingMD(ctx)
 
-		grpc_ctxtags.Extract(ctx).Set("grpc.proxy.backend", beName)
 		cc, err := pool.Conn(beName)
 		return ctx, cc, err
 	}

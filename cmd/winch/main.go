@@ -33,7 +33,7 @@ import (
 	"github.com/mwitkow/go-flagz/protobuf"
 	"github.com/mwitkow/go-proto-validators"
 	"github.com/mwitkow/grpc-proxy/proxy"
-	"github.com/oklog/oklog/pkg/group"
+	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
 	"github.com/rs/cors"
@@ -171,7 +171,7 @@ func main() {
 		),
 	)
 
-	var g group.Group
+	var g run.Group
 	{
 		g.Add(func() error {
 			err := httpWinchServer.Serve(httpPlainListener)

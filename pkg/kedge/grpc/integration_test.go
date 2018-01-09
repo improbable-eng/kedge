@@ -94,9 +94,9 @@ var routeConfigs = []*pb_route.Route{
 }
 
 type unknownResponse struct {
-	Addr     string           `protobuf:"bytes,1,opt,name=addr,json=value"`
-	Method   string           `protobuf:"bytes,2,opt,name=method"`
-	Backend  string           `protobuf:"bytes,3,opt,name=backend"`
+	Addr               string `protobuf:"bytes,1,opt,name=addr,json=value"`
+	Method             string `protobuf:"bytes,2,opt,name=method"`
+	Backend            string `protobuf:"bytes,3,opt,name=backend"`
 	AuthorizationToken string `protobuf:"bytes,4,opt,name=auth"`
 }
 

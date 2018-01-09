@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -36,6 +36,8 @@ import (
 	"github.com/mwitkow/go-conntrack/connhelpers"
 	"github.com/mwitkow/go-flagz"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	"github.com/oklog/run"
+	"github.com/pkg/errors"
 	"github.com/pressly/chi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -49,7 +51,7 @@ var (
 	flagMetricsPath = sharedflags.Set.String("server_metrics_path", "/debug/metrics", "path on which to serve metrics")
 	flagGrpcTlsPort = sharedflags.Set.Int("server_grpc_tls_port", 8444, "TCP TLS port to listen on for secure gRPC calls. If 0, no gRPC-TLS will be open.")
 	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
-	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no insecure HTTP will be open.")
+	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no debug HTTP endpoint will be open.")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
@@ -93,9 +95,17 @@ func main() {
 		log.AddHook(hook)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	grpc.EnableTracing = *flagGrpcWithTracing
+	logEntry := log.NewEntry(log.StandardLogger())
+	grpc_logrus.ReplaceGrpcLogger(logEntry)
+	tlsConfig, err := buildTLSConfigFromFlags()
+	if err != nil {
+		log.Fatalf("failed building TLS config from flags: %v", err)
+	}
 
+	var g run.Group
+
+	// Schedule Dynamic Routing Discovery if needed.
 	if *flagDynamicRoutingDiscoveryEnabled {
 		log.Info("Flag 'kedge_dynamic_routings_enabled' is true. Enabling dynamic routing with base configuration fetched from provided" +
 			" directorConfig and backendpoolConfig.")
@@ -108,193 +118,183 @@ func main() {
 			log.WithError(err).Fatal("Failed to create routingDiscovery")
 		}
 
-		go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		g.Add(func() error {
 			err := routingDiscovery.DiscoverAndSetFlags(
 				ctx,
 				flagConfigDirector,
 				flagConfigBackendpool,
 			)
 			if err != nil {
-				log.WithError(err).Fatal("Dynamic Routing Discovery failed")
+				return errors.Wrap(err, "dynamic routing discovery")
 			}
-		}()
+			return nil
+		}, func(error) {
+			cancel()
+		})
 	}
 
-	grpc.EnableTracing = *flagGrpcWithTracing
-	logEntry := log.NewEntry(log.StandardLogger())
-	grpc_logrus.ReplaceGrpcLogger(logEntry)
-	tlsConfig, err := buildTLSConfigFromFlags()
-	if err != nil {
-		log.Fatalf("failed building TLS config from flags: %v", err)
-	}
-
-	httpDirector := http_director.New(httpBackendPool, httpRouter, httpAddresser, logEntry)
-	grpcDirector := grpc_director.New(grpcBackendPool, grpcRouter)
-
-	// HTTPS proxy chain.
-	httpDirectorChain := chi.Chain(
-		http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
-		http_debug.Middleware(),                                                                     // Traces.
-		http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)),                        // Std Request/Response Logs.
-		http_metrics.Middleware(http_prometheus.ServerMetrics()),                                    // Std Request/Response Metrics.
-		reporter.Middleware(logEntry),                                                               // Kedge proxy metrics/logs
-	)
-
-	// HTTP debug chain.
-	httpDebugChain := chi.Chain(
-		http_ctxtags.Middleware("debug"),
-		http_debug.Middleware(),
-	)
-	// httpNonAuthDebugChain chain is shares the same base but will not include auth. It is for metrics and _healthz.
-	httpNonAuthDebugChain := httpDebugChain
-
-	grpcUnaryInterceptors := []grpc.UnaryServerInterceptor{
-		grpc_ctxtags.UnaryServerInterceptor(),
-		grpc_logrus.UnaryServerInterceptor(logEntry),
-		grpc_prometheus.UnaryServerInterceptor,
-	}
-	grpcStreamInterceptors := []grpc.StreamServerInterceptor{
-		grpc_ctxtags.StreamServerInterceptor(),
-		grpc_logrus.StreamServerInterceptor(logEntry),
-		grpc_prometheus.StreamServerInterceptor,
-	}
-
+	// authorizer decides how to auth the endpoint.
 	authorizer, err := authorizerFromFlags(logEntry)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create authorizer.")
 	}
-	if authorizer != nil {
-		httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(authorizer))
 
-		grpcAuth := grpc_director.NewGRPCAuthorizer(authorizer)
-		grpcUnaryInterceptors = append(grpcUnaryInterceptors, grpc_auth.UnaryServerInterceptor(grpcAuth))
-		grpcStreamInterceptors = append(grpcStreamInterceptors, grpc_auth.StreamServerInterceptor(grpcAuth))
+	var grpcServer *grpc.Server
 
-		logEntry.Info("configured OIDC authorization for HTTPS proxy and TLS gRPC.")
-	}
-
-	// GRPC kedge.
-	grpcDirectorServer := grpc.NewServer(
-		grpc.CustomCodec(proxy.Codec()), // needed for director to function.
-		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcDirector)),
-		grpc_middleware.WithUnaryServerChain(grpcUnaryInterceptors...),
-		grpc_middleware.WithStreamServerChain(grpcStreamInterceptors...),
-		grpc.Creds(credentials.NewTLS(tlsConfig)),
-	)
-
-	// Bouncer.
-	httpsBouncerServer := httpsBouncerServer(grpcDirectorServer, httpDirectorChain.Handler(httpDirector), logEntry)
-
-	if authorizer != nil && *flagEnableOIDCAuthForDebugEnpoints {
-		httpDebugChain = append(httpDebugChain, http_director.AuthMiddleware(authorizer))
-		logEntry.Info("configured OIDC authorization for HTTP debug server.")
-	}
-
-	// Debug.
-	httpDebugServer, err := debugServer(logEntry, httpDebugChain, httpNonAuthDebugChain)
-	if err != nil {
-		log.WithError(err).Fatal("failed to create debug Server.")
-	}
-
-	errChan := make(chan error)
-	var grpcTlsListener net.Listener
-	var httpPlainListener net.Listener
-	var httpTlsListener net.Listener
 	if *flagGrpcTlsPort != 0 {
-		grpcTlsListener = buildListenerOrFail("grpc_tls", *flagGrpcTlsPort)
+		// Setup gRPC handling.
+		grpcDirector := grpc_director.New(grpcBackendPool, grpcRouter)
+		grpcUnaryInterceptors := []grpc.UnaryServerInterceptor{
+			grpc_ctxtags.UnaryServerInterceptor(),
+			grpc_logrus.UnaryServerInterceptor(logEntry),
+			grpc_prometheus.UnaryServerInterceptor,
+		}
+		grpcStreamInterceptors := []grpc.StreamServerInterceptor{
+			grpc_ctxtags.StreamServerInterceptor(),
+			grpc_logrus.StreamServerInterceptor(logEntry),
+			grpc_prometheus.StreamServerInterceptor,
+		}
+		if authorizer != nil {
+			grpcAuth := grpc_director.NewGRPCAuthorizer(authorizer)
+			grpcUnaryInterceptors = append(grpcUnaryInterceptors, grpc_auth.UnaryServerInterceptor(grpcAuth))
+			grpcStreamInterceptors = append(grpcStreamInterceptors, grpc_auth.StreamServerInterceptor(grpcAuth))
+
+			logEntry.Info("configured OIDC authorization for TLS gRPC.")
+		}
+
+		// GRPC kedge.
+		grpcServer = grpc.NewServer(
+			grpc.CustomCodec(proxy.Codec()), // needed for director to function.
+			grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcDirector)),
+			grpc_middleware.WithUnaryServerChain(grpcUnaryInterceptors...),
+			grpc_middleware.WithStreamServerChain(grpcStreamInterceptors...),
+			grpc.Creds(credentials.NewTLS(tlsConfig)),
+		)
+
+		grpcTlsListener := buildListenerOrFail("grpc_tls", *flagGrpcTlsPort)
+		g.Add(func() error {
+			log.Infof("listening for gRPC TLS on: %v", grpcTlsListener.Addr().String())
+			err := grpcServer.Serve(grpcTlsListener)
+			if err != nil {
+				return errors.Wrap(err, "grpc_tls")
+			}
+			return nil
+		}, func(error) {
+			grpcServer.GracefulStop()
+			grpcTlsListener.Close()
+		})
 	}
-	if *flagHttpPort != 0 {
-		httpPlainListener = buildListenerOrFail("http_plain", *flagHttpPort)
-	}
+
 	if *flagHttpTlsPort != 0 {
-		httpTlsListener = buildListenerOrFail("http_tls", *flagHttpTlsPort)
+		// Setup HTTP handling (+ bouncer to gRPC if needed)
+		httpDirector := http_director.New(httpBackendPool, httpRouter, httpAddresser, logEntry)
+
+		// HTTPS proxy chain.
+		httpDirectorChain := chi.Chain(
+			http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
+			http_debug.Middleware(),                                                                     // Traces.
+			http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)),                        // Std Request/Response Logs.
+			http_metrics.Middleware(http_prometheus.ServerMetrics()),                                    // Std Request/Response Metrics.
+			reporter.Middleware(logEntry),                                                               // Kedge proxy metrics/logs
+		)
+
+		if authorizer != nil {
+			httpDirectorChain = append(httpDirectorChain, http_director.AuthMiddleware(authorizer))
+			logEntry.Info("configured OIDC authorization for HTTPS proxy.")
+		}
+
+		handler := httpDirectorChain.Handler(httpDirector)
+		if grpcServer != nil {
+			// Make HTTP handler bounce to gRPC if found proper content-type.
+			handler = http.HandlerFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
+					grpcServer.ServeHTTP(w, req)
+					return
+				}
+				handler.ServeHTTP(w, req)
+			}).ServeHTTP)
+		}
+
+		httpsServer := &http.Server{
+			WriteTimeout: *flagHttpMaxWriteTimeout,
+			ReadTimeout:  *flagHttpMaxReadTimeout,
+			ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
+			Handler:      handler,
+		}
+
+		httpTlsListener := buildListenerOrFail("http_tls", *flagHttpTlsPort)
 		http2TlsConfig, err := connhelpers.TlsConfigWithHttp2Enabled(tlsConfig)
 		if err != nil {
 			log.Fatalf("failed setting up HTTP2 TLS config: %v", err)
 		}
 		httpTlsListener = tls.NewListener(httpTlsListener, http2TlsConfig)
-	}
 
-	var serveWg sync.WaitGroup
-	if grpcTlsListener != nil {
-		log.Infof("listening for gRPC TLS on: %v", grpcTlsListener.Addr().String())
-		serveWg.Add(1)
-		go func() {
-			defer serveWg.Done()
-			if err := grpcDirectorServer.Serve(grpcTlsListener); err != nil {
-				errChan <- fmt.Errorf("grpc_tls server error: %v", err)
+		g.Add(func() error {
+			log.Infof("listening for HTTP TLS on: %v", httpTlsListener.Addr().String())
+			err := httpsServer.Serve(httpTlsListener)
+			if err != nil {
+				return errors.Wrap(err, "http_tls")
 			}
-		}()
-	}
-	if httpTlsListener != nil {
-		log.Infof("listening for HTTP TLS on: %v", httpTlsListener.Addr().String())
-		serveWg.Add(1)
-		go func() {
-			defer serveWg.Done()
-			if err := httpsBouncerServer.Serve(httpTlsListener); err != nil {
-				errChan <- fmt.Errorf("http_tls server error: %v", err)
-			}
-		}()
-	}
-	if httpPlainListener != nil {
-		log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
-		serveWg.Add(1)
-		go func() {
-			defer serveWg.Done()
-			if err := httpDebugServer.Serve(httpPlainListener); err != nil {
-				errChan <- fmt.Errorf("http_plain server error: %v", err)
-			}
-		}()
+			return nil
+		}, func(error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+
+			httpsServer.Shutdown(ctx)
+			httpTlsListener.Close()
+		})
 	}
 
-	defer shutdown(ctx, httpsBouncerServer, grpcDirectorServer, httpDebugServer)
+	if *flagHttpPort != 0 {
+		// HTTP debug chain.
+		httpDebugChain := chi.Chain(
+			http_ctxtags.Middleware("debug"),
+			http_debug.Middleware(),
+		)
 
-	go func() {
-		serveWg.Wait()
-		close(errChan)
-	}()
-
-	go func() {
-		waitForAny(ctx, syscall.SIGTERM, os.Interrupt)
-		close(errChan)
-	}()
-
-	select {
-	// Graceful shutdown finished after signal.
-	case err, ok := <-errChan:
-		if ok {
-			log.WithError(err).Fatalf("Fail")
+		if authorizer != nil && *flagEnableOIDCAuthForDebugEnpoints {
+			httpDebugChain = append(httpDebugChain, http_director.AuthMiddleware(authorizer))
+			logEntry.Info("configured OIDC authorization for HTTP debug server.")
 		}
-	}
-	return
-}
+		// httpNonAuthDebugChain chain is shares the same base but will not include auth. It is for metrics and _healthz.
+		httpNonAuthDebugChain := httpDebugChain
 
-func shutdown(ctx context.Context, bouncer *http.Server, grpcDirector *grpc.Server, debugServer *http.Server) {
-	log.Info("Shutting down servers gracefully.")
-
-	innerCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-
-	bouncer.Shutdown(innerCtx)
-	debugServer.Shutdown(innerCtx)
-	grpcDirector.GracefulStop()
-}
-
-// httpsBouncerHandler decides what kind of requests it is and redirects to GRPC if needed.
-func httpsBouncerServer(grpcHandler *grpc.Server, httpHandler http.Handler, logEntry *log.Entry) *http.Server {
-	httpBouncerHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
-			grpcHandler.ServeHTTP(w, req)
-			return
+		// Debug.
+		httpDebugServer, err := debugServer(logEntry, httpDebugChain, httpNonAuthDebugChain)
+		if err != nil {
+			log.WithError(err).Fatal("failed to create debug Server.")
 		}
-		httpHandler.ServeHTTP(w, req)
-	}).ServeHTTP
+		httpPlainListener := buildListenerOrFail("http_plain", *flagHttpPort)
 
-	return &http.Server{
-		WriteTimeout: *flagHttpMaxWriteTimeout,
-		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
-		Handler:      http.HandlerFunc(httpBouncerHandler),
+		g.Add(func() error {
+			log.Infof("listening for HTTP plain on: %v", httpPlainListener.Addr().String())
+			err := httpDebugServer.Serve(httpPlainListener)
+			if err != nil {
+				return errors.Wrap(err, "http_plain")
+			}
+			return nil
+		}, func(error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+
+			httpDebugServer.Shutdown(ctx)
+			httpPlainListener.Close()
+		})
+	}
+
+	{
+		cancel := make(chan struct{})
+		g.Add(func() error {
+			return interrupt(cancel)
+		}, func(error) {
+			log.Info("Shutting down servers gracefully.")
+			close(cancel)
+		})
+	}
+	// Serve all.
+	if err := g.Run(); err != nil {
+		log.WithError(err).Fatal("kedge failed")
 	}
 }
 
@@ -360,4 +360,15 @@ func kedgeRequestIDTagExtractor(req *http.Request) map[string]interface{} {
 	}
 
 	return tags
+}
+
+func interrupt(cancel <-chan struct{}) error {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case <-c:
+		return nil
+	case <-cancel:
+		return errors.New("canceled")
+	}
 }

@@ -29,10 +29,8 @@ install-tools:
 	@echo ">> fetching dep"
 	@go get -u github.com/golang/dep/cmd/dep
 
-proto:
+proto: deps
 	@echo ">> generating protobufs"
-	@go get -u github.com/mwitkow/go-proto-validators/protoc-gen-govalidators
-	@go get -u github.com/gogo/protobuf/protoc-gen-gogofast
 	@./scripts/protogen.sh
 
 test:

@@ -3,7 +3,7 @@ FILES             ?= $(shell find . -type f -name '*.go' -not -path "./vendor/*"
 DOCKER_IMAGE_NAME ?= kedge
 DOCKER_IMAGE_TAG  ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
-all: install-tools format build
+all: deps build
 
 format:
 	@echo ">> formatting code"
@@ -12,6 +12,12 @@ format:
 deps: install-tools
 	@echo ">> downloading dependencies"
 	@dep ensure
+
+build:
+	@echo ">> building kedge"
+	@go install github.com/improbable-eng/kedge/cmd/kedge
+	@echo ">> building winch"
+	@go install github.com/improbable-eng/kedge/cmd/winch
 
 vet:
 	@echo ">> vetting code"

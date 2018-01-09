@@ -72,7 +72,7 @@ For status, see [CHANGELOG](CHANGELOG.md)
 
 ## Wishlist
 
-See [issues](https://github.com/improbable-eng/kedge/issues?q=is%3Aopen+is%3Aissue+label%3A%22feature+%2F+improvement%22) for currently wanted features and improvements.
+See [Feature / Improvement issues](https://github.com/improbable-eng/kedge/issues?q=is%3Aopen+is%3Aissue+label%3A%22feature+%2F+improvement%22) for currently wanted features and improvements.
 
 ## License
 

@@ -8,11 +8,10 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"os/signal"
 	"strings"
 	"syscall"
 	"time"
-
-	"os/signal"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
@@ -189,7 +188,6 @@ func main() {
 
 	if *flagHttpTlsPort != 0 {
 		// Setup HTTP handling (+ bouncer to gRPC if needed)
-
 		httpDirector := http_director.New(httpBackendPool, httpRouter, httpAddresser, logEntry)
 
 		// HTTPS proxy chain.

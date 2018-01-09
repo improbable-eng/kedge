@@ -97,13 +97,7 @@ func main() {
 	logEntry := log.NewEntry(log.StandardLogger())
 	logEntry.Warn("Make sure you have enough file descriptors on your machine. Run ulimit -n <value> to set it for this terminal.")
 
-	var httpPlainListener net.Listener
-	httpPlainListener = buildListenerOrFail("http_plain", *flagHttpPort)
-	log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
-
-	var grpcPlainListener net.Listener
-	grpcPlainListener = buildListenerOrFail("grpc_plain", *flagGrpcPort)
-	log.Infof("listening for gRPC Plain on: %v", grpcPlainListener.Addr().String())
+	httpPlainListener := buildListenerOrFail("http_plain", *flagHttpPort)
 
 	mux := http.NewServeMux()
 	mux.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
@@ -131,49 +125,35 @@ func main() {
 	}
 
 	mapper := kedge_map.RouteMapper(routes.Get())
-	httpWinchHandler := http_winch.New(
-		mapper,
-		tlsConfig,
-		logEntry,
-		mux,
-		*flagDebugMode,
-	)
-
-	proxyMux := cors.New(cors.Options{
-		AllowedOrigins: *flagCORSAllowedOrigins,
-	}).Handler(httpWinchHandler)
-	httpWinchServer := &http.Server{
-		WriteTimeout: *flagHttpMaxWriteTimeout,
-		ReadTimeout:  *flagHttpMaxReadTimeout,
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry),
-		Handler: chi.Chain(
-			http_ctxtags.Middleware("winch"),
-			http_debug.Middleware(),
-			http_logrus.Middleware(logEntry, http_logrus.WithLevels(allAsDebug)),
-			reporter.Middleware(logEntry),
-		).Handler(proxyMux),
-	}
-
-	grpcWinchHandler := grpc_winch.New(mapper, tlsConfig, *flagDebugMode)
-
-	grpcWinchServer := grpc.NewServer(
-		grpc.CustomCodec(proxy.Codec()), // needed for winch to function.
-		grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcWinchHandler)),
-		grpc_middleware.WithUnaryServerChain(
-			grpc_ctxtags.UnaryServerInterceptor(),
-			grpc_logrus.UnaryServerInterceptor(logEntry),
-			grpc_prometheus.UnaryServerInterceptor,
-		),
-		grpc_middleware.WithStreamServerChain(
-			grpc_ctxtags.StreamServerInterceptor(),
-			grpc_logrus.StreamServerInterceptor(logEntry),
-			grpc_prometheus.StreamServerInterceptor,
-		),
-	)
 
 	var g run.Group
 	{
+		// Setup HTTP proxy (plain, no HTTP CONNECT yet).
+		httpWinchHandler := http_winch.New(
+			mapper,
+			tlsConfig,
+			logEntry,
+			mux,
+			*flagDebugMode,
+		)
+
+		proxyMux := cors.New(cors.Options{
+			AllowedOrigins: *flagCORSAllowedOrigins,
+		}).Handler(httpWinchHandler)
+
+		httpWinchServer := &http.Server{
+			WriteTimeout: *flagHttpMaxWriteTimeout,
+			ReadTimeout:  *flagHttpMaxReadTimeout,
+			ErrorLog:     http_logrus.AsHttpLogger(logEntry),
+			Handler: chi.Chain(
+				http_ctxtags.Middleware("winch"),
+				http_debug.Middleware(),
+				http_logrus.Middleware(logEntry, http_logrus.WithLevels(allAsDebug)),
+				reporter.Middleware(logEntry),
+			).Handler(proxyMux),
+		}
 		g.Add(func() error {
+			log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
 			err := httpWinchServer.Serve(httpPlainListener)
 			if err != nil {
 				return errors.Wrap(err, "http_plain server error")
@@ -191,25 +171,44 @@ func main() {
 		})
 	}
 	{
+		// Setup gRPC proxy (plain, no HTTP CONNECT yet).
+		grpcPlainListener := buildListenerOrFail("grpc_plain", *flagGrpcPort)
+
+		grpcWinchHandler := grpc_winch.New(mapper, tlsConfig, *flagDebugMode)
+		grpcWinchServer := grpc.NewServer(
+			grpc.CustomCodec(proxy.Codec()), // needed for winch to function.
+			grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcWinchHandler)),
+			grpc_middleware.WithUnaryServerChain(
+				grpc_ctxtags.UnaryServerInterceptor(),
+				grpc_logrus.UnaryServerInterceptor(logEntry),
+				grpc_prometheus.UnaryServerInterceptor,
+			),
+			grpc_middleware.WithStreamServerChain(
+				grpc_ctxtags.StreamServerInterceptor(),
+				grpc_logrus.StreamServerInterceptor(logEntry),
+				grpc_prometheus.StreamServerInterceptor,
+			),
+		)
+
 		g.Add(func() error {
+			log.Infof("listening for gRPC Plain on: %v", grpcPlainListener.Addr().String())
 			err := grpcWinchServer.Serve(grpcPlainListener)
 			if err != nil {
 				return errors.Wrap(err, "grpc_plain server error")
 			}
 			return nil
 		}, func(error) {
-			log.Infof("\nReceived an interrupt, stopping services...\n")
-
-			// TODO(bplotka): Add timeout to these.
 			grpcWinchServer.GracefulStop()
 			grpcPlainListener.Close()
 		})
 	}
+
 	{
 		cancel := make(chan struct{})
 		g.Add(func() error {
 			return interrupt(cancel)
 		}, func(error) {
+			log.Infof("\nReceived an interrupt, stopping services...\n")
 			close(cancel)
 		})
 	}

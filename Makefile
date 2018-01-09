@@ -29,7 +29,7 @@ install-tools:
 	@echo ">> fetching dep"
 	@go get -u github.com/golang/dep/cmd/dep
 
-proto: deps
+proto: 
 	@echo ">> generating protobufs"
 	@./scripts/protogen.sh
 

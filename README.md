@@ -72,19 +72,7 @@ For status, see [CHANGELOG](CHANGELOG.md)
 
 ## Wishlist
 
-The following features and items are planned:
-
-Kedge Service:
- * [ ] - example Kubernetes YAML files (deployment, config maps)
- * [ ] - TLS configuration (CA chains, etc.) for gRPC and HTTP backends 
- * [ ] - "adhoc routes" - support for HTTP Forward Proxying to an arbitrary (but filtered) SRV destination without a backend - calling pods
- * [ ] - support for TLS client certificate authentication on routes (metadata matches) (https://github.com/improbable-eng/kedge/issues/81)
- * [ ] - similar to above but for Open ID Connect: Support for different OIDC permission per route (group match) (https://github.com/improbable-eng/kedge/issues/81)
- * [ ] - support for load balanced CONNECT method proxying for TLS passthrough to backends - if needed
- 
-Winch (kedge client):
-* [ ] - add auto-configuration for all browser to use our PAC (WPAD is working, but no automatic way to configure browser for that)
-* [ ] - reading of TLS client certs from ~/.config/kedge
+See [Feature / Improvement issues](https://github.com/improbable-eng/kedge/issues?q=is%3Aopen+is%3Aissue+label%3A%22feature+%2F+improvement%22) for currently wanted features and improvements.
 
 ## License
 

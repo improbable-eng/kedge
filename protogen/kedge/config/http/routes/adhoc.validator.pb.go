@@ -14,7 +14,7 @@ It has these top-level messages:
 */
 package kedge_config_http_routes
 
-import github_com_mwitkow_go_proto_validators "github.com/mwitkow/go-proto-validators"
+import go_proto_validators "github.com/mwitkow/go-proto-validators"
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
@@ -26,8 +26,8 @@ var _ = math.Inf
 
 func (this *Adhoc) Validate() error {
 	if this.Port != nil {
-		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Port); err != nil {
-			return github_com_mwitkow_go_proto_validators.FieldError("Port", err)
+		if err := go_proto_validators.CallValidatorIfExists(this.Port); err != nil {
+			return go_proto_validators.FieldError("Port", err)
 		}
 	}
 	return nil
@@ -35,8 +35,8 @@ func (this *Adhoc) Validate() error {
 func (this *Adhoc_Port) Validate() error {
 	for _, item := range this.AllowedRanges {
 		if item != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(item); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("AllowedRanges", err)
+			if err := go_proto_validators.CallValidatorIfExists(item); err != nil {
+				return go_proto_validators.FieldError("AllowedRanges", err)
 			}
 		}
 	}

@@ -7,9 +7,9 @@ import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/mwitkow/go-proto-validators"
-import kedge_config_grpc_routes "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
-import kedge_config_http_routes "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
-import kedge_config_http_routes1 "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
+import  kedge_config_grpc_routes "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
+import  kedge_config_http_routes "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
+import  kedge_config_http_routes1 "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

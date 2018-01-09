@@ -25,8 +25,8 @@ install-tools:
 
 proto:
 	@echo ">> generating protobufs"
-	@go get github.com/mwitkow/go-proto-validators/protoc-gen-govalidators
-	@go get github.com/golang/protobuf/protoc-gen-go
+	@go get -u github.com/mwitkow/go-proto-validators/protoc-gen-govalidators
+	@go get -u github.com/gogo/protobuf/protoc-gen-gogofast
 	@./scripts/protogen.sh
 
 test:

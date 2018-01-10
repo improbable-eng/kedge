@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/improbable-eng/thanos/pkg/runutil"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/pkg/errors"
 )
 
 const expectedPACFile = `function FindProxyForURL(url, host) {

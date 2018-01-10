@@ -6,6 +6,12 @@
         "service_name_matcher": "*",
         "authority_host_matcher": "test_endpoint.localhost.internal.example.com",
         "authority_port_matcher": 18091
+      },
+      {
+        "backend_name": "test_endpoint",
+        "service_name_matcher": "*",
+        "authority_host_matcher": "no_auth.test_endpoint.localhost.internal.example.com",
+        "authority_port_matcher": 18091
       }
     ]
   },
@@ -14,6 +20,11 @@
       {
         "backend_name": "test_endpoint",
         "host_matcher": "test_endpoint.localhost.internal.example.com",
+        "port_matcher": 18090
+      },
+      {
+        "backend_name": "test_endpoint",
+        "host_matcher": "no_auth.test_endpoint.localhost.internal.example.com",
         "port_matcher": 18090
       }
     ]

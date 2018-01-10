@@ -36,6 +36,9 @@ const (
 	grpcTestEndpointPort = "18091"
 
 	miscDir = "../../misc/"
+
+	endpointDNS       = "test_endpoint.localhost.internal.example.com"
+	noAuthEndpointDNS = "no_auth.test_endpoint.localhost.internal.example.com"
 )
 
 type config struct {
@@ -84,7 +87,7 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 
 	if cfg.testEndpoint {
 		// Tokens are specified in misc/winch_auth.json
-		err := startTestEndpoints(&g, "secret-token2", "secret-token1")
+		err := startTestEndpoints(&g, "secret-token2", "secret-token")
 		if err != nil {
 			return nil, err
 		}

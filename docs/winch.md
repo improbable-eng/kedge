@@ -98,6 +98,8 @@ To force an application to dial required URL through winch just set `HTTP_PROXY`
 
 Example "through winch" gRPC dialer:
 ```go
+type dialContextFunc func(context.Context, string, ...grpc.DialOption) (*grpc.ClientConn, error)
+
 // WinchDialer returns dialer function that gives you WinchDialer-enabled dialer:
 // If winch.GRPCURLFromKubeConfig() gives empty string it returns pure grpc.DialContext.
 // If winch.GRPCURLFromKubeConfig() gives non URL formatted string it returns error.

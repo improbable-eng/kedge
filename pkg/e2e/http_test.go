@@ -11,16 +11,22 @@ import (
 	"net/http"
 	"net/url"
 
+	"errors"
+
 	"github.com/improbable-eng/thanos/pkg/runutil"
 	"github.com/stretchr/testify/require"
-	"errors"
 )
 
+// TestHTTPEndpointCall invokes end backend sayHello HTTP handler through winch and kedge.
 func TestHTTPEndpointCall(t *testing.T) {
 	const name = "kedge"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
+	defer func() {
+		cancel()
+		// Give time to print logs.
+		time.Sleep(100 * time.Millisecond)
+	}()
 
 	unexpectedExit, err := spinup(t, ctx, config{winch: true, kedge: true, testEndpoint: true})
 	require.NoError(t, err)
@@ -31,10 +37,10 @@ func TestHTTPEndpointCall(t *testing.T) {
 			return nil
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10 *time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		status, body, err := httpHelloViaWinchAndKedge(ctx, name)
+		status, body, err := httpHelloViaWinchAndKedge(ctx, endpointDNS, name)
 		if err != nil {
 			return err
 		}
@@ -49,19 +55,26 @@ func TestHTTPEndpointCall(t *testing.T) {
 		}
 
 		if body != expectedResponse(name) {
-			t.Errorf("Unexpected response: %s; Exp: %s", body, expectedResponse(name))
+			t.Errorf("Unexpected response: %v; Exp: %s", body, expectedResponse(name))
 			return nil
 		}
 
 		return nil
 	})
 	require.NoError(t, err)
+
+	// Try URL for which winch will not append backend auth and we expect it to fail.
+	status, body, err := httpHelloViaWinchAndKedge(ctx, noAuthEndpointDNS, name)
+	require.NoError(t, err)
+
+	if status != http.StatusUnauthorized {
+		t.Errorf("Unexpected status code: %v. Expected 401. Resp: %v", status, body)
+		return
+	}
 }
 
-const endpointDNS = "test_endpoint.localhost.internal.example.com"
-
-func httpHelloViaWinchAndKedge(ctx context.Context, name string) (int, string, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%s/?name=%s", endpointDNS, httpTestEndpointPort, name), nil)
+func httpHelloViaWinchAndKedge(ctx context.Context, dnsName string, name string) (int, string, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%s/?name=%s", dnsName, httpTestEndpointPort, name), nil)
 	if err != nil {
 		return 0, "", err
 	}

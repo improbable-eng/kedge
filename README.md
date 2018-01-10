@@ -64,7 +64,7 @@ Kedge package is using [dep](https://github.com/golang/dep) for vendoring.
 Please see 
 * the [kedge](docs/kedge.md) for an actual guide.
 * the [winch (client)](docs/winch.md) for a local forward proxy targeting kedge.
-
+* [end-to-end tests package](pkg/e2e) for example on-button usage of winch + kedge.
 ## Status
 
 The project is still in beta state, however heavily tested and used on prod clusters.

@@ -24,7 +24,7 @@ func TestHTTPEndpointCall(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer func() {
 		cancel()
-		// Give time to print logs.
+		// Give time to print logs and close ports.
 		time.Sleep(100 * time.Millisecond)
 	}()
 

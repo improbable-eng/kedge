@@ -29,12 +29,12 @@ const (
 	httpWinchPort = "18070"
 	grpcWinchPort = "18071"
 
-	httpKedgePort    = "18080"
-	httpTLSKedgePort = "18081"
-	grpcTLSKedgePort = "18082"
+	httpKedgePort    = "18170"
+	httpTLSKedgePort = "18171"
+	grpcTLSKedgePort = "18172"
 
-	httpTestEndpointPort = "18090"
-	grpcTestEndpointPort = "18091"
+	httpTestEndpointPort = "18270"
+	grpcTestEndpointPort = "18271"
 
 	miscDir = "../../misc/"
 

@@ -14,6 +14,7 @@ It has these top-level messages:
 	KubernetesAccess
 	OIDCAccess
 	DummyAccess
+	TokenAccess
 	MapperConfig
 	Route
 	DirectRoute
@@ -64,6 +65,13 @@ func (this *AuthSource) Validate() error {
 			}
 		}
 	}
+	if oneOfNester, ok := this.GetType().(*AuthSource_Token); ok {
+		if oneOfNester.Token != nil {
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.Token); err != nil {
+				return go_proto_validators.FieldError("Token", err)
+			}
+		}
+	}
 	return nil
 }
 func (this *KubernetesAccess) Validate() error {
@@ -73,5 +81,8 @@ func (this *OIDCAccess) Validate() error {
 	return nil
 }
 func (this *DummyAccess) Validate() error {
+	return nil
+}
+func (this *TokenAccess) Validate() error {
 	return nil
 }

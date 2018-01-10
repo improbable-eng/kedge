@@ -9,7 +9,6 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -44,6 +43,7 @@ import (
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"strings"
 )
 
 var (
@@ -207,13 +207,13 @@ func main() {
 		handler := httpDirectorChain.Handler(httpDirector)
 		if grpcServer != nil {
 			// Make HTTP handler bounce to gRPC if found proper content-type.
-			handler = http.HandlerFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
 					grpcServer.ServeHTTP(w, req)
 					return
 				}
-				handler.ServeHTTP(w, req)
-			}).ServeHTTP)
+				httpDirectorChain.Handler(httpDirector).ServeHTTP(w, req)
+			})
 		}
 
 		httpsServer := &http.Server{

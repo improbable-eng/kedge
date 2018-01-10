@@ -2,15 +2,11 @@
   "grpc": {
     "backends": [
       {
-        "name": "controller",
+        "name": "test_endpoint",
         "balancer": "ROUND_ROBIN",
-        "interceptors": [
-          {
-            "prometheus": true
-          }
-        ],
-        "srv": {
-          "dns_name": "_grpc._tcp.controller.default.svc.cluster.local"
+        "host": {
+          "dns_name": "localhost",
+          "port": 18091
         }
       }
     ]
@@ -18,10 +14,11 @@
   "http": {
     "backends": [
       {
-        "name": "controller",
+        "name": "test_endpoint",
         "balancer": "ROUND_ROBIN",
-        "srv": {
-          "dns_name": "_http._tcp.controller.default.svc.cluster.local"
+        "host": {
+          "dns_name": "localhost",
+          "port": 18090
         }
       }
     ]

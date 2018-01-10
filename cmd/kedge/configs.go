@@ -23,7 +23,10 @@ var (
 			Grpc: &pb_config.DirectorConfig_Grpc{},
 			Http: &pb_config.DirectorConfig_Http{},
 		},
-		"Contents of the Kedge Director configuration. Dynamically settable or read from file").WithFileFlag("../misc/director.json").WithValidator(generalValidator).WithNotifier(directorConfigReload)
+		"Contents of the Kedge Director configuration. Dynamically settable or read from file").
+		WithFileFlag("default_director.json").
+		WithValidator(generalValidator).
+		WithNotifier(directorConfigReload)
 
 	flagConfigBackendpool = protoflagz.DynProto3(sharedflags.Set,
 		"kedge_config_backendpool_config",
@@ -31,7 +34,9 @@ var (
 			Grpc: &pb_config.BackendPoolConfig_Grpc{},
 			Http: &pb_config.BackendPoolConfig_Http{},
 		},
-		"Contents of the Kedge Backendpool configuration. Dynamically settable or read from file").WithFileFlag("../misc/backendpool.json").WithValidator(generalValidator).WithNotifier(backendConfigReloaded)
+		"Contents of the Kedge Backendpool configuration. Dynamically settable or read from file").
+		WithFileFlag("default_backendpool.json").WithValidator(generalValidator).
+		WithNotifier(backendConfigReloaded)
 
 	grpcBackendPool = grpc_bp.NewDynamic(logrus.StandardLogger())
 	httpBackendPool = http_bp.NewDynamic(logrus.StandardLogger())

@@ -73,7 +73,8 @@ plain HTTP) as well as proxy auth. Any other internal request should have only p
 
 ```bash
 go run ./winch/server/*.go \
-  --server_http_port=8098 \
+  --server_http_port=8070 \
+  --server_grpc_port=8071 \
   --pac_redirect_sh_expressions="*.*.internal.example.com" \
   --server_mapper_config_path=misc/winch_mapper.json \
   --server_auth_config_path=misc/winch_auth.json

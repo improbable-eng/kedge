@@ -29,6 +29,7 @@ message Route {
     ProxyMode proxy_mode = 5;
 
     /// Optional port matcher. If 0 route will ignore port.
+    // TODO(bplotka): Type is not consistend with authority_host_matcher
     uint32 port_matcher = 6;
 
     /// TODO(mwitkow): Add fields that require TLS Client auth, or :authorization keys.

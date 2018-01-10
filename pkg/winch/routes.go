@@ -1,7 +1,6 @@
 package winch
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -10,14 +9,19 @@ import (
 	"github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	pb "github.com/improbable-eng/kedge/protogen/winch/config"
+	"github.com/pkg/errors"
 )
 
 type StaticRoutes struct {
-	routes []kedge_map.RouteGetter
+	httpRoutes []kedge_map.RouteGetter
+	gRPCRoutes []kedge_map.RouteGetter
 }
 
 func NewStaticRoutes(factory *AuthFactory, mapperConfig *pb.MapperConfig, authConfig *pb.AuthConfig) (*StaticRoutes, error) {
-	var routes []kedge_map.RouteGetter
+	var (
+		httpRoutes []kedge_map.RouteGetter
+		gRPCRoutes []kedge_map.RouteGetter
+	)
 	for _, configRoute := range mapperConfig.Routes {
 		backendAuth, err := routeAuth(factory, authConfig, configRoute.BackendAuth)
 		if err != nil {
@@ -49,16 +53,31 @@ func NewStaticRoutes(factory *AuthFactory, mapperConfig *pb.MapperConfig, authCo
 			return nil, errors.New("Config validation failed. No route rule (regexp|direct) configured")
 		}
 
-		routes = append(routes, routeMatcher)
+		switch configRoute.Protocol {
+		case pb.Protocol_ANY:
+			httpRoutes = append(httpRoutes, routeMatcher)
+			gRPCRoutes = append(gRPCRoutes, routeMatcher)
+		case pb.Protocol_HTTP:
+			httpRoutes = append(httpRoutes, routeMatcher)
+		case pb.Protocol_GRPC:
+			gRPCRoutes = append(gRPCRoutes, routeMatcher)
+		default:
+			return nil, errors.Errorf("Unknown protocol %s", configRoute.Protocol.String())
+		}
 	}
 
 	return &StaticRoutes{
-		routes: routes,
+		httpRoutes: httpRoutes,
+		gRPCRoutes: gRPCRoutes,
 	}, nil
 }
 
-func (r *StaticRoutes) Get() []kedge_map.RouteGetter {
-	return r.routes
+func (r *StaticRoutes) HTTP() []kedge_map.RouteGetter {
+	return r.httpRoutes
+}
+
+func (r *StaticRoutes) GRPC() []kedge_map.RouteGetter {
+	return r.gRPCRoutes
 }
 
 func routeAuth(f *AuthFactory, authConfig *pb.AuthConfig, authName string) (tokenauth.Source, error) {
@@ -75,7 +94,7 @@ func routeAuth(f *AuthFactory, authConfig *pb.AuthConfig, authName string) (toke
 			return auth, nil
 		}
 	}
-	return nil, fmt.Errorf("Config validation failed. Not found auth source called %q", authName)
+	return nil, errors.Errorf("Config validation failed. Not found auth source called %q", authName)
 }
 
 type regexpRoute struct {
@@ -122,7 +141,7 @@ func (r *regexpRoute) Route(hostPort string) (*kedge_map.Route, bool, error) {
 
 	u, err := url.Parse(routeURL)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Wrapf(err, "invalid evaluated URL in regexp winch route: %s", routeURL)
 	}
 
 	clonedRoute := *r.baseRoute

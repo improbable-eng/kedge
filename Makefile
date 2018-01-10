@@ -33,7 +33,7 @@ proto:
 	@echo ">> generating protobufs"
 	@./scripts/protogen.sh
 
-test:
+test: build
 	@echo ">> running all tests"
 	@go test $(shell go list ./... | grep -v /vendor/)
 
@@ -41,4 +41,4 @@ docker:
 	@echo ">> building docker image"
 	@docker build --build-arg BUILD_VERSION=$(date +%Y%m%d-%H%M%S)-001 -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
 
-.PHONY: all format deps vet install-tools proto test docker
+.PHONY: all format deps vet install-tools proto test docker build

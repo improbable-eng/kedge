@@ -2,10 +2,11 @@ package e2e
 
 import (
 	"bytes"
-	"context"
 	"os/exec"
 	"syscall"
 	"testing"
+
+	"golang.org/x/net/context"
 
 	"fmt"
 	"net"

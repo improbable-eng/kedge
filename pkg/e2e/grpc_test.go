@@ -1,9 +1,10 @@
 package e2e
 
 import (
-	"context"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"fmt"
 	"net/url"

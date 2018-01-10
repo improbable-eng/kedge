@@ -22,17 +22,20 @@ func TestHTTPEndpointCall(t *testing.T) {
 	const name = "kedge"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	exit, err := spinup(t, ctx, config{winch: true, kedge: true, testEndpoint: true})
+	if err != nil {
+		t.Error(err)
+		cancel()
+		return
+	}
+
 	defer func() {
 		cancel()
-		// Give time to print logs and close ports.
-		time.Sleep(100 * time.Millisecond)
+		<-exit
 	}()
 
-	unexpectedExit, err := spinup(t, ctx, config{winch: true, kedge: true, testEndpoint: true})
-	require.NoError(t, err)
-
 	err = runutil.Retry(time.Second, ctx.Done(), func() error {
-		if err = assertRunning(unexpectedExit); err != nil {
+		if err = assertRunning(exit); err != nil {
 			t.Error(err)
 			return nil
 		}

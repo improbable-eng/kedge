@@ -43,13 +43,20 @@ const expectedPACFile = `function FindProxyForURL(url, host) {
 
 func TestWinchPAC(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
+	exit, err := spinup(t, ctx, config{winch: true})
+	if err != nil {
+		t.Error(err)
+		cancel()
+		return
+	}
 
-	unexpectedExit, err := spinup(t, ctx, config{winch: true})
-	require.NoError(t, err)
+	defer func() {
+		cancel()
+		<-exit
+	}()
 
 	err = runutil.Retry(time.Second, ctx.Done(), func() error {
-		if err = assertRunning(unexpectedExit); err != nil {
+		if err = assertRunning(exit); err != nil {
 			t.Error(err)
 			return nil
 		}

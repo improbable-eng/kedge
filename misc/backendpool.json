@@ -6,7 +6,7 @@
         "balancer": "ROUND_ROBIN",
         "host": {
           "dns_name": "localhost",
-          "port": 18091
+          "port": 18271
         }
       }
     ]
@@ -18,7 +18,7 @@
         "balancer": "ROUND_ROBIN",
         "host": {
           "dns_name": "localhost",
-          "port": 18090
+          "port": 18270
         }
       }
     ]

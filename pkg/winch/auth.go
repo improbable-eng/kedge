@@ -8,6 +8,7 @@ import (
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
+	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/oidc"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/test"
@@ -79,8 +80,10 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 			testSource.Err = errors.New("Error dummy auth source. No TokenValue specified")
 		}
 		source = testSource
+	case *pb.AuthSource_Token:
+		source = directauth.New(configSource.Name, s.Token.GetToken())
 	default:
-		return nil, fmt.Errorf("source %v not supported.", reflect.TypeOf(s))
+		return nil, fmt.Errorf("source %v not supported", reflect.TypeOf(s))
 	}
 
 	if err != nil {

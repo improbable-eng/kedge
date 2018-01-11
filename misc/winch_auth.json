@@ -1,19 +1,15 @@
 {
   "auth_sources": [
       {
-        "name": "corp",
-        "kube": {
-          "user": "corp_access"
+        "name": "test-endpoint-grpc",
+        "token": {
+          "token": "secret-token"
         }
       },
       {
-        "name": "kedge-prod",
-        "oidc": {
-          "provider": "provider",
-          "client_id": "id",
-          "secret": "secret",
-          "scopes": [ "openid", "groups"],
-          "path": "$HOME/.winch_oidc_keys"
+        "name": "test-endpoint-http",
+        "token": {
+          "token": "secret-token2"
         }
       }
     ]

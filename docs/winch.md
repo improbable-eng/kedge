@@ -73,7 +73,8 @@ plain HTTP) as well as proxy auth. Any other internal request should have only p
 
 ```bash
 go run ./winch/server/*.go \
-  --server_http_port=8098 \
+  --server_http_port=8070 \
+  --server_grpc_port=8071 \
   --pac_redirect_sh_expressions="*.*.internal.example.com" \
   --server_mapper_config_path=misc/winch_mapper.json \
   --server_auth_config_path=misc/winch_auth.json
@@ -97,6 +98,8 @@ To force an application to dial required URL through winch just set `HTTP_PROXY`
 
 Example "through winch" gRPC dialer:
 ```go
+type dialContextFunc func(context.Context, string, ...grpc.DialOption) (*grpc.ClientConn, error)
+
 // WinchDialer returns dialer function that gives you WinchDialer-enabled dialer:
 // If winch.GRPCURLFromKubeConfig() gives empty string it returns pure grpc.DialContext.
 // If winch.GRPCURLFromKubeConfig() gives non URL formatted string it returns error.

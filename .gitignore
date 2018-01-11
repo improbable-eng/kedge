@@ -1,4 +1,5 @@
 .idea
+*.swp
 
 # For codecov file.
 coverage.txt

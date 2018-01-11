@@ -3,7 +3,7 @@
 
 package winch_config
 
-import github_com_mwitkow_go_proto_validators "github.com/mwitkow/go-proto-validators"
+import go_proto_validators "github.com/mwitkow/go-proto-validators"
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
@@ -17,8 +17,8 @@ var _ = math.Inf
 func (this *MapperConfig) Validate() error {
 	for _, item := range this.Routes {
 		if item != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(item); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Routes", err)
+			if err := go_proto_validators.CallValidatorIfExists(item); err != nil {
+				return go_proto_validators.FieldError("Routes", err)
 			}
 		}
 	}
@@ -27,15 +27,15 @@ func (this *MapperConfig) Validate() error {
 func (this *Route) Validate() error {
 	if oneOfNester, ok := this.GetType().(*Route_Direct); ok {
 		if oneOfNester.Direct != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(oneOfNester.Direct); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Direct", err)
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.Direct); err != nil {
+				return go_proto_validators.FieldError("Direct", err)
 			}
 		}
 	}
 	if oneOfNester, ok := this.GetType().(*Route_Regexp); ok {
 		if oneOfNester.Regexp != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(oneOfNester.Regexp); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Regexp", err)
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.Regexp); err != nil {
+				return go_proto_validators.FieldError("Regexp", err)
 			}
 		}
 	}

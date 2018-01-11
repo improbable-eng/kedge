@@ -18,7 +18,7 @@ function proto_build_dir {
   mkdir -p ${GENERATION_DIR}/${DIR_REL} 2> /dev/null
   PATH=${GOPATH}/bin:$PATH protoc \
     --proto_path=${PROTOBUF_DIR} \
-    --proto_path=${GOPATH}/src/github.com/google/protobuf/src \
+    --proto_path=${GOPATH}/src/github.com/gogo/protobuf/protobuf \
     --proto_path=${GOPATH}/src \
     --go_out=plugins=grpc:${GENERATION_DIR} \
     --govalidators_out=${GENERATION_DIR} \

@@ -17,7 +17,7 @@ package kedge_config
 
 import regexp "regexp"
 import fmt "fmt"
-import github_com_mwitkow_go_proto_validators "github.com/mwitkow/go-proto-validators"
+import go_proto_validators "github.com/mwitkow/go-proto-validators"
 import proto "github.com/golang/protobuf/proto"
 import math "math"
 import _ "github.com/mwitkow/go-proto-validators"
@@ -32,19 +32,19 @@ var _ = math.Inf
 func (this *BackendPoolConfig) Validate() error {
 	for _, item := range this.TlsServerConfigs {
 		if item != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(item); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("TlsServerConfigs", err)
+			if err := go_proto_validators.CallValidatorIfExists(item); err != nil {
+				return go_proto_validators.FieldError("TlsServerConfigs", err)
 			}
 		}
 	}
 	if this.Grpc != nil {
-		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Grpc); err != nil {
-			return github_com_mwitkow_go_proto_validators.FieldError("Grpc", err)
+		if err := go_proto_validators.CallValidatorIfExists(this.Grpc); err != nil {
+			return go_proto_validators.FieldError("Grpc", err)
 		}
 	}
 	if this.Http != nil {
-		if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(this.Http); err != nil {
-			return github_com_mwitkow_go_proto_validators.FieldError("Http", err)
+		if err := go_proto_validators.CallValidatorIfExists(this.Http); err != nil {
+			return go_proto_validators.FieldError("Http", err)
 		}
 	}
 	return nil
@@ -52,8 +52,8 @@ func (this *BackendPoolConfig) Validate() error {
 func (this *BackendPoolConfig_Grpc) Validate() error {
 	for _, item := range this.Backends {
 		if item != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(item); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Backends", err)
+			if err := go_proto_validators.CallValidatorIfExists(item); err != nil {
+				return go_proto_validators.FieldError("Backends", err)
 			}
 		}
 	}
@@ -62,8 +62,8 @@ func (this *BackendPoolConfig_Grpc) Validate() error {
 func (this *BackendPoolConfig_Http) Validate() error {
 	for _, item := range this.Backends {
 		if item != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(item); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Backends", err)
+			if err := go_proto_validators.CallValidatorIfExists(item); err != nil {
+				return go_proto_validators.FieldError("Backends", err)
 			}
 		}
 	}
@@ -74,7 +74,7 @@ var _regex_TlsServerConfig_Name = regexp.MustCompile("^[a-z_.]{2,64}$")
 
 func (this *TlsServerConfig) Validate() error {
 	if !_regex_TlsServerConfig_Name.MatchString(this.Name) {
-		return github_com_mwitkow_go_proto_validators.FieldError("Name", fmt.Errorf(`value '%v' must be a string conforming to regex "^[a-z_.]{2,64}$"`, this.Name))
+		return go_proto_validators.FieldError("Name", fmt.Errorf(`value '%v' must be a string conforming to regex "^[a-z_.]{2,64}$"`, this.Name))
 	}
 	return nil
 }

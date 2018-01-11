@@ -14,6 +14,7 @@ It has these top-level messages:
 	KubernetesAccess
 	OIDCAccess
 	DummyAccess
+	TokenAccess
 	MapperConfig
 	Route
 	DirectRoute
@@ -21,7 +22,7 @@ It has these top-level messages:
 */
 package winch_config
 
-import github_com_mwitkow_go_proto_validators "github.com/mwitkow/go-proto-validators"
+import go_proto_validators "github.com/mwitkow/go-proto-validators"
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
@@ -35,8 +36,8 @@ var _ = math.Inf
 func (this *AuthConfig) Validate() error {
 	for _, item := range this.AuthSources {
 		if item != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(item); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("AuthSources", err)
+			if err := go_proto_validators.CallValidatorIfExists(item); err != nil {
+				return go_proto_validators.FieldError("AuthSources", err)
 			}
 		}
 	}
@@ -45,22 +46,29 @@ func (this *AuthConfig) Validate() error {
 func (this *AuthSource) Validate() error {
 	if oneOfNester, ok := this.GetType().(*AuthSource_Dummy); ok {
 		if oneOfNester.Dummy != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(oneOfNester.Dummy); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Dummy", err)
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.Dummy); err != nil {
+				return go_proto_validators.FieldError("Dummy", err)
 			}
 		}
 	}
 	if oneOfNester, ok := this.GetType().(*AuthSource_Kube); ok {
 		if oneOfNester.Kube != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(oneOfNester.Kube); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Kube", err)
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.Kube); err != nil {
+				return go_proto_validators.FieldError("Kube", err)
 			}
 		}
 	}
 	if oneOfNester, ok := this.GetType().(*AuthSource_Oidc); ok {
 		if oneOfNester.Oidc != nil {
-			if err := github_com_mwitkow_go_proto_validators.CallValidatorIfExists(oneOfNester.Oidc); err != nil {
-				return github_com_mwitkow_go_proto_validators.FieldError("Oidc", err)
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.Oidc); err != nil {
+				return go_proto_validators.FieldError("Oidc", err)
+			}
+		}
+	}
+	if oneOfNester, ok := this.GetType().(*AuthSource_Token); ok {
+		if oneOfNester.Token != nil {
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.Token); err != nil {
+				return go_proto_validators.FieldError("Token", err)
 			}
 		}
 	}
@@ -73,5 +81,8 @@ func (this *OIDCAccess) Validate() error {
 	return nil
 }
 func (this *DummyAccess) Validate() error {
+	return nil
+}
+func (this *TokenAccess) Validate() error {
 	return nil
 }

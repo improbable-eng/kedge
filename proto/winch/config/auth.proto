@@ -18,7 +18,7 @@ message AuthSource {
         DummyAccess dummy = 2;
         KubernetesAccess kube = 3;
         OIDCAccess oidc = 4;
-        // TODO(bplotka): Consider addining more sources e.g token or just user:passwd based.
+        TokenAccess token = 5;
     }
 }
 
@@ -49,4 +49,9 @@ message OIDCAccess {
 // DummyAccess just directly passes specified value into auth header. If value is not specified it will return error.
 message DummyAccess {
     string value = 1;
+}
+
+// TokenAccess passes specified token into auth header as a bearer.
+message TokenAccess {
+    string token = 1 [(validator.field) = {msg_exists : true}];
 }

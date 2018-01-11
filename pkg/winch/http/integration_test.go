@@ -200,7 +200,7 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 	require.NoError(s.T(), err, "config must be parsable")
 
 	m.Handle("/", New(kedge_map.RouteMapper(
-		s.routes.Get()),
+		s.routes.HTTP()),
 		s.tlsClientConfigForTest(),
 		logrus.NewEntry(logrus.New()),
 		nil,

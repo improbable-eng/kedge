@@ -1,11 +1,26 @@
 {
   "routes": [
     {
-      "backend_auth": "corp",
       "regexp": {
-        "exp": "([a-z0-9-].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
-        "url": "${cluster}.kedge.ext.example.com"
+        "exp": "^no_auth[.]([a-z0-9-_].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "url": "https://${cluster}:18171"
       }
+    },
+    {
+      "backend_auth": "test-endpoint-http",
+      "regexp": {
+        "exp": "^([a-z0-9-_].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "url": "https://${cluster}:18171"
+      },
+      "protocol": "HTTP"
+    },
+    {
+      "backend_auth": "test-endpoint-grpc",
+      "regexp": {
+        "exp": "^([a-z0-9-_].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "url": "https://${cluster}:18172"
+      },
+      "protocol": "GRPC"
     }
   ]
 }

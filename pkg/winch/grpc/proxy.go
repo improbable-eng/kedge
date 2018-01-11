@@ -8,6 +8,8 @@ import (
 
 	"os"
 
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
@@ -33,7 +35,7 @@ func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.Stre
 			return ctx, nil, errors.New("No :authority header. Cannot find the host")
 		}
 
-		route, err := mapper.Map(targetAuthority, "")
+		route, err := mapper.Map(stripPort(targetAuthority), portOnly(targetAuthority))
 		if err != nil {
 			if err == kedge_map.ErrNotKedgeDestination {
 				return ctx, nil, status.Error(codes.Unimplemented, err.Error())
@@ -116,4 +118,29 @@ func (c *oidcCreds) RequireTransportSecurity() bool {
 
 func newTokenCredentials(source tokenauth.Source, header string) credentials.PerRPCCredentials {
 	return &oidcCreds{source: source, header: header}
+}
+
+func stripPort(hostport string) string {
+	colon := strings.IndexByte(hostport, ':')
+	if colon == -1 {
+		return hostport
+	}
+	if i := strings.IndexByte(hostport, ']'); i != -1 {
+		return strings.TrimPrefix(hostport[:i], "[")
+	}
+	return hostport[:colon]
+}
+
+func portOnly(hostport string) string {
+	colon := strings.IndexByte(hostport, ':')
+	if colon == -1 {
+		return ""
+	}
+	if i := strings.Index(hostport, "]:"); i != -1 {
+		return hostport[i+len("]:"):]
+	}
+	if strings.Contains(hostport, "]") {
+		return ""
+	}
+	return hostport[colon+len(":"):]
 }

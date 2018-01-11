@@ -2,16 +2,14 @@ package e2e
 
 import (
 	"context"
-	"testing"
-	"time"
-
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
-
-	"errors"
+	"testing"
+	"time"
 
 	"github.com/improbable-eng/thanos/pkg/runutil"
 	"github.com/stretchr/testify/require"

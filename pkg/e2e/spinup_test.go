@@ -2,24 +2,21 @@ package e2e
 
 import (
 	"bytes"
-	"os/exec"
-	"syscall"
-	"testing"
-
-	"golang.org/x/net/context"
-
 	"fmt"
 	"net"
 	"net/http"
-	"time"
-
+	"os/exec"
 	"strings"
+	"syscall"
+	"testing"
+	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/improbable-eng/kedge/protogen/e2e"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -82,9 +79,7 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 		))
 	}
 
-	var (
-		g run.Group
-	)
+	var g run.Group
 
 	if cfg.testEndpoint {
 		// Tokens are specified in misc/winch_auth.json

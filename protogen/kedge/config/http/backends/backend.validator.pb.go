@@ -20,7 +20,7 @@ import go_proto_validators "github.com/mwitkow/go-proto-validators"
 import proto "github.com/golang/protobuf/proto"
 import math "math"
 import _ "github.com/mwitkow/go-proto-validators"
-import  _ "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
+import _ "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

@@ -10,6 +10,12 @@ message MapperConfig {
     repeated Route routes = 1;
 }
 
+enum Protocol {
+    ANY = 0;
+    HTTP = 1;
+    GRPC = 2;
+}
+
 message Route {
     // Optional auth injection. Reference to AuthSource.
     string backend_auth = 1;
@@ -18,6 +24,7 @@ message Route {
         DirectRoute direct = 3;
         RegexpRoute regexp = 4;
     }
+    Protocol protocol = 5;
 }
 
 /// Simplest routing mechanism using just direct mapping between dns and (proxy) kedge target.
@@ -36,5 +43,6 @@ message RegexpRoute {
     // exp = ([a-z0-9-].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]org
     // in that case you can use following variable:
     // - ${cluster}
+    // NOTE: https:// prefix is required here.
     string url = 2 [(validator.field) = {msg_exists : true}];
 }

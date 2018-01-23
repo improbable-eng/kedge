@@ -42,9 +42,9 @@ Kedge can be accessed then:
 
 ### Using native kedge http.Client inside caller library
 
-Following diagram shows POD to POD communication cross-cluster.
+Following diagram shows cross-cluster POD to POD communication using kEdge dialer.
 
-![Kedge Cert Routing](./docs/kedge_arch.png)
+![Kedge Cert Routing](./docs/kedge_native_dialer_certs.png)
 
 ### Using Winch (local proxy to kedges)
 
@@ -52,10 +52,10 @@ Following diagram shows the routing done by forward proxy called [winch (client)
 kedge OIDC auth is enabled to support corp use cases (per backend access controlled by permissions stored in custom IDToked claim). 
 It can be also switched to just client certificate verification as in the diagram above.
 
-NOTE: Any auth which is required by Service/Pod B needs to configured on winch due to clients blocking sending auth headers via
+NOTE: Any auth which is required by Service B / Pod B needs to configured on winch due to clients blocking sending auth headers via
  plain HTTP, even over local network (e.g kubectl). 
 
-![Kedge Winch Routing](./docs/kedge_arch_with_winch.png)
+![Kedge Winch Routing](./docs/kedge_winch_oidc.png)
 
 ## Usage
 

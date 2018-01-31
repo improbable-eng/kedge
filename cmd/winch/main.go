@@ -36,7 +36,6 @@ import (
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
-	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
@@ -58,9 +57,8 @@ var (
 		&pb_config.AuthConfig{},
 		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
 		WithFileFlag("default_winch_auth.json").WithValidator(validateMapper)
-	flagCORSAllowedOrigins = sharedflags.Set.StringSlice("cors_allowed_origin", []string{}, "CORS allowed origins for proxy endpoint.")
-	flagLogLevel           = sharedflags.Set.String("log_level", "info", "Log level")
-	flagDebugMode          = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. "+
+	flagLogLevel  = sharedflags.Set.String("log_level", "info", "Log level")
+	flagDebugMode = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. "+
 		"This will force DEBUG log level on winch and will append header to the request signaling Kedge to Log to INFO all debug"+
 		"level logs for this request, overriding the kedge log level setting.")
 )
@@ -135,10 +133,6 @@ func main() {
 			*flagDebugMode,
 		)
 
-		proxyMux := cors.New(cors.Options{
-			AllowedOrigins: *flagCORSAllowedOrigins,
-		}).Handler(httpWinchHandler)
-
 		httpWinchServer := &http.Server{
 			WriteTimeout: *flagHttpMaxWriteTimeout,
 			ReadTimeout:  *flagHttpMaxReadTimeout,
@@ -148,7 +142,7 @@ func main() {
 				http_debug.Middleware(),
 				http_logrus.Middleware(logEntry, http_logrus.WithLevels(allAsDebug)),
 				reporter.Middleware(logEntry),
-			).Handler(proxyMux),
+			).Handler(httpWinchHandler),
 		}
 		g.Add(func() error {
 			log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())

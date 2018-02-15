@@ -54,9 +54,10 @@ var (
 	flagHttpTlsPort = sharedflags.Set.Int("server_http_tls_port", 8443, "TCP port to listen on for HTTPS. If gRPC call will hit it will bounce to gRPC handler. If 0, no TLS will be open.")
 	flagHttpPort    = sharedflags.Set.Int("server_http_port", 8080, "TCP port to listen on for HTTP1.1/REST calls for debug endpoints like metrics, flagz page or optional pprof (insecure, but private only IP are allowed). If 0, no debug HTTP endpoint will be open.")
 
-	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
-	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
-	flagGrpcWithTracing     = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
+	flagHttpMaxWriteTimeout  = sharedflags.Set.Duration("server_http_max_write_timeout", 10*time.Second, "HTTP server config, max write duration.")
+	flagHttpMaxReadTimeout   = sharedflags.Set.Duration("server_http_max_read_timeout", 10*time.Second, "HTTP server config, max read duration.")
+	flagGracefulShutdownTime = sharedflags.Set.Duration("server_http_graceful_shutdown_time", 30*time.Second, "The time waited for http servers to gracefully shutdown before they are forcefully killed.")
+	flagGrpcWithTracing      = sharedflags.Set.Bool("server_tracing_grpc_enabled", true, "Whether enable gRPC tracing (could be expensive).")
 
 	flagLogLevel        = sharedflags.Set.String("log_level", "info", "Log level")
 	flagLogstashAddress = sharedflags.Set.String("logstash_hostport", "", "Host:port of logstash for remote logging. If empty remote logging is disabled.")
@@ -239,10 +240,13 @@ func main() {
 			}
 			return nil
 		}, func(error) {
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), *flagGracefulShutdownTime)
 			defer cancel()
 
-			httpsServer.Shutdown(ctx)
+			err := httpsServer.Shutdown(ctx)
+			if err != nil {
+        log.WithError(err).Infof("Failed to gracefully shutdown https server")
+      }
 			httpTlsListener.Close()
 		})
 	}
@@ -276,10 +280,13 @@ func main() {
 			}
 			return nil
 		}, func(error) {
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), *flagGracefulShutdownTime)
 			defer cancel()
 
-			httpDebugServer.Shutdown(ctx)
+			err := httpDebugServer.Shutdown(ctx)
+			if err != nil {
+        log.WithError(err).Infof("Failed to gracefully shutdown http debug server")
+			}
 			httpPlainListener.Close()
 		})
 	}
@@ -367,7 +374,8 @@ func interrupt(cancel <-chan struct{}) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	select {
-	case <-c:
+	case s := <-c:
+		log.Infof("Received interrupt signal %v", s)
 		return nil
 	case <-cancel:
 		return errors.New("canceled")

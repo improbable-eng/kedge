@@ -22,9 +22,18 @@ type client struct {
 // See https://kubernetes.io/docs/api-reference/v1.7/#watch-132
 // NOTE: In the beginning of stream, k8s will give us sufficient info about current state. (No need to GET first)
 func (c *client) StartChangeStream(ctx context.Context, labelSelector string) (io.ReadCloser, error) {
-	servicesToExposeWatch := fmt.Sprintf("%s/api/v1/watch/services?labelSelector=%s",
+	var labelSelectorFragment string
+	if labelSelector != "" {
+		labelSelectorFragment = fmt.Sprintf("&labelSelector=%s", labelSelector)
+	}
+
+	// Explicitly filter for only ClusterIP services which are not headless
+	fieldSelectorFragment := "fieldSelector=spec.type=ClusterIP,spec.ClusterIP!=None"
+
+	servicesToExposeWatch := fmt.Sprintf("%s/api/v1/watch/services?%s&%s",
 		c.k8sClient.Address,
-		labelSelector,
+		fieldSelectorFragment,
+		labelSelectorFragment,
 	)
 
 	return c.startGET(ctx, servicesToExposeWatch)

@@ -24,8 +24,10 @@ var (
 	// TODO(bplotka): Consider moving to regex with .namespace .name variables.
 	flagExternalDomainSuffix = sharedflags.Set.String("discovery_external_domain_suffix", "", "Required suffix "+
 		"that will be added to service name to constructs external domain for director route")
-	flagAnnotationLabelPrefix = sharedflags.Set.String("discovery_label_annotation_prefix", "kedge.com/",
-		"Expected annotation/label prefix for all kedge annotations and kedge-exposed label")
+	flagAnnotationLabelPrefix = sharedflags.Set.String("discovery_label_annotation_prefix", "kedge.com",
+		"Annotation/label prefix for all kedge annotations and kedge-exposed label")
+	flagDiscoveryByAnnotation = sharedflags.Set.Bool("enable_discovery_by_annotation", false,
+		"Filter discovered endpoints by annotation label. Default is to discover all endpoints.")
 	streamRetryBackoff = &backoff.Backoff{
 		Min:    50 * time.Millisecond,
 		Jitter: true,
@@ -61,12 +63,18 @@ func NewFromFlags(logger logrus.FieldLogger, baseDirector *pb_config.DirectorCon
 
 // NewWithClient returns a new Kubernetes RoutingDiscovery using given k8s.APIClient configured to be used against kube-apiserver.
 func NewWithClient(logger logrus.FieldLogger, baseDirector *pb_config.DirectorConfig, baseBackendpool *pb_config.BackendPoolConfig, serviceClient serviceClient) *RoutingDiscovery {
+	// If we want to discover by label selector, set a key.
+	var labelSelectorKey string
+	if *flagDiscoveryByAnnotation {
+		labelSelectorKey = fmt.Sprintf("%s%s", *flagAnnotationLabelPrefix, selectorKeySuffix)
+	}
+
 	return &RoutingDiscovery{
 		logger:                logger,
 		baseBackendpool:       baseBackendpool,
 		baseDirector:          baseDirector,
 		serviceClient:         serviceClient,
-		labelSelectorKey:      fmt.Sprintf("%s%s", *flagAnnotationLabelPrefix, selectorKeySuffix),
+		labelSelectorKey:      labelSelectorKey,
 		externalDomainSuffix:  *flagExternalDomainSuffix,
 		labelAnnotationPrefix: *flagAnnotationLabelPrefix,
 	}

@@ -148,7 +148,7 @@ func (u *updater) onModifiedOrAddedEvent(serviceObj service, service serviceKey,
 		}
 		domainPort := fmt.Sprintf("%s.%s:%v", service.name, service.namespace, port.Name)
 		foundRoute := route{
-			nameMatcher: fmt.Sprintf("%s.%s", service.name, u.externalDomainSuffix),
+			nameMatcher: fmt.Sprintf("%s.%s.svc.%s", service.name, service.namespace, u.externalDomainSuffix),
 			portMatcher: port.Port,
 		}
 

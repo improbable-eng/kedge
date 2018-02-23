@@ -1,5 +1,9 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.9](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.9)
+Kedge service:
+* [x] Kubernetes discovery now prepends service short name to route matcher instead of just service name.
+
 ### [v1.0.0-beta.8](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.8)
 Kedge service:
 * [x] Fixed passing headers through gRPC proxies

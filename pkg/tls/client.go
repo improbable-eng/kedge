@@ -3,11 +3,11 @@ package kedge_tls
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"io/ioutil"
 
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/mwitkow/go-conntrack/connhelpers"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,14 +35,14 @@ func BuildClientTLSConfigFromFlags() (*tls.Config, error) {
 
 	// Add client certs if specified.
 	if *flagTLSClientCert == "" || *flagTLSClientKey == "" {
-		log.Info("Either key or cert for TLS client certificates are not present.")
+		log.Debug("Either key or cert for TLS client certificates are not present.")
 		tlsConfig = &tls.Config{}
 	} else {
 		// TlsConfigForServerCerts name is misleading - it Certificates field is used for client as well when used on http.Client
 		var err error
 		tlsConfig, err = connhelpers.TlsConfigForServerCerts(*flagTLSClientCert, *flagTLSClientKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed reading TLS client keys. Err: %v", err)
+			return nil, errors.Wrapf(err, "failed reading TLS client keys. ", err)
 		}
 	}
 	tlsConfig.MinVersion = tls.VersionTLS12
@@ -53,10 +53,10 @@ func BuildClientTLSConfigFromFlags() (*tls.Config, error) {
 		for _, path := range *flagTLSRootCAFiles {
 			data, err := ioutil.ReadFile(path)
 			if err != nil {
-				return nil, fmt.Errorf("failed reading root CA file %v: %v", path, err)
+				return nil, errors.Wrapf(err, "failed reading root CA file %v: %v", path)
 			}
 			if ok := tlsConfig.RootCAs.AppendCertsFromPEM(data); !ok {
-				return nil, fmt.Errorf("failed processing root CA file %v", path)
+				return nil, errors.Errorf("failed processing root CA file %v", path)
 			}
 		}
 	}

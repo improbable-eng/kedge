@@ -81,13 +81,10 @@ func main() {
 	if err := flagz.ReadFileFlags(sharedflags.Set); err != nil {
 		log.WithError(err).Fatal("failed reading flagz from files")
 	}
-	tlsConfig, err := kedge_tls.BuildClientTLSConfigFromFlags()
-	if err != nil {
-		log.WithError(err).Fatal("failed building TLS config from flags")
-	}
 
 	lvl := log.DebugLevel
 	if !*flagDebugMode {
+		var err error
 		lvl, err = log.ParseLevel(*flagLogLevel)
 		if err != nil {
 			log.WithError(err).Fatalf("Cannot parse log level: %s", *flagLogLevel)
@@ -96,6 +93,11 @@ func main() {
 	log.SetLevel(lvl)
 	logEntry := log.NewEntry(log.StandardLogger())
 	logEntry.Warn("Make sure you have enough file descriptors on your machine. Run ulimit -n <value> to set it for this terminal.")
+
+	tlsConfig, err := kedge_tls.BuildClientTLSConfigFromFlags()
+	if err != nil {
+		log.WithError(err).Fatal("failed building TLS config from flags")
+	}
 
 	httpPlainListener := buildListenerOrFail("http_plain", *flagHttpPort)
 

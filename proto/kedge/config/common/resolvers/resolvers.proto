@@ -17,7 +17,7 @@ message SrvResolver {
 message K8sResolver {
     // Common kube DNS name with optional port: "<service><|.namespace>(.whatever suffix)<|:port_name|:value number>"
     // to resolve by this resolver using endpoints API.
-    // e.g ":backend1.namespace1:http_port1"
+    // e.g "backend1.namespace1:http_port1"
     string dns_port_name = 1;
 }
 

@@ -2,7 +2,7 @@ package e2e
 
 import (
 	"fmt"
-	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -17,7 +17,8 @@ import (
 )
 
 // TestGRPCEndpointCall invokes end backend SayHello RPC through winch and kedge.
-func TestGRPCEndpointCall(t *testing.T) {
+func TestGRPCEndpointCallViaEnv(t *testing.T) {
+	t.Skip("")
 	const name = "kedge"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -42,7 +43,7 @@ func TestGRPCEndpointCall(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		reply, err := grpcHelloViaWinchAndKedge(ctx, endpointDNS, name)
+		reply, err := grpcHelloViaWinchAndKedgeUsingEnv(ctx, endpointDNS, name)
 		if err != nil {
 			if st, ok := status.FromError(err); ok {
 				if st.Code() == codes.Unavailable {
@@ -64,10 +65,6 @@ func TestGRPCEndpointCall(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = grpcHelloViaWinchAndKedgeUsingEnv(ctx, endpointDNS, name)
-	require.NoError(t, err)
-
-
 	// Try URL for which winch will not append backend auth and we expect it to fail.
 	_, err = grpcHelloViaWinchAndKedge(ctx, noAuthEndpointDNS, name)
 	require.Error(t, err)
@@ -83,33 +80,15 @@ func TestGRPCEndpointCall(t *testing.T) {
 	t.Errorf("Unexpected error: %v", err)
 }
 
-func grpcHelloViaWinchAndKedge(ctx context.Context, dnsName string, name string) (*e2e_helloworld.HelloReply, error) {
-	dialer, err := winchDialer(fmt.Sprintf("http://127.0.0.1:%s", grpcWinchPort))
-	if err != nil {
-		return nil, err
-	}
+func grpcHelloViaWinchAndKedgeUsingEnv(ctx context.Context, dnsName string, name string) (*e2e_helloworld.HelloReply, error) {
+	os.Setenv("http_proxy", fmt.Sprintf("http://127.0.0.1:%s", grpcWinchPort))
+	os.Setenv("HTTP_PROXY", fmt.Sprintf("http://127.0.0.1:%s", grpcWinchPort))
 
-	cc, err := dialer(ctx, fmt.Sprintf("%s:%s", dnsName, grpcTestEndpointPort))
+
+	cc, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%s", dnsName, grpcTestEndpointPort), grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
 
 	return e2e_helloworld.NewGreeterClient(cc).SayHello(ctx, &e2e_helloworld.HelloRequest{Name: name})
-}
-
-type dialContextFunc func(context.Context, string, ...grpc.DialOption) (*grpc.ClientConn, error)
-
-func winchDialer(winchURL string) (dialContextFunc, error) {
-	proxyURL, err := url.Parse(winchURL)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid winch URL address %q: %v", winchURL, err)
-	}
-
-	return func(ctx context.Context, targetAuthority string, grpcOpts ...grpc.DialOption) (*grpc.ClientConn, error) {
-		// NOTE: This will conflict with TLS transport credential grpc options passed by argument, but we don't have the control to validate that.
-		grpcOpts = append(grpcOpts, grpc.WithInsecure())
-		grpcOpts = append(grpcOpts, grpc.WithAuthority(targetAuthority))
-
-		return grpc.DialContext(ctx, proxyURL.Host, grpcOpts...)
-	}, nil
 }

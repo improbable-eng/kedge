@@ -27,6 +27,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"bufio"
+	"context"
+	"io"
+	"net/http/httputil"
+	"github.com/zenazn/goji/graceful/listener"
+	"google.golang.org/grpc"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func unknownPingbackHandler(id int) http.Handler {
@@ -108,12 +115,10 @@ func TestWinchIntegrationSuite(t *testing.T) {
 func (s *WinchIntegrationSuite) SetupSuite() {
 	var err error
 	s.winchListenerPlain, err = net.Listen("tcp", "localhost:0")
-	require.NoError(s.T(), err, "must be able to allocate a port for winchListenerPlain")
+	s.Require().NoError(err, "must be able to allocate a port for winchListenerPlain")
 
 	http2ServerTlsConfig, err := connhelpers.TlsConfigWithHttp2Enabled(s.tlsServerConfigForTest())
-	if err != nil {
-		s.FailNow("cannot configure the tls config for http2")
-	}
+	s.Require().NoError(err, "cannot configure the tls config for http2")
 
 	// It does not make sense if kedge is not secure.
 	s.localSecureKedges.SetupKedges(s.T(), http2ServerTlsConfig, 3)
@@ -156,6 +161,24 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 					},
 				},
 			},
+			{
+				Type: &pb.Route_Direct{
+					Direct: &pb.DirectRoute{
+						Key: "http-connect.grpc.example.com",
+						Url: "does not matter",
+					},
+				},
+				Protocol: pb.Protocol_GRPC,
+			},
+			{
+				Type: &pb.Route_Direct{
+					Direct: &pb.DirectRoute{
+						Key: "http-connect.http.example.com",
+						Url: "does not matter",
+					},
+				},
+				Protocol: pb.Protocol_HTTP,
+			},
 		},
 	}
 	authConfig := &pb.AuthConfig{
@@ -197,10 +220,32 @@ func (s *WinchIntegrationSuite) SetupSuite() {
 
 	m := http.NewServeMux()
 	s.routes, err = winch.NewStaticRoutes(winch.NewAuthFactory(s.winchListenerPlain.Addr().String(), m), testConfig, authConfig)
-	require.NoError(s.T(), err, "config must be parsable")
+	s.Require().NoError(err, "config must be parsable")
 
-	m.Handle("/", New(kedge_map.RouteMapper(
-		s.routes.HTTP()),
+	//// can be normal HTTP (simplifies test).
+	//// Setup server for HTTP CONNECT "termination" test. This will mimic additional grpc endpoint for winch, but for test purposes
+	//winchSecondEndpointListener, err := net.Listen("tcp", "127.0.0.1:0")
+	//s.Require().NoError(err, "must be able to allocate a port for winch local endpoint")
+	//
+	//server := grpc.NewServer(
+	//	grpc.UnknownServiceHandler(unknownPingbackHandler(name, listener.Addr().String())),
+	//	grpc.Creds(credentials.NewTLS(config)),
+	//)
+	//
+	//go func() {
+	//	server.Serve(listener)
+	//}()
+	//
+	//return listener, server
+
+	secondEndpointPort, err := strconv.Atoi(strings.Split(s.winchListenerPlain.Addr().String(), ":")[1])
+	s.Require().NoError(err)
+
+	m.Handle("/", New(
+		kedge_map.RouteMapper(s.routes.HTTP()),
+		kedge_map.RouteMapper(s.routes.GRPC()),
+		// This is supposed to be gRPC endpoint but
+		secondEndpointPort,
 		s.tlsClientConfigForTest(),
 		logrus.NewEntry(logrus.New()),
 		nil,
@@ -295,6 +340,13 @@ func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute3_AuthError
 	s.assertBadGatewayPingback(req, resp, err)
 }
 
+func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute3_AuthError() {
+	req := &http.Request{Method: "GET", URL: urlMustParse("http://error.ext.example.com/some/strict/path")}
+	resp, err := s.forwardProxyClient().Do(req)
+	s.assertBadGatewayPingback(req, resp, err)
+}
+
+
 // Client that will proxy through winch.
 func (s *WinchIntegrationSuite) forwardProxyClient() *http.Client {
 	return &http.Client{
@@ -357,4 +409,54 @@ func urlMustParse(uStr string) *url.URL {
 		panic(err)
 	}
 	return u
+}
+
+// To read a response from a net.Conn, http.ReadResponse() takes a bufio.Reader.
+// It's possible that this reader reads more than what's need for the response and stores
+// those bytes in the buffer.
+// bufConn wraps the original net.Conn and the bufio.Reader to make sure we don't lose the
+// bytes in the buffer.
+type bufConn struct {
+	net.Conn
+	r io.Reader
+}
+
+func (c *bufConn) Read(b []byte) (int, error) {
+	return c.r.Read(b)
+}
+
+// DoHTTPConnectHandshake performs dial using HTTP CONNECT method. This allows for proxying requests over TLS.
+// This method is copied from "google.golang.org/grpc/proxy.go".
+func DoHTTPConnectHandshake(ctx context.Context, conn net.Conn, addr string) (_ net.Conn, err error) {
+	defer func() {
+		if err != nil {
+			conn.Close()
+		}
+	}()
+
+	req := &http.Request{
+		Method: http.MethodConnect,
+		URL:    &url.URL{Host: addr},
+		Header: map[string][]string{"User-Agent": {"test"}},
+	}
+
+	if err := req.WithContext(ctx).Write(conn); err != nil {
+		return nil, fmt.Errorf("failed to write the HTTP request: %v", err)
+	}
+
+	r := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(r, req)
+	if err != nil {
+		return nil, fmt.Errorf("reading server HTTP response: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		dump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to do connect handshake, status code: %s", resp.Status)
+		}
+		return nil, fmt.Errorf("failed to do connect handshake, response: %q", dump)
+	}
+
+	return &bufConn{Conn: conn, r: r}, nil
 }

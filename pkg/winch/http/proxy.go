@@ -9,6 +9,10 @@ import (
 	"net/http/httputil"
 	"time"
 
+	"fmt"
+	"io"
+	"net"
+
 	"github.com/improbable-eng/go-httpwares"
 	"github.com/improbable-eng/go-httpwares/logging/logrus"
 	"github.com/improbable-eng/go-httpwares/tags"
@@ -33,7 +37,16 @@ type winchMapper interface {
 	kedge_map.Mapper
 }
 
-func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *http.ServeMux, debugMode bool) *Proxy {
+func New(
+	httpMapper winchMapper,
+	grpcMapper winchMapper,
+	localGRPCPort int,
+	config *tls.Config,
+	logEntry *logrus.Entry,
+	mux *http.ServeMux,
+	debugMode bool,
+) *Proxy {
+
 	// Prepare chain of trippers for winch logic. (The last wrapped will be first in the chain of tripperwares)
 	// 5) Last, default transport for communication with our kedges.
 	// 4) Kedge auth tipper - injects auth for kedge based on route.
@@ -49,7 +62,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 	parentTransport = tripperware.WrapForProxyAuth(parentTransport)
 	parentTransport = tripperware.WrapForBackendAuth(parentTransport)
 	parentTransport = tripperware.WrapForRouting(parentTransport)
-	parentTransport = tripperware.WrapForMapping(mapper, parentTransport)
+	parentTransport = tripperware.WrapForMapping(httpMapper, parentTransport)
 	parentTransport = tripperware.WrapForRequestID("winch-", parentTransport)
 	parentTransport = reverseProxyErrHandler(parentTransport, logEntry)
 
@@ -73,6 +86,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 				return nil
 			},
 		},
+		handleHTTPConnect: handleHTTPConnectFunc(httpMapper, grpcMapper, localGRPCPort),
 	}
 }
 
@@ -80,12 +94,17 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 // Mux is for routes that are directed to winch directly (debug endpoints).
 type Proxy struct {
 	kedgeReverseProxy *httputil.ReverseProxy
+	handleHTTPConnect http.HandlerFunc
 	mux               *http.ServeMux
 }
 
 func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if _, ok := resp.(http.Flusher); !ok {
 		panic("the http.ResponseWriter passed must be an http.Flusher")
+	}
+
+	if req.Method == http.MethodConnect {
+		p.handleHTTPConnect(resp, req)
 	}
 
 	// Is this request directly to us, or just to be proxied?
@@ -96,6 +115,67 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 	normReq := proxyreq.NormalizeInboundRequest(req)
 	p.kedgeReverseProxy.ServeHTTP(resp, normReq)
+}
+
+func handleHTTPConnectFunc(
+	httpMapper winchMapper,
+	grpcMapper winchMapper,
+	localGRPCPort int,
+) func(resp http.ResponseWriter, req *http.Request) {
+	return func(resp http.ResponseWriter, req *http.Request) {
+		destHostPort := req.Host
+		_, err := grpcMapper.Map(req.URL.Hostname(), req.URL.Port())
+		if err == nil {
+			// It's kedge gRPC destination. Kedge does not support HTTP CONNECT on purpose.
+			// We don't want to lose ability to add custom headers and drain proxy on rolling restart.
+			// However if connection is insecure, we may want to do TLS termination here and just forward to local
+			// gRPC endpoint here.
+			destHostPort = fmt.Sprintf("localhost:%v", localGRPCPort)
+		}
+		if err != kedge_map.ErrNotKedgeDestination {
+			http.Error(resp, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		_, err = httpMapper.Map(req.URL.Hostname(), req.URL.Port())
+		if err == nil {
+			// HTTP CONNECT for HTTPS is unavailable. Kedge does not support it and we cannot terminate TLS here, since
+			// winch does not expose non-gRPC HTTP-TLS endpoint.
+			http.Error(resp, "HTTP CONNECT for HTTPS routes are not implemented.", http.StatusNotImplemented)
+			return
+		}
+		if err != kedge_map.ErrNotKedgeDestination {
+			http.Error(resp, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// We do TCP proxy for all not kedge destinations.
+		destConn, err := net.DialTimeout("tcp", destHostPort, 10*time.Second)
+		if err != nil {
+			http.Error(resp, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		hijacker, ok := resp.(http.Hijacker)
+		if !ok {
+			http.Error(resp, "Hijacking is not supported", http.StatusInternalServerError)
+			return
+
+		}
+		clientConn, _, err := hijacker.Hijack()
+		if err != nil {
+			http.Error(resp, err.Error(), http.StatusServiceUnavailable)
+		}
+
+		resp.WriteHeader(http.StatusOK)
+		go transfer(destConn, clientConn)
+		go transfer(clientConn, destConn)
+	}
+}
+func transfer(destination io.WriteCloser, source io.ReadCloser) {
+	defer destination.Close()
+	defer source.Close()
+	// TODO(bplotka): This seems unsafe -> we need to handle error
+	io.Copy(destination, source)
 }
 
 func reverseProxyErrHandler(next http.RoundTripper, logEntry logrus.FieldLogger) http.RoundTripper {

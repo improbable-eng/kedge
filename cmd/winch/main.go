@@ -131,6 +131,8 @@ func main() {
 		// Setup HTTP proxy (plain, no HTTP CONNECT yet).
 		httpWinchHandler := http_winch.New(
 			kedge_map.RouteMapper(routes.HTTP()),
+			kedge_map.RouteMapper(routes.GRPC()),
+			*flagGrpcPort,
 			tlsConfig,
 			logEntry,
 			mux,
@@ -171,9 +173,9 @@ func main() {
 		})
 	}
 	{
-		// Setup gRPC proxy (plain, no HTTP CONNECT yet).
-		grpcPlainListener := buildListenerOrFail("grpc_plain", *flagGrpcPort)
+		grpcListener := buildListenerOrFail("grpc", *flagGrpcPort)
 
+		// Setup gRPC proxy.
 		grpcWinchHandler := grpc_winch.New(kedge_map.RouteMapper(routes.GRPC()), tlsConfig, *flagDebugMode)
 		grpcWinchServer := grpc.NewServer(
 			grpc.CustomCodec(proxy.Codec()), // needed for winch to function.
@@ -191,15 +193,15 @@ func main() {
 		)
 
 		g.Add(func() error {
-			log.Infof("listening for gRPC Plain on: %v", grpcPlainListener.Addr().String())
-			err := grpcWinchServer.Serve(grpcPlainListener)
+			log.Infof("listening for gRPC on: %v", grpcListener.Addr().String())
+			err := grpcWinchServer.Serve(grpcListener)
 			if err != nil {
-				return errors.Wrap(err, "grpc_plain server error")
+				return errors.Wrap(err, "grpc server error")
 			}
 			return nil
 		}, func(error) {
 			grpcWinchServer.GracefulStop()
-			grpcPlainListener.Close()
+			grpcListener.Close()
 		})
 	}
 

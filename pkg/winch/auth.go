@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"reflect"
 
+	"io/ioutil"
+
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
@@ -69,7 +71,22 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 		)
 		// Register handler for clearing ID token.
 		f.mux.HandleFunc(fmt.Sprintf("/winch/cleartoken/%s", configSource.Name), oidcClearTokenHandler(clearIDTokenFunc))
+	case *pb.AuthSource_ServiceAccountOidc:
+		serviceAccountJson, err := ioutil.ReadFile(s.ServiceAccountOidc.ServiceAccountJsonPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to open Google SA from %s", s.ServiceAccountOidc.ServiceAccountJsonPath)
+		}
 
+		source, err = oidcauth.NewGoogleFromServiceAccount(
+			configSource.Name,
+			login.OIDCConfig{
+				Provider:     s.ServiceAccountOidc.Provider,
+				ClientID:     s.ServiceAccountOidc.ClientId,
+				ClientSecret: s.ServiceAccountOidc.Secret,
+				Scopes:       s.ServiceAccountOidc.Scopes,
+			},
+			serviceAccountJson,
+		)
 	case *pb.AuthSource_Dummy:
 		testSource := &testauth.Source{
 			NameValue:  configSource.Name,

@@ -12,6 +12,7 @@ import (
 
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
@@ -21,7 +22,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-var NoAuth tokenauth.Source = nil
+var (
+	NoAuth tokenauth.Source = nil
+
+	fAuthTimeout = sharedflags.Set.Duration("server_auth_timeout", 10*time.Second, "Max duration we will wait for auth to be set up.")
+)
 
 type AuthFactory struct {
 	listenAddress string
@@ -47,8 +52,7 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 	var source tokenauth.Source
 	var err error
 
-	// Get is always use on startup only, so we can set reasonable timeout here.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), *fAuthTimeout)
 	defer cancel()
 
 	switch s := configSource.GetType().(type) {

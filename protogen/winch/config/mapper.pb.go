@@ -234,6 +234,7 @@ type RegexpRoute struct {
 	// exp = ([a-z0-9-].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]org
 	// in that case you can use following variable:
 	// - ${cluster}
+	// NOTE: https:// prefix is required here.
 	Url string `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
 }
 

@@ -7,9 +7,18 @@
   revision = "fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0"
 
 [[projects]]
+  branch = "master"
   name = "github.com/Bplotka/oidc"
-  packages = [".","authorize","login","login/diskcache","login/k8scache","xerrors"]
-  revision = "ffd69540d1a1c458e4edd9b0b055ffcefe05a50e"
+  packages = [
+    ".",
+    "authorize",
+    "gsa",
+    "login",
+    "login/diskcache",
+    "login/k8scache",
+    "xerrors"
+  ]
+  revision = "35680c395e118f942be5c3e15cca396f66772d56"
 
 [[projects]]
   name = "github.com/PuerkitoBio/purell"
@@ -35,7 +44,10 @@
 
 [[projects]]
   name = "github.com/emicklei/go-restful"
-  packages = [".","log"]
+  packages = [
+    ".",
+    "log"
+  ]
   revision = "ff4f55a206334ef123e4f79bbf348980da81ca46"
 
 [[projects]]
@@ -78,7 +90,34 @@
 
 [[projects]]
   name = "github.com/gogo/protobuf"
-  packages = ["proto","protoc-gen-gogo/descriptor","sortkeys"]
+  packages = [
+    "gogoproto",
+    "plugin/compare",
+    "plugin/defaultcheck",
+    "plugin/description",
+    "plugin/embedcheck",
+    "plugin/enumstringer",
+    "plugin/equal",
+    "plugin/face",
+    "plugin/gostring",
+    "plugin/marshalto",
+    "plugin/oneofcheck",
+    "plugin/populate",
+    "plugin/size",
+    "plugin/stringer",
+    "plugin/testgen",
+    "plugin/union",
+    "plugin/unmarshal",
+    "proto",
+    "protoc-gen-gogo/descriptor",
+    "protoc-gen-gogo/generator",
+    "protoc-gen-gogo/grpc",
+    "protoc-gen-gogo/plugin",
+    "protoc-gen-gogofast",
+    "sortkeys",
+    "vanity",
+    "vanity/command"
+  ]
   revision = "c0656edd0d9eab7c66d1eb0c568f9039345796f7"
 
 [[projects]]
@@ -89,7 +128,14 @@
 
 [[projects]]
   name = "github.com/golang/protobuf"
-  packages = ["jsonpb","proto","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
+  packages = [
+    "jsonpb",
+    "proto",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/timestamp"
+  ]
   revision = "4bd1920723d7b7c925de087aa32e2187708897f7"
 
 [[projects]]
@@ -104,7 +150,14 @@
 
 [[projects]]
   name = "github.com/grpc-ecosystem/go-grpc-middleware"
-  packages = [".","auth","logging","logging/logrus","tags","util/metautils"]
+  packages = [
+    ".",
+    "auth",
+    "logging",
+    "logging/logrus",
+    "tags",
+    "util/metautils"
+  ]
   revision = "f63a7dfb64c138bd93d5c5b896d8b33c4b08e000"
 
 [[projects]]
@@ -127,14 +180,31 @@
 [[projects]]
   branch = "master"
   name = "github.com/improbable-eng/go-httpwares"
-  packages = [".","logging","logging/logrus","metrics","metrics/prometheus","tags","tracing/debug"]
+  packages = [
+    ".",
+    "logging",
+    "logging/logrus",
+    "metrics",
+    "metrics/prometheus",
+    "tags",
+    "tracing/debug"
+  ]
   revision = "d1341ef6621b4cd9b75ca0a1c08ef4b95ffd265a"
 
 [[projects]]
   branch = "master"
   name = "github.com/improbable-eng/go-srvlb"
-  packages = ["grpc","srv"]
+  packages = [
+    "grpc",
+    "srv"
+  ]
   revision = "3c3372fdcde8456476c314f805e8e15f929bd35f"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/improbable-eng/thanos"
+  packages = ["pkg/runutil"]
+  revision = "ed6099df6b21c5d8a0ddf3c9af109392dc1c94db"
 
 [[projects]]
   name = "github.com/jonboulle/clockwork"
@@ -153,7 +223,11 @@
 
 [[projects]]
   name = "github.com/mailru/easyjson"
-  packages = ["buffer","jlexer","jwriter"]
+  packages = [
+    "buffer",
+    "jlexer",
+    "jwriter"
+  ]
   revision = "d5b7844b561a7bc640052f1b935f7b800330d7e0"
 
 [[projects]]
@@ -165,19 +239,29 @@
 [[projects]]
   branch = "master"
   name = "github.com/mwitkow/go-conntrack"
-  packages = [".","connhelpers"]
+  packages = [
+    ".",
+    "connhelpers"
+  ]
   revision = "cc309e4a22231782e8893f3c35ced0967807a33e"
 
 [[projects]]
   branch = "master"
   name = "github.com/mwitkow/go-flagz"
-  packages = [".","protobuf"]
+  packages = [
+    ".",
+    "protobuf"
+  ]
   revision = "12def25b6a92a8ea1017af73121f6322f62c59be"
 
 [[projects]]
   branch = "master"
   name = "github.com/mwitkow/go-proto-validators"
-  packages = ["."]
+  packages = [
+    ".",
+    "plugin",
+    "protoc-gen-govalidators"
+  ]
   revision = "a55ca57f374a8846924b030f534d8b8211508cf0"
 
 [[projects]]
@@ -215,7 +299,10 @@
 
 [[projects]]
   name = "github.com/prometheus/client_golang"
-  packages = ["prometheus","prometheus/promhttp"]
+  packages = [
+    "prometheus",
+    "prometheus/promhttp"
+  ]
   revision = "c5b7fccd204277076155f10851dad72b76a49317"
   version = "v0.8.0"
 
@@ -227,12 +314,19 @@
 
 [[projects]]
   name = "github.com/prometheus/common"
-  packages = ["expfmt","internal/bitbucket.org/ww/goautoneg","model"]
+  packages = [
+    "expfmt",
+    "internal/bitbucket.org/ww/goautoneg",
+    "model"
+  ]
   revision = "49fee292b27bfff7f354ee0f64e1bc4850462edf"
 
 [[projects]]
   name = "github.com/prometheus/procfs"
-  packages = [".","xfs"]
+  packages = [
+    ".",
+    "xfs"
+  ]
   revision = "a1dba9ce8baed984a2495b658c82687f8157b98f"
 
 [[projects]]
@@ -243,7 +337,10 @@
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
-  packages = [".","hooks/test"]
+  packages = [
+    ".",
+    "hooks/test"
+  ]
   revision = "181d419aa9e2223811b824e8f0b4af96f9ba9302"
 
 [[projects]]
@@ -258,7 +355,12 @@
 
 [[projects]]
   name = "github.com/stretchr/testify"
-  packages = ["assert","mock","require","suite"]
+  packages = [
+    "assert",
+    "mock",
+    "require",
+    "suite"
+  ]
   revision = "f6abca593680b2315d2075e0f5e2a9751e3f431a"
 
 [[projects]]
@@ -273,12 +375,27 @@
 
 [[projects]]
   name = "golang.org/x/net"
-  packages = ["context","context/ctxhttp","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
+  packages = [
+    "context",
+    "context/ctxhttp",
+    "http2",
+    "http2/hpack",
+    "idna",
+    "internal/timeseries",
+    "lex/httplex",
+    "trace"
+  ]
   revision = "f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f"
 
 [[projects]]
   name = "golang.org/x/oauth2"
-  packages = [".","google","internal","jws","jwt"]
+  packages = [
+    ".",
+    "google",
+    "internal",
+    "jws",
+    "jwt"
+  ]
   revision = "96fca6c793ec32f068f97942ae3c7c073810dfc1"
 
 [[projects]]
@@ -288,12 +405,40 @@
 
 [[projects]]
   name = "golang.org/x/text"
-  packages = ["cases","internal","internal/gen","internal/tag","internal/triegen","internal/ucd","language","runes","secure/bidirule","secure/precis","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
+  packages = [
+    "cases",
+    "internal",
+    "internal/gen",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "runes",
+    "secure/bidirule",
+    "secure/precis",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable",
+    "width"
+  ]
   revision = "3bd178b88a8180be2df394a1fbb81313916f0e7b"
 
 [[projects]]
   name = "google.golang.org/appengine"
-  packages = [".","internal","internal/app_identity","internal/base","internal/datastore","internal/log","internal/modules","internal/remote_api","internal/urlfetch","urlfetch"]
+  packages = [
+    ".",
+    "internal",
+    "internal/app_identity",
+    "internal/base",
+    "internal/datastore",
+    "internal/log",
+    "internal/modules",
+    "internal/remote_api",
+    "internal/urlfetch",
+    "urlfetch"
+  ]
   revision = "c5a90ac045b779001847fec87403f5cba090deae"
 
 [[projects]]
@@ -303,7 +448,22 @@
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","codes","credentials","grpclb/grpc_lb_v1","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
+  packages = [
+    ".",
+    "codes",
+    "credentials",
+    "grpclb/grpc_lb_v1",
+    "grpclog",
+    "internal",
+    "keepalive",
+    "metadata",
+    "naming",
+    "peer",
+    "stats",
+    "status",
+    "tap",
+    "transport"
+  ]
   revision = "963eb485d85690cc992e3d02f9dd2a81d5fb0923"
 
 [[projects]]
@@ -314,7 +474,11 @@
 
 [[projects]]
   name = "gopkg.in/square/go-jose.v2"
-  packages = [".","cipher","json"]
+  packages = [
+    ".",
+    "cipher",
+    "json"
+  ]
   revision = "b25e6cab129e4a54675b42ea49d38e9c33ade9e6"
   version = "v2.1.2"
 
@@ -330,17 +494,65 @@
 
 [[projects]]
   name = "k8s.io/apimachinery"
-  packages = ["pkg/api/errors","pkg/api/resource","pkg/apis/meta/v1","pkg/conversion","pkg/conversion/queryparams","pkg/fields","pkg/labels","pkg/openapi","pkg/runtime","pkg/runtime/schema","pkg/runtime/serializer/json","pkg/runtime/serializer/recognizer","pkg/runtime/serializer/streaming","pkg/runtime/serializer/versioning","pkg/selection","pkg/types","pkg/util/clock","pkg/util/errors","pkg/util/framer","pkg/util/intstr","pkg/util/net","pkg/util/runtime","pkg/util/sets","pkg/util/validation","pkg/util/validation/field","pkg/util/wait","pkg/util/yaml","pkg/version","pkg/watch","third_party/forked/golang/reflect"]
+  packages = [
+    "pkg/api/errors",
+    "pkg/api/resource",
+    "pkg/apis/meta/v1",
+    "pkg/conversion",
+    "pkg/conversion/queryparams",
+    "pkg/fields",
+    "pkg/labels",
+    "pkg/openapi",
+    "pkg/runtime",
+    "pkg/runtime/schema",
+    "pkg/runtime/serializer/json",
+    "pkg/runtime/serializer/recognizer",
+    "pkg/runtime/serializer/streaming",
+    "pkg/runtime/serializer/versioning",
+    "pkg/selection",
+    "pkg/types",
+    "pkg/util/clock",
+    "pkg/util/errors",
+    "pkg/util/framer",
+    "pkg/util/intstr",
+    "pkg/util/net",
+    "pkg/util/runtime",
+    "pkg/util/sets",
+    "pkg/util/validation",
+    "pkg/util/validation/field",
+    "pkg/util/wait",
+    "pkg/util/yaml",
+    "pkg/version",
+    "pkg/watch",
+    "third_party/forked/golang/reflect"
+  ]
   revision = "dc1f89aff9a7509782bde3b68824c8043a3e58cc"
 
 [[projects]]
   name = "k8s.io/client-go"
-  packages = ["pkg/version","rest","rest/watch","third_party/forked/golang/template","tools/auth","tools/clientcmd","tools/clientcmd/api","tools/clientcmd/api/latest","tools/clientcmd/api/v1","tools/metrics","transport","util/cert","util/flowcontrol","util/homedir","util/integer","util/jsonpath"]
+  packages = [
+    "pkg/version",
+    "rest",
+    "rest/watch",
+    "third_party/forked/golang/template",
+    "tools/auth",
+    "tools/clientcmd",
+    "tools/clientcmd/api",
+    "tools/clientcmd/api/latest",
+    "tools/clientcmd/api/v1",
+    "tools/metrics",
+    "transport",
+    "util/cert",
+    "util/flowcontrol",
+    "util/homedir",
+    "util/integer",
+    "util/jsonpath"
+  ]
   revision = "45673e060eb921b510677b1123737ad1158e49fa"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "92e360ff151a00662b2f0f45e4ef3a4531a2c36650abbfcc913cc911d5592f32"
+  inputs-digest = "cc4d3e9fd525511c854711dd5d20dd9efe55261361ea6b77ba46cc9345e13951"
   solver-name = "gps-cdcl"
   solver-version = 1

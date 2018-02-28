@@ -13,6 +13,7 @@ It has these top-level messages:
 	AuthSource
 	KubernetesAccess
 	OIDCAccess
+	GoogleServiceAccountOIDCAccess
 	DummyAccess
 	TokenAccess
 	MapperConfig
@@ -72,12 +73,22 @@ func (this *AuthSource) Validate() error {
 			}
 		}
 	}
+	if oneOfNester, ok := this.GetType().(*AuthSource_ServiceAccountOidc); ok {
+		if oneOfNester.ServiceAccountOidc != nil {
+			if err := go_proto_validators.CallValidatorIfExists(oneOfNester.ServiceAccountOidc); err != nil {
+				return go_proto_validators.FieldError("ServiceAccountOidc", err)
+			}
+		}
+	}
 	return nil
 }
 func (this *KubernetesAccess) Validate() error {
 	return nil
 }
 func (this *OIDCAccess) Validate() error {
+	return nil
+}
+func (this *GoogleServiceAccountOIDCAccess) Validate() error {
 	return nil
 }
 func (this *DummyAccess) Validate() error {

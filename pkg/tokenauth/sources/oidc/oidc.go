@@ -22,14 +22,14 @@ type source struct {
 // New constructs OIDC tokenauth.Source that optionally supports logging in if callbackSrc is not nil.
 // Additionally it returns clearIDToken function that can be used to clear the token if needed.
 // TokenSource is by default configured to use disk as cache for tokens.
-func New(name string, config login.OIDCConfig, path string, callbackSrv *login.CallbackServer) (tokenauth.Source, func() error, error) {
-	return NewWithCache(name, disk.NewCache(path, config), callbackSrv)
+func New(ctx context.Context, name string, config login.OIDCConfig, path string, callbackSrv *login.CallbackServer) (tokenauth.Source, func() error, error) {
+	return NewWithCache(ctx, name, disk.NewCache(path, config), callbackSrv)
 }
 
 // NewWithCache is same as New but allows to pass custom cache e.g k8s one.
-func NewWithCache(name string, cache login.Cache, callbackSrv *login.CallbackServer) (tokenauth.Source, func() error, error) {
+func NewWithCache(ctx context.Context, name string, cache login.Cache, callbackSrv *login.CallbackServer) (tokenauth.Source, func() error, error) {
 	tokenSource, clearIDTokenFunc, err := login.NewOIDCTokenSource(
-		context.Background(),
+		ctx,
 		log.New(os.Stdout, fmt.Sprintf("OIDC Auth %s ", name), 0),
 		login.Config{
 			NonceCheck: false,
@@ -38,7 +38,7 @@ func NewWithCache(name string, cache login.Cache, callbackSrv *login.CallbackSer
 		callbackSrv,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "failed to create OIDC Token Source")
 	}
 
 	return &source{
@@ -48,9 +48,9 @@ func NewWithCache(name string, cache login.Cache, callbackSrv *login.CallbackSer
 }
 
 // NewGoogleFromServiceAccount constructs tokenauth.Source that is able to return valid OIDC token from given Google Service Account.
-func NewGoogleFromServiceAccount(name string, config login.OIDCConfig, googleServiceAccountJSON []byte) (tokenauth.Source, error) {
+func NewGoogleFromServiceAccount(ctx context.Context, name string, config login.OIDCConfig, googleServiceAccountJSON []byte) (tokenauth.Source, error) {
 	tokenSource, _, err := gsa.NewOIDCTokenSource(
-		context.Background(),
+		ctx,
 		log.New(os.Stdout, "", log.LstdFlags),
 		googleServiceAccountJSON,
 		config.Provider,
@@ -61,7 +61,7 @@ func NewGoogleFromServiceAccount(name string, config login.OIDCConfig, googleSer
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create Google Service Account Token Source")
 	}
 
 	return &source{

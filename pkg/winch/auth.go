@@ -7,6 +7,9 @@ import (
 
 	"io/ioutil"
 
+	"context"
+	"time"
+
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
@@ -44,9 +47,13 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 	var source tokenauth.Source
 	var err error
 
+	// Get is always use on startup only, so we can set reasonable timeout here.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	switch s := configSource.GetType().(type) {
 	case *pb.AuthSource_Kube:
-		source, err = k8sauth.New(configSource.Name, s.Kube.Path, s.Kube.User)
+		source, err = k8sauth.New(ctx, configSource.Name, s.Kube.Path, s.Kube.User)
 	case *pb.AuthSource_Oidc:
 		var callbackSrv *login.CallbackServer
 		if s.Oidc.LoginCallbackPath != "" {
@@ -65,6 +72,7 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 
 		var clearIDTokenFunc func() error
 		source, clearIDTokenFunc, err = oidcauth.NewWithCache(
+			ctx,
 			configSource.Name,
 			cache,
 			callbackSrv,
@@ -74,10 +82,11 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 	case *pb.AuthSource_ServiceAccountOidc:
 		serviceAccountJson, err := ioutil.ReadFile(s.ServiceAccountOidc.ServiceAccountJsonPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to open Google SA from %s", s.ServiceAccountOidc.ServiceAccountJsonPath)
+			return nil, errors.Wrapf(err, "failed to open google SA JSON file from %s", s.ServiceAccountOidc.ServiceAccountJsonPath)
 		}
 
 		source, err = oidcauth.NewGoogleFromServiceAccount(
+			ctx,
 			configSource.Name,
 			login.OIDCConfig{
 				Provider:     s.ServiceAccountOidc.Provider,

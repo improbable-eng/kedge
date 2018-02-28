@@ -5,8 +5,14 @@ import (
 	"net/http"
 	"reflect"
 
+	"io/ioutil"
+
+	"context"
+	"time"
+
 	"github.com/Bplotka/oidc/login"
 	"github.com/Bplotka/oidc/login/diskcache"
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
@@ -16,7 +22,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-var NoAuth tokenauth.Source = nil
+var (
+	NoAuth tokenauth.Source = nil
+
+	fAuthTimeout = sharedflags.Set.Duration("server_auth_timeout", 10*time.Second, "Max duration we will wait for auth to be set up.")
+)
 
 type AuthFactory struct {
 	listenAddress string
@@ -42,9 +52,12 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 	var source tokenauth.Source
 	var err error
 
+	ctx, cancel := context.WithTimeout(context.Background(), *fAuthTimeout)
+	defer cancel()
+
 	switch s := configSource.GetType().(type) {
 	case *pb.AuthSource_Kube:
-		source, err = k8sauth.New(configSource.Name, s.Kube.Path, s.Kube.User)
+		source, err = k8sauth.New(ctx, configSource.Name, s.Kube.Path, s.Kube.User)
 	case *pb.AuthSource_Oidc:
 		var callbackSrv *login.CallbackServer
 		if s.Oidc.LoginCallbackPath != "" {
@@ -63,13 +76,30 @@ func (f *AuthFactory) Get(configSource *pb.AuthSource) (tokenauth.Source, error)
 
 		var clearIDTokenFunc func() error
 		source, clearIDTokenFunc, err = oidcauth.NewWithCache(
+			ctx,
 			configSource.Name,
 			cache,
 			callbackSrv,
 		)
 		// Register handler for clearing ID token.
 		f.mux.HandleFunc(fmt.Sprintf("/winch/cleartoken/%s", configSource.Name), oidcClearTokenHandler(clearIDTokenFunc))
+	case *pb.AuthSource_ServiceAccountOidc:
+		serviceAccountJson, err := ioutil.ReadFile(s.ServiceAccountOidc.ServiceAccountJsonPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to open google SA JSON file from %s", s.ServiceAccountOidc.ServiceAccountJsonPath)
+		}
 
+		source, err = oidcauth.NewGoogleFromServiceAccount(
+			ctx,
+			configSource.Name,
+			login.OIDCConfig{
+				Provider:     s.ServiceAccountOidc.Provider,
+				ClientID:     s.ServiceAccountOidc.ClientId,
+				ClientSecret: s.ServiceAccountOidc.Secret,
+				Scopes:       s.ServiceAccountOidc.Scopes,
+			},
+			serviceAccountJson,
+		)
 	case *pb.AuthSource_Dummy:
 		testSource := &testauth.Source{
 			NameValue:  configSource.Name,

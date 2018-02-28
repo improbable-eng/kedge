@@ -19,6 +19,7 @@ message AuthSource {
         KubernetesAccess kube = 3;
         OIDCAccess oidc = 4;
         TokenAccess token = 5;
+        GoogleServiceAccountOIDCAccess service_account_oidc = 6;
     }
 }
 
@@ -34,16 +35,30 @@ message KubernetesAccess {
     // TODO(bplotka): Consider enabling login for OIDC from kube config.
 }
 
+// OIDCAccess is an access based on OIDC flow with user login (if refresh token is not in given path).
 message OIDCAccess {
     string provider = 1 [(validator.field) = {msg_exists : true}];
     string client_id = 2  [(validator.field) = {msg_exists : true}];
     string secret = 3  [(validator.field) = {msg_exists : true}];
     repeated string scopes = 4;
     string path = 5;
-    // login_callback_path specified URL path for redirect URL to specify when doing OIDC login.
+
+    // login_callback_path specifies URL path for redirect URL to specify when doing OIDC login.
     // If empty login will be disabled which means in case of no refresh token or not valid one, error will be returned
     // thus not needing user interaction.
     string login_callback_path = 6;
+}
+
+// GoogleServiceAccountOIDCAccess is an access based on custom OIDC flow that supports Google Service Accounts.
+message GoogleServiceAccountOIDCAccess {
+    string provider = 1 [(validator.field) = {msg_exists : true}];
+    string client_id = 2  [(validator.field) = {msg_exists : true}];
+    string secret = 3  [(validator.field) = {msg_exists : true}];
+    repeated string scopes = 4;
+
+    // service_account_json_path specifies path to the JSON credential file that works as Service Account against certain
+    // OIDC servers that supports it.
+    string service_account_json_path = 5 [(validator.field) = {msg_exists : true}];
 }
 
 // DummyAccess just directly passes specified value into auth header. If value is not specified it will return error.

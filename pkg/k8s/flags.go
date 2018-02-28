@@ -9,6 +9,9 @@ import (
 	"net/url"
 	"os"
 
+	"context"
+	"time"
+
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
@@ -42,6 +45,7 @@ var (
 			"This auth method has priority 1.")
 	fKubeConfigAuthPath = sharedflags.Set.String("k8sclient_kubeconfig_path", "", "Kube config path. "+
 		"Only used when k8sclient_kubeconfig_user is specified. If empty it will try default path.")
+	fAuthTimeout = sharedflags.Set.Duration("k8sclient_auth_timeout", 10*time.Second, "Max duration we will wait for k8s client auth to be set up.")
 )
 
 // NewFromFlags creates APIClient from flags.
@@ -75,9 +79,11 @@ func NewFromFlags() (*APIClient, error) {
 
 	var source tokenauth.Source
 
+	ctx, cancel := context.WithTimeout(context.Background(), *fAuthTimeout)
+	defer cancel()
 	// Try kubeconfig auth first.
 	if user := *fKubeConfigAuthUser; user != "" {
-		source, err = k8sauth.New("kube_api", *fKubeConfigAuthPath, user)
+		source, err = k8sauth.New(ctx, "kube_api", *fKubeConfigAuthPath, user)
 		if err != nil {
 			return nil, errors.Wrap(err, "k8sclient: failed to create k8sauth Source")
 		}

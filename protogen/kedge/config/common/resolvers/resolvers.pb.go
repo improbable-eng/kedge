@@ -63,7 +63,7 @@ func (m *SrvResolver) GetPortOverride() uint32 {
 type K8SResolver struct {
 	// Common kube DNS name with optional port: "<service><|.namespace>(.whatever suffix)<|:port_name|:value number>"
 	// to resolve by this resolver using endpoints API.
-	// e.g ":backend1.namespace1:http_port1"
+	// e.g "backend1.namespace1:http_port1"
 	DnsPortName string `protobuf:"bytes,1,opt,name=dns_port_name,json=dnsPortName" json:"dns_port_name,omitempty"`
 }
 

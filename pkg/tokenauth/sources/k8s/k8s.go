@@ -1,6 +1,8 @@
 package k8sauth
 
 import (
+	"context"
+
 	"github.com/Bplotka/oidc/login/k8scache"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
@@ -12,7 +14,7 @@ import (
 
 // New constructs appropriate tokenAuth Source to the given AuthInfo from kube config referenced by user.
 // This is really convenient if you want to reuse well configured kube config.
-func New(name string, configPath string, userName string) (tokenauth.Source, error) {
+func New(ctx context.Context, name string, configPath string, userName string) (tokenauth.Source, error) {
 	if configPath == "" {
 		configPath = k8s.DefaultKubeConfigPath
 	}
@@ -38,7 +40,7 @@ func New(name string, configPath string, userName string) (tokenauth.Source, err
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to get OIDC configuration from user. ")
 			}
-			s, _, err := oidcauth.NewWithCache(name, cache, nil)
+			s, _, err := oidcauth.NewWithCache(ctx, name, cache, nil)
 			return s, err
 		case "gcp":
 			c, err := oauth2auth.NewConfigFromMap(info.AuthProvider.Config)

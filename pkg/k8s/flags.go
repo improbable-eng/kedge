@@ -9,6 +9,9 @@ import (
 	"net/url"
 	"os"
 
+	"context"
+	"time"
+
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
@@ -75,9 +78,11 @@ func NewFromFlags() (*APIClient, error) {
 
 	var source tokenauth.Source
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	// Try kubeconfig auth first.
 	if user := *fKubeConfigAuthUser; user != "" {
-		source, err = k8sauth.New("kube_api", *fKubeConfigAuthPath, user)
+		source, err = k8sauth.New(ctx, "kube_api", *fKubeConfigAuthPath, user)
 		if err != nil {
 			return nil, errors.Wrap(err, "k8sclient: failed to create k8sauth Source")
 		}

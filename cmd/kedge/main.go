@@ -69,18 +69,13 @@ var (
 			"director & backendpool routings. It will update them directly into into flagz value, so you can see the current routings anytime in debug/flagz")
 )
 
-const (
-	grpcWebContentTypePrefix = "application/grpc-web"
-	grpcContentTypePrefix    = "application/grpc"
-)
-
 func isGRPCReq(header http.Header) bool {
 	// Do not treat "grpc-web" request as pure gRPC. It is pure HTTP/2 at this point.
-	if strings.HasPrefix(header.Get("content-type"), grpcWebContentTypePrefix) {
+	if strings.HasPrefix(header.Get("content-type"), "application/grpc-web") {
 		return false
 	}
 
-	if strings.HasPrefix(header.Get("content-type"), grpcContentTypePrefix) {
+	if strings.HasPrefix(header.Get("content-type"), "application/grpc") {
 		return true
 	}
 

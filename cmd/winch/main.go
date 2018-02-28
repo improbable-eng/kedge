@@ -52,12 +52,12 @@ var (
 		"server_mapper_config",
 		&pb_config.MapperConfig{},
 		"Contents of the Winch Mapper configuration. Content or read from file if _path suffix.").
-		WithFileFlag("default_winch_mapper.json").WithValidator(validateMapper)
+		WithFileFlag("").WithValidator(validateMapper)
 	flagAuthConfig = protoflagz.DynProto3(sharedflags.Set,
 		"server_auth_config",
 		&pb_config.AuthConfig{},
 		"Contents of the Winch Auth configuration. Content or read from file if _path suffix.").
-		WithFileFlag("default_winch_auth.json").WithValidator(validateMapper)
+		WithFileFlag("").WithValidator(validateMapper)
 	flagCORSAllowedOrigins = sharedflags.Set.StringSlice("cors_allowed_origin", []string{}, "CORS allowed origins for proxy endpoint.")
 	flagLogLevel           = sharedflags.Set.String("log_level", "info", "Log level")
 	flagDebugMode          = sharedflags.Set.Bool("debug_mode", false, "If true debug mode is enabled. "+

@@ -69,6 +69,19 @@ var (
 			"director & backendpool routings. It will update them directly into into flagz value, so you can see the current routings anytime in debug/flagz")
 )
 
+func isGRPCReq(header http.Header) bool {
+	// Do not treat "grpc-web" request as pure gRPC. It is pure HTTP/2 at this point.
+	if strings.HasPrefix(header.Get("content-type"), "application/grpc-web") {
+		return false
+	}
+
+	if strings.HasPrefix(header.Get("content-type"), "application/grpc") {
+		return true
+	}
+
+	return false
+}
+
 func main() {
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
 		log.WithError(err).Fatalf("failed parsing flags")
@@ -209,7 +222,7 @@ func main() {
 		if grpcServer != nil {
 			// Make HTTP handler bounce to gRPC if found proper content-type.
 			handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				if strings.HasPrefix(req.Header.Get("content-type"), "application/grpc") {
+				if isGRPCReq(req.Header) {
 					grpcServer.ServeHTTP(w, req)
 					return
 				}

@@ -1,5 +1,12 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.10](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.10)
+Kedge service:
+* [x] Added support for [grpc-web](https://github.com/improbable-eng/grpc-web) protocol
+
+Winch (kedge client):
+* [x] Added new OIDC-based auth method with service accounts.
+
 ### [v1.0.0-beta.9](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.9)
 Kedge service:
 * [x] Kubernetes discovery now prepends service short name to route matcher instead of just service name.

@@ -3,13 +3,16 @@ package k8sresolver
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/fortytw2/leaktest"
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 type readerCloserMock struct {
@@ -59,7 +62,7 @@ func (m *endpointClientMock) StartChangeStream(ctx context.Context, t targetEntr
 	return m.connMock, nil
 }
 
-func startTestStream(t *testing.T) (chan []byte, chan error, *readerCloserMock, chan watchResult, func()) {
+func startTestStream(t *testing.T) (chan []byte, chan error, *readerCloserMock, *streamer, func()) {
 	bytesCh := make(chan []byte)
 	errCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.TODO())
@@ -88,36 +91,40 @@ func startTestStream(t *testing.T) (chan []byte, chan error, *readerCloserMock, 
 		cancel2()
 	}
 
-	eventsCh := make(chan watchResult)
-
-	err := startWatchingEndpointsChanges(
-		streamWatcherCtx,
-		testTarget,
-		epClientMock,
-		eventsCh,
-	)
+	s, err := startNewStreamer(streamWatcherCtx, testTarget, epClientMock)
 	if err != nil {
 		closeFn()
 		t.Fatal(err.Error())
 	}
 
-	return bytesCh, errCh, connMock, eventsCh, closeFn
+	return bytesCh, errCh, connMock, s, closeFn
 }
 
 func TestStreamWatcher_DecodingError_EventErr_ClosesStream(t *testing.T) {
-	bytesCh, _, connMock, eventsCh, cancel := startTestStream(t)
+	defer leaktest.CheckTimeout(t, 10*time.Second)
+
+	bytesCh, _, connMock, streamer, cancel := startTestStream(t)
 	defer cancel()
+
+	changeCh, errCh := streamer.ResultChans()
 
 	// Triggering error while decoding.
 	// It should block on connMock.Read by now.
 	// Send some undecodable stuff:
 	bytesCh <- []byte(`{{{{ "temp-err": true}`)
-	event := <-eventsCh
-	require.Error(t, event.err, "we expect it fails to decode eventCh")
+	select {
+	case err := <-errCh:
+		require.Error(t, err, "we expect it fails to decode changeCh")
+	case change := <-changeCh:
+		t.Errorf("unexpected change event %v", change)
+		t.FailNow()
+	}
 
 	// Expect connection closed.
 	select {
-	case <-eventsCh:
+	case <-errCh:
+		t.Error("No err was expected")
+	case <-changeCh:
 		t.Error("No event was expected")
 	// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
@@ -126,8 +133,12 @@ func TestStreamWatcher_DecodingError_EventErr_ClosesStream(t *testing.T) {
 }
 
 func TestStreamWatcher_NotSupportedType_EventErr_ClosesConn(t *testing.T) {
-	bytesCh, _, connMock, eventsCh, cancel := startTestStream(t)
+	defer leaktest.CheckTimeout(t, 10*time.Second)
+
+	bytesCh, _, connMock, streamer, cancel := startTestStream(t)
 	defer cancel()
+
+	changeCh, errCh := streamer.ResultChans()
 
 	// Triggering not supported event.
 	wrongEvent := event{
@@ -137,103 +148,153 @@ func TestStreamWatcher_NotSupportedType_EventErr_ClosesConn(t *testing.T) {
 	require.NoError(t, err)
 
 	bytesCh <- []byte(b)
-	event := <-eventsCh
-	require.Error(t, event.err, "we expect it invalid event type error")
+	select {
+	case err := <-errCh:
+		require.Error(t, err, "we expect invalid event type error")
+		require.Equal(t, "got invalid watch event type: not-supported", err.Error())
+	case change := <-changeCh:
+		t.Errorf("unexpected change event %v", change)
+		t.FailNow()
+	}
 
 	// Expect connection closed.
 	select {
-	case <-eventsCh:
+	case <-errCh:
+		t.Error("No err was expected")
+	case <-changeCh:
 		t.Error("No event was expected")
-	// Not really nice to use time in tests, but should be enough for now.
+		// Not really nice to use time in tests, but should be enough for now.
+	case <-time.After(200 * time.Millisecond):
+	}
+	require.True(t, connMock.isClosed())
+}
+
+func TestStreamWatcher_ErrorEventType_EventErr_ClosesConn(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 10*time.Second)
+
+	bytesCh, _, connMock, streamer, cancel := startTestStream(t)
+	defer cancel()
+
+	changeCh, errCh := streamer.ResultChans()
+
+	status := &metav1.Status{
+		Status:  "err",
+		Code:    124,
+		Message: "some-msg",
+	}
+	// Triggering not supported event.
+	wrongEvent := event{
+		Type: watch.Error,
+		Object: eventObject{
+			Status: status,
+		},
+	}
+	b, err := json.Marshal(wrongEvent)
+	require.NoError(t, err)
+
+	bytesCh <- []byte(b)
+	select {
+	case err := <-errCh:
+		require.Error(t, err, "we expect event type error")
+		require.Equal(t, "err: some-msg. Code: 124", err.Error())
+	case change := <-changeCh:
+		t.Errorf("unexpected change event %v", change)
+		t.FailNow()
+	}
+
+	// Expect connection closed.
+	select {
+	case <-errCh:
+		t.Error("No err was expected")
+	case <-changeCh:
+		t.Error("No event was expected")
+		// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
 	require.True(t, connMock.isClosed())
 }
 
 func TestStreamWatcher_EOF_EventErr_ClosesConn(t *testing.T) {
-	_, errCh, connMock, eventsCh, cancel := startTestStream(t)
+	defer leaktest.CheckTimeout(t, 10*time.Second)
+
+	_, connErrCh, connMock, streamer, cancel := startTestStream(t)
 	defer cancel()
 
+	changeCh, errCh := streamer.ResultChans()
+
 	// Triggering EOF.
-	errCh <- io.EOF
-	event := <-eventsCh
-	require.Error(t, event.err, "we expect it invalid event type error")
+	connErrCh <- io.EOF
+	select {
+	case err := <-errCh:
+		require.Error(t, err, "we expect EOF error")
+		require.Equal(t, err, io.EOF)
+	case change := <-changeCh:
+		t.Errorf("unexpected change event %v", change)
+		t.FailNow()
+	}
 
 	// Expect connection closed.
 	select {
-	case <-eventsCh:
+	case <-errCh:
+		t.Error("No err was expected")
+	case <-changeCh:
 		t.Error("No event was expected")
-	// Not really nice to use time in tests, but should be enough for now.
+		// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
 	require.True(t, connMock.isClosed())
 }
 
-func TestStreamWatcher_OK_2OKEvents(t *testing.T) {
-	bytesCh, _, _, eventsCh, cancel := startTestStream(t)
+func newTestChange(typ watch.EventType, subs ...v1.EndpointSubset) change {
+	return change{
+		typ: typ,
+		Endpoints: &v1.Endpoints{
+			Subsets: subs,
+		},
+	}
+}
+
+func changeToEvent(change change) event {
+	return event{
+		Type: change.typ,
+		Object: eventObject{
+			Endpoints: change.Endpoints,
+		},
+	}
+}
+
+func TestStreamWatcher_OK_TwoOKEvents(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 10*time.Second)
+
+	bytesCh, _, _, streamer, cancel := startTestStream(t)
 	defer cancel()
 
-	// Triggering OK gotEvent.
-	expectedEvent := event{
-		Type: added,
-		Object: endpoints{
-			Metadata: metadata{
-				ResourceVersion: "123",
-			},
-			Subsets: []subset{
-				{
-					Ports: []port{
-						{
-							Port: 8080,
-							Name: "noName",
-						},
-					},
-					Addresses: []address{
-						{
-							IP: "1.2.3.4",
-						},
-					},
-				},
-			},
-		},
-	}
+	changeCh, errCh := streamer.ResultChans()
 
-	b, err := json.Marshal(expectedEvent)
+	// Triggering OK event..
+	expectedChange := newTestChange(watch.Added, testAddr1)
+	b, err := json.Marshal(changeToEvent(expectedChange))
 	require.NoError(t, err)
 	bytesCh <- b
-	gotEvent := <-eventsCh
-	require.NoError(t, gotEvent.err)
-	require.Equal(t, expectedEvent, *gotEvent.ep)
 
-	expectedEvent2 := event{
-		Type: added,
-		Object: endpoints{
-			Metadata: metadata{
-				ResourceVersion: "123",
-			},
-			Subsets: []subset{
-				{
-					Ports: []port{
-						{
-							Port: 8080,
-							Name: "noName",
-						},
-					},
-					Addresses: []address{
-						{
-							IP: "1.2.3.4",
-						},
-					},
-				},
-			},
-		},
+	select {
+	case err := <-errCh:
+		t.Errorf("unexpected error event: %v", err)
+		t.FailNow()
+	case change := <-changeCh:
+		require.Equal(t, expectedChange, change)
 	}
 
-	b2, err2 := json.Marshal(expectedEvent2)
-	fmt.Println(string(b2))
+	expectedChange2 := newTestChange(watch.Deleted, testAddr1)
+	b2, err2 := json.Marshal(changeToEvent(expectedChange2))
 	require.NoError(t, err2)
 	bytesCh <- b2
-	gotEvent2 := <-eventsCh
-	require.NoError(t, gotEvent2.err)
-	require.Equal(t, expectedEvent2, *gotEvent2.ep)
+
+	select {
+	case err := <-errCh:
+		t.Errorf("unexpected error event %v", err)
+		t.FailNow()
+	case change := <-changeCh:
+		require.Equal(t, expectedChange2, change)
+	}
 }

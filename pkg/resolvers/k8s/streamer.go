@@ -8,22 +8,30 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
-// startWatchingEndpointsChanges starts a stream that in go routine reads from connection for every change event.
+type change struct {
+	*v1.Endpoints
+	typ watch.EventType
+}
+
+type streamer struct {
+	changeCh chan change
+	errCh    chan error
+}
+
+// startNewStreamer starts a stream that in go routine reads from connection for every change event.
 // Since watcher.Next() errors are assumed irrecoverable, it is a caller responsibility to re-resolve on EOF, error event etc.
 // We read connection from separate go routine because read is blocking with no timeout/cancel logic.
-func startWatchingEndpointsChanges(
-	ctx context.Context,
-	target targetEntry,
-	epClient endpointClient,
-	eventsCh chan<- watchResult,
-) error {
+func startNewStreamer(ctx context.Context, target targetEntry, epClient endpointClient) (*streamer, error) {
 	innerCtx, innerCancel := context.WithCancel(ctx)
 	stream, err := epClient.StartChangeStream(innerCtx, target)
 	if err != nil {
 		innerCancel()
-		return errors.Wrapf(err, "k8sresolver: Failed to do start stream for target %v", target)
+		return nil, errors.Wrapf(err, "Failed to do start stream for target %v", target)
 	}
 
 	go func() {
@@ -33,79 +41,88 @@ func startWatchingEndpointsChanges(
 			_, _ = ioutil.ReadAll(stream)
 			err = stream.Close()
 			if err != nil {
-				logrus.WithError(err).Warn("k8sresolver: Failed to Close cancelled stream connection")
+				logrus.WithError(err).Warn("Failed to Close cancelled stream connection")
 			}
 		}
 	}()
-
+	s := &streamer{
+		changeCh: make(chan change),
+		errCh:    make(chan error, 1),
+	}
 	go func() {
-		proxyAllEvents(innerCtx, json.NewDecoder(stream), eventsCh)
-		innerCancel()
+		defer innerCancel()
+
+		if err := proxy(innerCtx, json.NewDecoder(stream), s.changeCh); err != nil {
+			s.errCh <- err
+		}
 	}()
 
-	return nil
+	return s, nil
 }
 
-type eventType string
+func (s *streamer) ResultChans() (<-chan change, <-chan error) {
+	return s.changeCh, s.errCh
+}
 
-const (
-	added    eventType = "ADDED"
-	modified eventType = "MODIFIED"
-	deleted  eventType = "DELETED"
-	failed   eventType = "ERROR"
-)
-
-// event represents a single event to a watched resource.
+// We don't want to use special, internal decoder, so we need to have all typed.
 type event struct {
-	Type   eventType `json:"type"`
-	Object endpoints `json:"object"`
+	Type   watch.EventType
+	Object eventObject
 }
 
-// proxyAllEvents gets events in loop and proxies to eventsCh. If event include some error it always returns, because
-// watchers.Next errors are meant to irrecoverable.
-func proxyAllEvents(ctx context.Context, decoder *json.Decoder, eventsCh chan<- watchResult) {
+type eventObject struct {
+	// If type == Error.
+	*metav1.Status
+	// If type == Added, Modified or Deleted.
+	*v1.Endpoints
+}
+
+// proxy receives events in loop and proxies to changeCh. If event include some error, or stream errors it always returns
+// error, because watchers.Next errors are meant to irrecoverable. On graceful EOF, or cancelled context, no error is returned.
+func proxy(ctx context.Context, decoder *json.Decoder, endpCh chan<- change) error {
+	var event event
+
 	for ctx.Err() == nil {
-		var eventErr error
-		var got event
 		// Blocking read.
-		if err := decoder.Decode(&got); err != nil {
+		if err := decoder.Decode(&event); err != nil {
 			if ctx.Err() != nil {
 				// Stopping state.
-				return
+				return nil
 			}
 			switch err {
 			case io.EOF:
-				// Watch closed normally - weird.
-				eventErr = errors.Wrap(err, "EOF during watch stream event decoding")
+				// Stream closed gracefully.
+				return io.EOF
 			case io.ErrUnexpectedEOF:
-				eventErr = errors.Wrap(err, "Unexpected EOF during watch stream event decoding")
+				return errors.Wrap(err, "unexpected EOF during watch stream event decoding")
 			default:
-				eventErr = errors.Wrap(err, "Unable to decode an event from the watch stream")
+				return errors.Wrap(err, "unable to decode an event from the watch stream")
 			}
 		}
 
-		if eventErr == nil {
-			switch got.Type {
-			case added, modified, deleted:
-			// All is fine.
-			case failed:
-				eventErr = errors.Errorf("%s: %s. Code: %d",
-					got.Object.Status,
-					got.Object.Message,
-					got.Object.Code,
+		switch event.Type {
+		case watch.Error:
+			if event.Object.Status != nil {
+				return errors.Errorf("%s: %s. Code: %d",
+					event.Object.Status.Status,
+					event.Object.Status.Message,
+					event.Object.Status.Code,
 				)
-			default:
-				eventErr = errors.Errorf("Got invalid watch event type: %v", got.Type)
 			}
+			return errors.Errorf("unexpected error object type %v", event.Object)
+
+		case watch.Added, watch.Modified, watch.Deleted:
+		default:
+			return errors.Errorf("got invalid watch event type: %v", event.Type)
 		}
 
-		eventsCh <- watchResult{
-			ep:  &got,
-			err: eventErr,
+		if event.Object.Endpoints == nil {
+			return errors.Errorf("unexpected event object type %v. Expected *v1.Endpoints", event.Object)
 		}
-		if eventErr != nil {
-			// Error is irrecoverable for watcher.Next(). Return here.
-			return
+		endpCh <- change{
+			Endpoints: event.Object.Endpoints,
+			typ:       event.Type,
 		}
 	}
+	return nil
 }

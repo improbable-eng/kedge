@@ -77,8 +77,8 @@ type eventObject struct {
 	*v1.Endpoints
 }
 
-// proxy receives events in loop and proxies to changeCh. If event include some error, or stream errors it always returns
-// error, because watchers.Next errors are meant to irrecoverable. On graceful EOF, or cancelled context, no error is returned.
+// proxy receives events in loop and proxies to changeCh. If event include some error, or stream errors, it always returns
+// error. This is because watchers.Next errors are meant to irrecoverable. On cancelled context, no error is returned.
 func proxy(ctx context.Context, decoder *json.Decoder, endpCh chan<- change) error {
 	var event event
 

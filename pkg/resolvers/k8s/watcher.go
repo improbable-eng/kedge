@@ -51,14 +51,14 @@ func (w *watcher) Close() {
 func (w *watcher) Next() ([]*naming.Update, error) {
 	if w.ctx.Err() != nil {
 		// We already stopped.
-		return []*naming.Update(nil), errors.Wrap(w.ctx.Err(), "watcher.Next already stopped or Next returned error already. "+
+		return []*naming.Update(nil), errors.Wrap(w.ctx.Err(), "k8sresolver: watcher.Next already stopped or Next returned error already. "+
 			"Note that watcher errors are not recoverable.")
 	}
 	u, err := w.next()
 	if err != nil {
 		// Just in case.
 		w.Close()
-		return u, errors.Wrap(err, "k8sresolver")
+		return u, errors.Wrap(err, "k8sresolver: ")
 	}
 	return u, nil
 }
@@ -75,6 +75,10 @@ func keyFromAddr(address v1.EndpointAddress) (key, error) {
 	return key{ns: address.TargetRef.Namespace, name: address.TargetRef.Name}, nil
 }
 
+// next gathers kube api endpoint watch changes and translates them to naming.Update set.
+// The main complexity is fact that naming.Update can be either Add or Delete. However kube events can be Add,
+// Delete or Modified. As a result we are required to maintain state. If the state is malformed we immdiately return error
+// which will cause resync on caller side (new resolver).
 func (w *watcher) next() ([]*naming.Update, error) {
 	var (
 		updates           []*naming.Update
@@ -92,7 +96,6 @@ func (w *watcher) next() ([]*naming.Update, error) {
 	case change = <-changeCh:
 	}
 
-	// Translate kube api endpoint watch change to resolver address and put into map for easier lookup.
 	for _, subset := range change.Subsets {
 		var err error
 		endpointsToUpdate, err = subsetToAddresses(w.target, subset)

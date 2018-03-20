@@ -163,7 +163,7 @@ func TestStreamWatcher_NotSupportedType_EventErr_ClosesConn(t *testing.T) {
 		t.Error("No err was expected")
 	case <-changeCh:
 		t.Error("No event was expected")
-		// Not really nice to use time in tests, but should be enough for now.
+	// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
 	require.True(t, connMock.isClosed())
@@ -208,7 +208,7 @@ func TestStreamWatcher_ErrorEventType_EventErr_ClosesConn(t *testing.T) {
 		t.Error("No err was expected")
 	case <-changeCh:
 		t.Error("No event was expected")
-		// Not really nice to use time in tests, but should be enough for now.
+	// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
 	require.True(t, connMock.isClosed())
@@ -239,7 +239,7 @@ func TestStreamWatcher_EOF_EventErr_ClosesConn(t *testing.T) {
 		t.Error("No err was expected")
 	case <-changeCh:
 		t.Error("No event was expected")
-		// Not really nice to use time in tests, but should be enough for now.
+	// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
 	require.True(t, connMock.isClosed())

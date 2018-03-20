@@ -138,13 +138,20 @@ func TestWatcher_Next_OK(t *testing.T) {
 		expectedUpdates   [][]*naming.Update
 		expectedErrs      []error
 	}{
+		// Tests for subsetToAddresses function.
 		{
 			watchedTargetPort: targetPort{},
 			changes:           []change{newTestChange(watch.Added, testAddr1)},
+			expectedErrs: []error{errors.New("failed to convert k8s endpoint subset to update Addr: we got " +
+				"[{someName 8080 } {someName1 8081 } {someName2 8082 }] ports and target port is not specified. Don't know what to choose")},
+		},
+		{
+			watchedTargetPort: targetPort{},
+			changes:           []change{newTestChange(watch.Added, modifiedAddr1)},
 			expectedUpdates: [][]*naming.Update{
 				{
 					{
-						Addr: "1.2.3.4:8080",
+						Addr: "1.2.3.5:8080",
 						Op:   naming.Add,
 					},
 				},
@@ -163,12 +170,12 @@ func TestWatcher_Next_OK(t *testing.T) {
 			},
 		},
 		{
-			watchedTargetPort: targetPort{value: "9090"},
+			watchedTargetPort: targetPort{value: "8081"},
 			changes:           []change{newTestChange(watch.Added, testAddr1)},
 			expectedUpdates: [][]*naming.Update{
 				{
 					{
-						Addr: "1.2.3.4:9090",
+						Addr: "1.2.3.4:8081",
 						Op:   naming.Add,
 					},
 				},
@@ -177,11 +184,20 @@ func TestWatcher_Next_OK(t *testing.T) {
 		{
 			// Non existing port just return no IPs. This makes configuration bit harder to debug, but we cannot assume
 			// port is always in any subset.
-			watchedTargetPort: targetPort{isNamed: true, value: "non-existing-port-name"},
+			watchedTargetPort: targetPort{value: "no-such-number"},
 			changes:           []change{newTestChange(watch.Added, testAddr1)},
 			expectedUpdates:   [][]*naming.Update{nil},
 		},
 		{
+			// Non existing named port just return no IPs. This makes configuration bit harder to debug, but we cannot assume
+			// port is always in any subset.
+			watchedTargetPort: targetPort{isNamed: true, value: "non-existing-port-name"},
+			changes:           []change{newTestChange(watch.Added, testAddr1)},
+			expectedUpdates:   [][]*naming.Update{nil},
+		},
+		// Watcher next tests:
+		{
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
 				newTestChange(watch.Modified, modifiedAddr1),
@@ -206,6 +222,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 			},
 		},
 		{
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, multipleAddrSubset),
 				newTestChange(watch.Deleted, someAddrSubset),
@@ -257,6 +274,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 		},
 		{
 			// Test case that did not work previously because of bug.
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
 				newTestChange(watch.Deleted, testAddr1),
@@ -285,18 +303,21 @@ func TestWatcher_Next_OK(t *testing.T) {
 		},
 		// Malformed state cases. We assume this order of events will never happen:
 		{
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Deleted, testAddr1),
 			},
 			expectedErrs: []error{errors.New("malformed internal state for endpoints. On delete event type, we got update for {ns1 pod1} that does not exists in map[]. Doing resync...")},
 		},
 		{
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Modified, testAddr1),
 			},
 			expectedErrs: []error{errors.New("malformed internal state for endpoints. On modified event type, we got update for {ns1 pod1} that does not exists in map[]. Doing resync...")},
 		},
 		{
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
 				newTestChange(watch.Added, testAddr1),

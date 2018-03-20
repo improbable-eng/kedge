@@ -148,33 +148,20 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			updates = append(updates, &naming.Update{Op: naming.Delete, Addr: addr})
 			delete(w.endpoints, k)
 		}
+	default:
+		return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
 	}
 	return updates, nil
 }
 
 func subsetToAddresses(t targetEntry, sub v1.EndpointSubset) (map[key]string, error) {
-	if len(sub.Ports) == 0 {
-		return nil, errors.Errorf("retrieved subset update contains no port")
+	port, found, err := matchTargetPort(t.port, sub.Ports)
+	if err != nil {
+		return nil, err
 	}
-	var port string
 
-	// targetEntry that is specified for this watcher controls what port we should use.
-	if t.port == noTargetPort {
-		// Get first one spotted.
-		port = fmt.Sprintf("%v", sub.Ports[0].Port)
-	} else if t.port.isNamed {
-		for _, p := range sub.Ports {
-			if p.Name == t.port.value {
-				port = fmt.Sprintf("%v", p.Port)
-				break
-			}
-		}
-		if port == "" {
-			// Not found.
-			return map[key]string{}, nil
-		}
-	} else {
-		port = t.port.value
+	if !found {
+		return map[key]string{}, nil
 	}
 
 	addrs := map[key]string{}
@@ -186,4 +173,36 @@ func subsetToAddresses(t targetEntry, sub v1.EndpointSubset) (map[key]string, er
 		addrs[k] = net.JoinHostPort(address.IP, port)
 	}
 	return addrs, nil
+}
+
+// matchTargetPort searches for specified port in targetPort and returns port number as string. Basically:
+//
+// service.namespace - means no target port specified.
+// service.namespace:123 - means not named port, so we should just use, but only if it's present in endpoint.
+// service.namespace:abc - means named port.
+func matchTargetPort(targetPort targetPort, ports []v1.EndpointPort) (string, bool, error) {
+	if len(ports) == 0 {
+		return "", false, errors.Errorf("retrieved subset update contains no port")
+	}
+
+	if targetPort == noTargetPort {
+		if len(ports) > 1 {
+			return "", false, errors.Errorf("we got %v ports and target port is not specified. Don't know what to choose", ports)
+		}
+		return fmt.Sprintf("%v", ports[0].Port), true, nil
+	}
+
+	for _, p := range ports {
+		if targetPort.isNamed && p.Name == targetPort.value {
+			return fmt.Sprintf("%v", p.Port), true, nil
+		}
+
+		// Even that we have target specified as number value we want to ensure we have endpoint for it.
+		if !targetPort.isNamed && fmt.Sprintf("%v", p.Port) == targetPort.value {
+			return targetPort.value, true, nil
+		}
+	}
+
+	// No port found.
+	return "", false, nil
 }

@@ -1,5 +1,12 @@
 # Kedge & Winch Release Notes
 
+### [v1.0.0-beta.11](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.11)
+Kedge service:
+* [x] Fixed critical bug(s) in k8sresolver
+
+Tools:
+* [x] Added standalone k8sresolver runner for debugging purposes.
+
 ### [v1.0.0-beta.10](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.10)
 Kedge service:
 * [x] Added support for [grpc-web](https://github.com/improbable-eng/grpc-web) protocol

@@ -111,10 +111,9 @@ func (w *watcher) next() ([]*naming.Update, error) {
 		// Target port not found yet. Maybe other subsets includes target one?
 	}
 
-	switch change.typ {
-	case watch.Added:
-		// Create updates to add new endpoints.
-		for k, addr := range endpointsToUpdate {
+	for k, addr := range endpointsToUpdate {
+		switch change.typ {
+		case watch.Added:
 			_, ok := w.endpoints[k]
 			if ok {
 				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
@@ -123,9 +122,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 
 			w.endpoints[k] = addr
 			updates = append(updates, &naming.Update{Op: naming.Add, Addr: addr})
-		}
-	case watch.Modified:
-		for k, addr := range endpointsToUpdate {
+		case watch.Modified:
 			oldAddr, ok := w.endpoints[k]
 			if !ok {
 				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
@@ -135,10 +132,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			updates = append(updates, &naming.Update{Op: naming.Delete, Addr: oldAddr})
 			w.endpoints[k] = addr
 			updates = append(updates, &naming.Update{Op: naming.Add, Addr: addr})
-		}
-	case watch.Deleted:
-		// Create updates to delete old endpoints.
-		for k, addr := range endpointsToUpdate {
+		case watch.Deleted:
 			_, ok := w.endpoints[k]
 			if !ok {
 				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
@@ -147,9 +141,9 @@ func (w *watcher) next() ([]*naming.Update, error) {
 
 			updates = append(updates, &naming.Update{Op: naming.Delete, Addr: addr})
 			delete(w.endpoints, k)
+		default:
+			return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
 		}
-	default:
-		return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
 	}
 	return updates, nil
 }

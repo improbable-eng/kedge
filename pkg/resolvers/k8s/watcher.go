@@ -2,17 +2,14 @@ package k8sresolver
 
 import (
 	"context"
+	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/naming"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/watch"
 )
-
-type watchResult struct {
-	ep  *event
-	err error
-}
 
 // A Watcher provides name resolution updates by watching endpoints API.
 // It works by watching endpoint Watch API (retries if connection broke). Returned events with
@@ -20,28 +17,28 @@ type watchResult struct {
 type watcher struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+	target targetEntry
 
-	target      targetEntry
-	watchChange chan watchResult
-	lastUpdates map[string]struct{}
+	streamer  *streamer
+	endpoints map[key]string
 }
 
 func startNewWatcher(target targetEntry, epClient endpointClient) (*watcher, error) {
 	// NOTE(bplotka): Would love to have proper context from above but naming.Resolver does not allow that.
 	ctx, cancel := context.WithCancel(context.Background())
-	w := &watcher{
-		ctx:         ctx,
-		cancel:      cancel,
-		target:      target,
-		watchChange: make(chan watchResult),
-		lastUpdates: make(map[string]struct{}),
-	}
 
-	err := startWatchingEndpointsChanges(ctx, target, epClient, w.watchChange)
+	s, err := startNewStreamer(ctx, target, epClient)
 	if err != nil {
 		return nil, err
 	}
-	return w, nil
+
+	return &watcher{
+		ctx:       ctx,
+		cancel:    cancel,
+		target:    target,
+		streamer:  s,
+		endpoints: map[key]string{},
+	}, nil
 }
 
 // Close closes the watcher, cleaning up any open connections.
@@ -61,112 +58,145 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	if err != nil {
 		// Just in case.
 		w.Close()
+		return u, errors.Wrap(err, "k8sresolver: ")
 	}
-	return u, err
+	return u, nil
 }
 
+type key struct {
+	// EndpointAddress fields (usually pod).
+	ns, name string
+}
+
+func keyFromAddr(address v1.EndpointAddress) (key, error) {
+	if address.TargetRef == nil {
+		return key{}, errors.New("address targetRef is empty. Cannot maintain internal state.")
+	}
+	return key{ns: address.TargetRef.Namespace, name: address.TargetRef.Name}, nil
+}
+
+// next gathers kube api endpoint watch changes and translates them to naming.Update set.
+// The main complexity is fact that naming.Update can be either Add or Delete. However kube events can be Add,
+// Delete or Modified. As a result we are required to maintain state. If the state is malformed we immdiately return error
+// which will cause resync on caller side (new resolver).
 func (w *watcher) next() ([]*naming.Update, error) {
-	updates := make([]*naming.Update, 0)
-	updatedEndpoints := make(map[string]struct{})
-	var event event
+	var (
+		updates           []*naming.Update
+		change            change
+		changeCh, errCh   = w.streamer.ResultChans()
+		endpointsToUpdate = map[key]string{}
+	)
+
 	select {
 	case <-w.ctx.Done():
 		// We already stopped.
 		return []*naming.Update(nil), w.ctx.Err()
-	case r := <-w.watchChange:
-		if r.err != nil {
-			return []*naming.Update(nil), errors.Wrap(r.err, "k8sresolver: error on reading event stream")
-		}
-		event = *r.ep
+	case err := <-errCh:
+		return []*naming.Update(nil), errors.Wrap(err, "error on reading change stream")
+	case change = <-changeCh:
 	}
 
-	// Translate kube api endpoint watch event to resolver address and put into map for easier lookup.
-	for _, subset := range event.Object.Subsets {
-		updatedAddresses, err := subsetToAddresses(w.target, subset)
+	for _, subset := range change.Subsets {
+		var err error
+		endpointsToUpdate, err = subsetToAddresses(w.target, subset)
 		if err != nil {
-			return []*naming.Update(nil), errors.Wrap(err, "k8sresolver: failed to convert k8s endpoint subset to update Addr")
+			return []*naming.Update(nil), errors.Wrap(err, "failed to convert k8s endpoint subset to update Addr")
 		}
 
-		for _, address := range updatedAddresses {
-			updatedEndpoints[address] = struct{}{}
+		if len(endpointsToUpdate) > 0 {
+			// Expected port found.
+			break
 		}
+
+		// Target port not found yet. Maybe other subsets includes target one?
 	}
 
-	// Create updates to add new endpoints.
-	for addr, md := range updatedEndpoints {
-		if _, ok := w.lastUpdates[addr]; ok {
-			continue
-		}
+	for k, addr := range endpointsToUpdate {
+		switch change.typ {
+		case watch.Added:
+			_, ok := w.endpoints[k]
+			if ok {
+				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
+					"On added event type, we got update for %v that already exists in %v. Doing resync...", k, w.endpoints)
+			}
 
-		updates = append(updates, &naming.Update{Op: naming.Add, Addr: addr, Metadata: md})
-	}
-	// Create updates to delete old endpoints.
-	for addr := range w.lastUpdates {
-		if _, ok := updatedEndpoints[addr]; ok {
-			continue
-		}
-		updates = append(updates, &naming.Update{Op: naming.Delete, Addr: addr, Metadata: nil})
-	}
+			w.endpoints[k] = addr
+			updates = append(updates, &naming.Update{Op: naming.Add, Addr: addr})
+		case watch.Modified:
+			oldAddr, ok := w.endpoints[k]
+			if !ok {
+				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
+					"On modified event type, we got update for %v that does not exists in %v. Doing resync...", k, w.endpoints)
+			}
 
-	w.lastUpdates = updatedEndpoints
+			updates = append(updates, &naming.Update{Op: naming.Delete, Addr: oldAddr})
+			w.endpoints[k] = addr
+			updates = append(updates, &naming.Update{Op: naming.Add, Addr: addr})
+		case watch.Deleted:
+			_, ok := w.endpoints[k]
+			if !ok {
+				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
+					"On delete event type, we got update for %v that does not exists in %v. Doing resync...", k, w.endpoints)
+			}
+
+			updates = append(updates, &naming.Update{Op: naming.Delete, Addr: addr})
+			delete(w.endpoints, k)
+		default:
+			return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
+		}
+	}
 	return updates, nil
 }
 
-type endpoints struct {
-	Kind       string   `json:"kind"`
-	APIVersion string   `json:"apiVersion"`
-	Metadata   metadata `json:"metadata"`
-	// If kins: Endpoints
-	Subsets []subset `json:"subsets"`
-	// If kind: Status
-	Status  string `json:"status"`
-	Message string `json:"message"`
-	Code    int    `json:"code"`
-}
-
-type metadata struct {
-	Name            string `json:"name"`
-	ResourceVersion string `json:"resourceVersion"`
-}
-
-type subset struct {
-	Addresses []address `json:"addresses"`
-	Ports     []port    `json:"ports"`
-}
-
-type address struct {
-	IP string `json:"ip"`
-}
-
-type port struct {
-	Name string `json:"name"`
-	Port int    `json:"port"`
-}
-
-func subsetToAddresses(t targetEntry, sub subset) ([]string, error) {
-	if len(sub.Ports) == 0 {
-		return []string(nil), errors.Errorf("retrieved subset update contains no port")
+func subsetToAddresses(t targetEntry, sub v1.EndpointSubset) (map[key]string, error) {
+	port, found, err := matchTargetPort(t.port, sub.Ports)
+	if err != nil {
+		return nil, err
 	}
 
-	var port string
-	if t.port == noTargetPort {
-		// Get first one spotted.
-		port = strconv.Itoa(sub.Ports[0].Port)
-	} else if t.port.isNamed {
-		for _, p := range sub.Ports {
-			if p.Name == t.port.value {
-				port = strconv.Itoa(p.Port)
-				break
-			}
-		}
-	} else {
-		port = t.port.value
+	if !found {
+		return map[key]string{}, nil
 	}
 
-	var updatedAddresses []string
+	addrs := map[key]string{}
 	for _, address := range sub.Addresses {
-		updatedAddresses = append(updatedAddresses, net.JoinHostPort(address.IP, port))
+		k, err := keyFromAddr(address)
+		if err != nil {
+			return nil, err
+		}
+		addrs[k] = net.JoinHostPort(address.IP, port)
+	}
+	return addrs, nil
+}
+
+// matchTargetPort searches for specified port in targetPort and returns port number as string. Basically:
+//
+// service.namespace - means no target port specified.
+// service.namespace:123 - means not named port, so we should just use, but only if it's present in endpoint.
+// service.namespace:abc - means named port.
+func matchTargetPort(targetPort targetPort, ports []v1.EndpointPort) (string, bool, error) {
+	if len(ports) == 0 {
+		return "", false, errors.Errorf("retrieved subset update contains no port")
 	}
 
-	return updatedAddresses, nil
+	if targetPort == noTargetPort {
+		if len(ports) > 1 {
+			return "", false, errors.Errorf("we got %v ports and target port is not specified. Don't know what to choose", ports)
+		}
+		return fmt.Sprintf("%v", ports[0].Port), true, nil
+	}
+
+	for _, p := range ports {
+		if targetPort.isNamed && p.Name == targetPort.value {
+			return fmt.Sprintf("%v", p.Port), true, nil
+		}
+
+		// Even that we have target specified as number value we want to ensure we have endpoint for it.
+		if !targetPort.isNamed && fmt.Sprintf("%v", p.Port) == targetPort.value {
+			return targetPort.value, true, nil
+		}
+	}
+
+	// No port found.
+	return "", false, nil
 }

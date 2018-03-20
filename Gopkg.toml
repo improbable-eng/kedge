@@ -4,3 +4,6 @@ required = ["github.com/mwitkow/go-proto-validators/protoc-gen-govalidators", "g
   name = "github.com/mwitkow/grpc-proxy"
   revision = "67591eb23c48346a480470e462289835d96f70da"
 
+[[constraint]]
+  name = "github.com/Bplotka/oidc"
+  version = "v0.1.0"

@@ -2,6 +2,8 @@ package k8sresolver
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,10 +34,6 @@ var (
 		Addresses: []v1.EndpointAddress{
 			{
 				IP: "1.2.3.4",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod1",
-					Namespace: "ns1",
-				},
 			},
 		},
 	}
@@ -48,11 +46,7 @@ var (
 		},
 		Addresses: []v1.EndpointAddress{
 			{
-				IP: "1.2.3.5",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod1",
-					Namespace: "ns1",
-				},
+				IP: "1.2.3.5", // Changed IP.
 			},
 		},
 	}
@@ -66,28 +60,16 @@ var (
 		Addresses: []v1.EndpointAddress{
 			{
 				IP: "1.2.3.3",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod1",
-					Namespace: "ns1",
-				},
 			},
 			{
 				IP: "1.2.4.4",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod2",
-					Namespace: "ns1",
-				},
 			},
 			{
 				IP: "1.2.5.5",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod3",
-					Namespace: "ns1",
-				},
 			},
 		},
 	}
-	someAddrSubset = v1.EndpointSubset{
+	modifiedMultipleAddrSubset = v1.EndpointSubset{
 		Ports: []v1.EndpointPort{
 			{
 				Port: 8080,
@@ -97,35 +79,11 @@ var (
 		Addresses: []v1.EndpointAddress{
 			{
 				IP: "1.2.3.3",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod1",
-					Namespace: "ns1",
-				},
 			},
 			{
-				IP: "1.2.4.4",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod2",
-					Namespace: "ns1",
-				},
+				IP: "1.2.4.5", // Changed
 			},
-		},
-	}
-	modifiedLastAddrSubset = v1.EndpointSubset{
-		Ports: []v1.EndpointPort{
-			{
-				Port: 8080,
-				Name: "someName",
-			},
-		},
-		Addresses: []v1.EndpointAddress{
-			{
-				IP: "1.2.5.7",
-				TargetRef: &v1.ObjectReference{
-					Name:      "pod3",
-					Namespace: "ns1",
-				},
-			},
+			// IP: "1.2.5.5" deleted
 		},
 	}
 )
@@ -195,7 +153,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 			changes:           []change{newTestChange(watch.Added, testAddr1)},
 			expectedUpdates:   [][]*naming.Update{nil},
 		},
-		// Watcher next tests:
+		// Watcher next() tests:
 		{
 			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
@@ -225,9 +183,9 @@ func TestWatcher_Next_OK(t *testing.T) {
 			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, multipleAddrSubset),
-				newTestChange(watch.Deleted, someAddrSubset),
-				newTestChange(watch.Modified, modifiedLastAddrSubset),
-				newTestChange(watch.Deleted, modifiedLastAddrSubset),
+				newTestChange(watch.Modified, multipleAddrSubset),
+				newTestChange(watch.Modified, modifiedMultipleAddrSubset),
+				newTestChange(watch.Deleted, modifiedMultipleAddrSubset),
 			},
 			expectedUpdates: [][]*naming.Update{
 				{
@@ -244,29 +202,28 @@ func TestWatcher_Next_OK(t *testing.T) {
 						Op:   naming.Add,
 					},
 				},
+				nil, // No change.
+				{
+					{
+						Addr: "1.2.4.4:8080",
+						Op:   naming.Delete,
+					},
+					{
+						Addr: "1.2.4.5:8080",
+						Op:   naming.Add,
+					},
+					{
+						Addr: "1.2.5.5:8080",
+						Op:   naming.Delete,
+					},
+				},
 				{
 					{
 						Addr: "1.2.3.3:8080",
 						Op:   naming.Delete,
 					},
 					{
-						Addr: "1.2.4.4:8080",
-						Op:   naming.Delete,
-					},
-				},
-				{
-					{
-						Addr: "1.2.5.5:8080",
-						Op:   naming.Delete,
-					},
-					{
-						Addr: "1.2.5.7:8080",
-						Op:   naming.Add,
-					},
-				},
-				{
-					{
-						Addr: "1.2.5.7:8080",
+						Addr: "1.2.4.5:8080",
 						Op:   naming.Delete,
 					},
 				},
@@ -301,20 +258,30 @@ func TestWatcher_Next_OK(t *testing.T) {
 				},
 			},
 		},
+		{
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
+			changes: []change{
+				newTestChange(watch.Modified, testAddr1),
+			},
+			// It's hard to detect this case, so we just add the thing.
+			expectedUpdates: [][]*naming.Update{
+				{
+					{
+						Addr: "1.2.3.4:8080",
+						Op:   naming.Add,
+					},
+				},
+			},
+		},
 		// Malformed state cases. We assume this order of events will never happen:
 		{
 			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Deleted, testAddr1),
 			},
-			expectedErrs: []error{errors.New("malformed internal state for endpoints. On delete event type, we got update for {ns1 pod1} that does not exists in map[]. Doing resync...")},
-		},
-		{
-			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
-			changes: []change{
-				newTestChange(watch.Modified, testAddr1),
-			},
-			expectedErrs: []error{errors.New("malformed internal state for endpoints. On modified event type, we got update for {ns1 pod1} that does not exists in map[]. Doing resync...")},
+			expectedErrs: []error{errors.New("malformed internal state for addresses for target {  " +
+				"{true someName}}. We got delete event type with state before deletion and it does not match with that " +
+				"we tracked map[]. State before deletion map[1.2.3.4:8080:{}]. Doing resync...")},
 		},
 		{
 			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
@@ -330,7 +297,9 @@ func TestWatcher_Next_OK(t *testing.T) {
 					},
 				},
 			},
-			expectedErrs: []error{nil, errors.New("malformed internal state for endpoints. On added event type, we got update for {ns1 pod1} that already exists in map[{ns1 pod1}:1.2.3.4:8080]. Doing resync...")},
+			expectedErrs: []error{nil, errors.New("malformed internal state for addresses for target {  " +
+				"{true someName}}. We got added event type, but we already have some addresses from old updates: " +
+				"map[1.2.3.4:8080:{}]. Doing resync...")},
 		},
 	} {
 		ok := t.Run("", func(t *testing.T) {
@@ -339,7 +308,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			changeCh := make(chan change, 1)
+			changeCh := make(chan change, 10)
 			errCh := make(chan error, 1)
 			w := &watcher{
 				ctx:    ctx,
@@ -349,12 +318,17 @@ func TestWatcher_Next_OK(t *testing.T) {
 					changeCh: changeCh,
 					errCh:    errCh,
 				},
-				endpoints: map[key]string{},
+				addrsState: map[string]struct{}{},
 			}
 			defer w.Close()
 
 			for i, change := range tcase.changes {
 				changeCh <- change
+				if len(tcase.expectedUpdates) > i && len(tcase.expectedUpdates[i]) == 0 {
+					// if 0 updates, then next will not give us anything.
+					continue
+				}
+
 				u, err := w.next()
 				if len(tcase.expectedErrs) > i && tcase.expectedErrs[i] != nil {
 					require.Error(t, err)
@@ -362,6 +336,10 @@ func TestWatcher_Next_OK(t *testing.T) {
 					continue
 				}
 				require.NoError(t, err)
+
+				sort.Slice(u, func(i, j int) bool {
+					return strings.Compare(u[i].Addr, u[j].Addr) < 0
+				})
 				require.Equal(t, tcase.expectedUpdates[i], u, "case %d is wrong", i)
 			}
 		})

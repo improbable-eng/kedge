@@ -1,6 +1,6 @@
 # Kedge & Winch Release Notes
 
-### [v1.0.0-beta.11](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.11)
+### [v1.0.0-beta.12](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.12)
 Kedge service:
 * [x] Fixed critical bug(s) in k8sresolver
 

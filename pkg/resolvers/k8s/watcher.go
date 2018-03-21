@@ -19,8 +19,8 @@ type watcher struct {
 	cancel context.CancelFunc
 	target targetEntry
 
-	streamer  *streamer
-	endpoints map[key]string
+	streamer   *streamer
+	addrsState map[string]struct{}
 }
 
 func startNewWatcher(target targetEntry, epClient endpointClient) (*watcher, error) {
@@ -33,11 +33,11 @@ func startNewWatcher(target targetEntry, epClient endpointClient) (*watcher, err
 	}
 
 	return &watcher{
-		ctx:       ctx,
-		cancel:    cancel,
-		target:    target,
-		streamer:  s,
-		endpoints: map[key]string{},
+		ctx:        ctx,
+		cancel:     cancel,
+		target:     target,
+		streamer:   s,
+		addrsState: map[string]struct{}{},
 	}, nil
 }
 
@@ -63,84 +63,95 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	return u, nil
 }
 
-type key struct {
-	// EndpointAddress fields (usually pod).
-	ns, name string
-}
-
-func keyFromAddr(address v1.EndpointAddress) (key, error) {
-	if address.TargetRef == nil {
-		return key{}, errors.New("address targetRef is empty. Cannot maintain internal state.")
-	}
-	return key{ns: address.TargetRef.Namespace, name: address.TargetRef.Name}, nil
-}
-
 // next gathers kube api endpoint watch changes and translates them to naming.Update set.
 // The main complexity is fact that naming.Update can be either Add or Delete. However kube events can be Add,
-// Delete or Modified. As a result we are required to maintain state. If the state is malformed we immdiately return error
+// Delete or Modified. As a result we are required to maintain state. If the state is malformed we immediately return error
 // which will cause resync on caller side (new resolver).
 func (w *watcher) next() ([]*naming.Update, error) {
 	var (
-		updates           []*naming.Update
-		change            change
-		changeCh, errCh   = w.streamer.ResultChans()
-		endpointsToUpdate = map[key]string{}
+		updates         []*naming.Update
+		change          change
+		changeCh, errCh = w.streamer.ResultChans()
+		newAddrsState   = map[string]struct{}{}
 	)
 
-	select {
-	case <-w.ctx.Done():
-		// We already stopped.
-		return []*naming.Update(nil), w.ctx.Err()
-	case err := <-errCh:
-		return []*naming.Update(nil), errors.Wrap(err, "error on reading change stream")
-	case change = <-changeCh:
-	}
-
-	for _, subset := range change.Subsets {
-		var err error
-		endpointsToUpdate, err = subsetToAddresses(w.target, subset)
-		if err != nil {
-			return []*naming.Update(nil), errors.Wrap(err, "failed to convert k8s endpoint subset to update Addr")
+	for len(updates) == 0 {
+		select {
+		case <-w.ctx.Done():
+			// We already stopped.
+			return []*naming.Update(nil), w.ctx.Err()
+		case err := <-errCh:
+			return []*naming.Update(nil), errors.Wrap(err, "error on reading change stream")
+		case change = <-changeCh:
 		}
 
-		if len(endpointsToUpdate) > 0 {
-			// Expected port found.
-			break
+		for _, subset := range change.Subsets {
+			var err error
+			newAddrsState, err = subsetToAddresses(w.target, subset)
+			if err != nil {
+				return []*naming.Update(nil), errors.Wrap(err, "failed to convert k8s endpoint subset to update Addr")
+			}
+
+			if len(newAddrsState) > 0 {
+				// Expected port found.
+				break
+			}
+
+			// Target port not found yet. Maybe other subsets includes target one?
 		}
 
-		// Target port not found yet. Maybe other subsets includes target one?
-	}
-
-	for k, addr := range endpointsToUpdate {
+		// We watch strictly for single service, thus we assume single "endpoints" object all the time.
+		// This way we can safely treat the object for Added and Modified as new state.
+		// Deleted event gives state before deletion, but we don't care. The whole object was deleted.
 		switch change.typ {
 		case watch.Added:
-			_, ok := w.endpoints[k]
-			if ok {
-				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
-					"On added event type, we got update for %v that already exists in %v. Doing resync...", k, w.endpoints)
+			if len(w.addrsState) > 0 {
+				return []*naming.Update(nil), errors.Errorf("malformed internal state for addresses for target %v. "+
+					"We got added event type, but we already have some addresses from old updates: %v. Doing resync...", w.target, w.addrsState)
 			}
 
-			w.endpoints[k] = addr
-			updates = append(updates, &naming.Update{Op: naming.Add, Addr: addr})
+			for addr := range newAddrsState {
+				updates = append(updates, w.addAddr(addr))
+			}
 		case watch.Modified:
-			oldAddr, ok := w.endpoints[k]
-			if !ok {
-				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
-					"On modified event type, we got update for %v that does not exists in %v. Doing resync...", k, w.endpoints)
+			for addr := range newAddrsState {
+				_, ok := w.addrsState[addr]
+				if ok {
+					// Address already exists in old state, nothing to do.
+					continue
+				}
+
+				// Address does not exists in old state, let's add it.
+				updates = append(updates, w.addAddr(addr))
 			}
 
-			updates = append(updates, &naming.Update{Op: naming.Delete, Addr: oldAddr})
-			w.endpoints[k] = addr
-			updates = append(updates, &naming.Update{Op: naming.Add, Addr: addr})
+			for addr := range w.addrsState {
+				_, ok := newAddrsState[addr]
+				if ok {
+					// Address exists in new state, nothing to do.
+					continue
+				}
+
+				// Address does not exists in new state, let's remove it.
+				updates = append(updates, w.delAddr(addr))
+			}
 		case watch.Deleted:
-			_, ok := w.endpoints[k]
-			if !ok {
-				return []*naming.Update(nil), errors.Errorf("malformed internal state for endpoints. "+
-					"On delete event type, we got update for %v that does not exists in %v. Doing resync...", k, w.endpoints)
+			if len(w.addrsState) != len(newAddrsState) {
+				return []*naming.Update(nil), errors.Errorf("malformed internal state for addresses for target %v. "+
+					"We got delete event type with state before deletion and it does not match with that we tracked %v. "+
+					"State before deletion %v. Doing resync...", w.target, w.addrsState, newAddrsState)
 			}
 
-			updates = append(updates, &naming.Update{Op: naming.Delete, Addr: addr})
-			delete(w.endpoints, k)
+			for addr := range w.addrsState {
+				_, ok := newAddrsState[addr]
+				if !ok {
+					return []*naming.Update(nil), errors.Errorf("malformed internal state for addresses for target %v. "+
+						"We got delete event type with state before deletion and it does not match with that we tracked %v. "+
+						"State before deletion %v. Doing resync...", w.target, w.addrsState, newAddrsState)
+				}
+
+				updates = append(updates, w.delAddr(addr))
+			}
 		default:
 			return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
 		}
@@ -148,23 +159,29 @@ func (w *watcher) next() ([]*naming.Update, error) {
 	return updates, nil
 }
 
-func subsetToAddresses(t targetEntry, sub v1.EndpointSubset) (map[key]string, error) {
+func (w *watcher) addAddr(addr string) *naming.Update {
+	w.addrsState[addr] = struct{}{}
+	return &naming.Update{Op: naming.Add, Addr: addr}
+}
+
+func (w *watcher) delAddr(addr string) *naming.Update {
+	delete(w.addrsState, addr)
+	return &naming.Update{Op: naming.Delete, Addr: addr}
+}
+
+func subsetToAddresses(t targetEntry, sub v1.EndpointSubset) (map[string]struct{}, error) {
 	port, found, err := matchTargetPort(t.port, sub.Ports)
 	if err != nil {
 		return nil, err
 	}
 
+	addrs := map[string]struct{}{}
 	if !found {
-		return map[key]string{}, nil
+		return nil, nil
 	}
 
-	addrs := map[key]string{}
 	for _, address := range sub.Addresses {
-		k, err := keyFromAddr(address)
-		if err != nil {
-			return nil, err
-		}
-		addrs[k] = net.JoinHostPort(address.IP, port)
+		addrs[net.JoinHostPort(address.IP, port)] = struct{}{}
 	}
 	return addrs, nil
 }

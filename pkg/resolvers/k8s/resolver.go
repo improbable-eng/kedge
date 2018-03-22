@@ -9,6 +9,7 @@ import (
 
 	"github.com/improbable-eng/kedge/pkg/k8s"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
 )
 
@@ -17,6 +18,33 @@ const (
 	// the kubeDNS/CoreDNS entry format.
 	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<port_name>|:<value number>)"
 )
+
+var (
+	resolvedAddrs     *prometheus.GaugeVec
+	watcherErrs       *prometheus.CounterVec
+	watcherGotChanges *prometheus.CounterVec
+)
+
+func init() {
+	resolvedAddrs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_up_addresses",
+		Help:      "Number of IPs that are correct from the point of view of this k8sresolver.",
+	}, []string{"target"})
+
+	watcherErrs = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_watcher_next_errors_total",
+		Help:      "Count of all watcher next() irrecoverable errors.",
+	}, []string{"target"})
+
+	watcherGotChanges = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_watcher_next_got_changes_total",
+		Help:      "Count of all changes that watcher got from streamer to update the addresses.",
+	}, []string{"target"})
+	prometheus.MustRegister(resolvedAddrs, watcherErrs, watcherGotChanges)
+}
 
 // resolver resolves service names using Kubernetes endpoints instead of usual SRV DNS lookup.
 type resolver struct {
@@ -108,5 +136,11 @@ func (r *resolver) Resolve(target string) (naming.Watcher, error) {
 	}
 
 	// Now the tricky part begins (:
-	return startNewWatcher(t, r.cl)
+	return startNewWatcher(
+		t,
+		r.cl,
+		resolvedAddrs.WithLabelValues(target),
+		watcherErrs.WithLabelValues(target),
+		watcherGotChanges.WithLabelValues(target),
+	)
 }

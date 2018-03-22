@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -21,9 +22,19 @@ type watcher struct {
 
 	streamer   *streamer
 	addrsState map[string]struct{}
+
+	resolvedAddrs     prometheus.Gauge
+	watcherErrs       prometheus.Counter
+	watcherGotChanges prometheus.Counter
 }
 
-func startNewWatcher(target targetEntry, epClient endpointClient) (*watcher, error) {
+func startNewWatcher(
+	target targetEntry,
+	epClient endpointClient,
+	resolvedAddrs prometheus.Gauge,
+	watcherErrs prometheus.Counter,
+	watcherGotChanges prometheus.Counter,
+) (*watcher, error) {
 	// NOTE(bplotka): Would love to have proper context from above but naming.Resolver does not allow that.
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -38,6 +49,10 @@ func startNewWatcher(target targetEntry, epClient endpointClient) (*watcher, err
 		target:     target,
 		streamer:   s,
 		addrsState: map[string]struct{}{},
+
+		resolvedAddrs:     resolvedAddrs,
+		watcherErrs:       watcherErrs,
+		watcherGotChanges: watcherGotChanges,
 	}, nil
 }
 
@@ -56,11 +71,20 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	}
 	u, err := w.next()
 	if err != nil {
+		w.watcherErrs.Inc()
+		w.resolvedAddrs.Set(float64(0))
+
 		// Just in case.
 		w.Close()
-		return u, errors.Wrap(err, "k8sresolver: ")
+		return nil, errors.Wrap(err, "k8sresolver: ")
 	}
+
+	w.resolvedAddrs.Set(float64(len(w.addrsState)))
 	return u, nil
+}
+
+func (w *watcher) debugTarget() bool {
+	return w.target.service == "scarlet" && w.target.port.value == "grpc"
 }
 
 // next gathers kube api endpoint watch changes and translates them to naming.Update set.
@@ -84,7 +108,12 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			return []*naming.Update(nil), errors.Wrap(err, "error on reading change stream")
 		case change = <-changeCh:
 		}
+		w.watcherGotChanges.Inc()
 
+		if w.debugTarget() {
+			// TODO(bplotka): Debug only - remove that.
+			fmt.Println("Got change: ", change, "initial state ", w.addrsState)
+		}
 		for _, subset := range change.Subsets {
 			var err error
 			newAddrsState, err = subsetToAddresses(w.target, subset)
@@ -155,6 +184,15 @@ func (w *watcher) next() ([]*naming.Update, error) {
 		default:
 			return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
 		}
+	}
+
+	if w.debugTarget() {
+		// TODO(bplotka): Debug only - remove that.
+		var msg string
+		for _, up := range updates {
+			msg += fmt.Sprintf("[op: %v, addr: %s]", up.Op, up.Addr)
+		}
+		fmt.Printf("Returning Updates: %s\nOverall state: %v\n", msg, w.addrsState)
 	}
 	return updates, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/improbable-eng/kedge/pkg/k8s"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
 )
 
@@ -20,7 +21,14 @@ const (
 
 // resolver resolves service names using Kubernetes endpoints instead of usual SRV DNS lookup.
 type resolver struct {
-	cl *client
+	cl      *client
+	metrics *resolverMetrics
+}
+
+type resolverMetrics struct {
+	resolvedAddrs     *prometheus.GaugeVec
+	watcherErrs       *prometheus.CounterVec
+	watcherGotChanges *prometheus.CounterVec
 }
 
 func NewFromFlags() (name naming.Resolver, err error) {
@@ -28,15 +36,46 @@ func NewFromFlags() (name naming.Resolver, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewWithClient(apiClient), nil
+	// TODO(bplotka): Add properly custom registry from above.
+	return NewWithClient(apiClient, prometheus.DefaultRegisterer), nil
 }
 
 // NewWithClient returns a new Kubernetes resolver using given k8s.APIClient configured to be used against kube-apiserver.
-func NewWithClient(apiClient *k8s.APIClient) naming.Resolver {
+func NewWithClient(apiClient *k8s.APIClient, reg prometheus.Registerer) naming.Resolver {
 	return &resolver{
 		cl: &client{
 			k8sClient: apiClient,
 		},
+		metrics: newResolverMetrics(reg),
+	}
+}
+
+func newResolverMetrics(reg prometheus.Registerer) *resolverMetrics {
+	resolvedAddrs := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_up_addresses",
+		Help:      "Number of IPs that are correct from the point of view of this k8sresolver.",
+	}, []string{"target"})
+
+	watcherErrs := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_watcher_next_errors_total",
+		Help:      "Count of all watcher next() irrecoverable errors.",
+	}, []string{"target"})
+
+	watcherGotChanges := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_watcher_next_got_changes_total",
+		Help:      "Count of all changes that watcher got from streamer to update the addresses.",
+	}, []string{"target"})
+	if reg != nil {
+		reg.MustRegister(resolvedAddrs, watcherErrs, watcherGotChanges)
+	}
+
+	return &resolverMetrics{
+		resolvedAddrs:     resolvedAddrs,
+		watcherErrs:       watcherErrs,
+		watcherGotChanges: watcherGotChanges,
 	}
 }
 
@@ -108,5 +147,11 @@ func (r *resolver) Resolve(target string) (naming.Watcher, error) {
 	}
 
 	// Now the tricky part begins (:
-	return startNewWatcher(t, r.cl)
+	return startNewWatcher(
+		t,
+		r.cl,
+		r.metrics.resolvedAddrs.WithLabelValues(target),
+		r.metrics.watcherErrs.WithLabelValues(target),
+		r.metrics.watcherGotChanges.WithLabelValues(target),
+	)
 }

@@ -24,6 +24,7 @@ func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !ok {
 		return t.parent.RoundTrip(req)
 	}
+	// TODO(bplotka): Pack some cache for kedge DNS resolution. It does not change much after winch startup.
 	destURL := route.URL
 
 	tags := http_ctxtags.ExtractInbound(req)

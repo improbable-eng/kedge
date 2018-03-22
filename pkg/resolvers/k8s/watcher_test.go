@@ -89,6 +89,7 @@ var (
 )
 
 func TestWatcher_Next_OK(t *testing.T) {
+	dummyMetrics := newResolverMetrics(nil)
 	for _, tcase := range []struct {
 		watchedTargetPort targetPort
 		changes           []change
@@ -319,6 +320,10 @@ func TestWatcher_Next_OK(t *testing.T) {
 					errCh:    errCh,
 				},
 				addrsState: map[string]struct{}{},
+
+				resolvedAddrs:     dummyMetrics.resolvedAddrs.WithLabelValues(""),
+				watcherErrs:       dummyMetrics.watcherErrs.WithLabelValues(""),
+				watcherGotChanges: dummyMetrics.watcherGotChanges.WithLabelValues(""),
 			}
 			defer w.Close()
 

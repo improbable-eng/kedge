@@ -105,7 +105,7 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 }
 
 // addrTagBalancer is a hacky way (and only one) to add gRPC tag with the actual IP address that was chosen by internal
-// gRPC balancer (using our resolver) for given RPC. Tag will is required for logging.
+// gRPC balancer (using our resolver) for given RPC. Tag is required for logging.
 type addrTagBalancer struct {
 	grpc.Balancer
 }
@@ -116,7 +116,7 @@ func (b *addrTagBalancer) Get(ctx context.Context, opts grpc.BalancerGetOptions)
 		return addr, put, err
 	}
 
-	grpc_ctxtags.Extract(ctx).Set("grpc.target.resolved_authority", addr.Addr)
+	grpc_ctxtags.Extract(ctx).Set("grpc.target.ip", addr.Addr)
 	return addr, put, err
 }
 

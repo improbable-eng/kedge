@@ -71,8 +71,15 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	}
 	u, err := w.next()
 	if err != nil {
-		w.watcherErrs.Inc()
-		w.resolvedAddrs.Set(float64(0))
+		if w.ctx.Err() == nil {
+			// Only update those if watcher is not cancelled.
+			w.watcherErrs.Inc()
+			w.resolvedAddrs.Set(float64(0))
+
+			if w.debugTarget() {
+				fmt.Println("Watcher error: ", err.Error())
+			}
+		}
 
 		// Just in case.
 		w.Close()

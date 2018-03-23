@@ -1,7 +1,6 @@
 package backendpool
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/improbable-eng/kedge/pkg/resolvers/host"
 	"github.com/improbable-eng/kedge/pkg/resolvers/k8s"
@@ -17,6 +17,7 @@ import (
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -103,13 +104,29 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	return b, nil
 }
 
+// addrTagBalancer is a hacky way (and only one) to add gRPC tag with the actual IP address that was chosen by internal
+// gRPC balancer (using our resolver) for given RPC. Tag will is required for logging.
+type addrTagBalancer struct {
+	grpc.Balancer
+}
+
+func (b *addrTagBalancer) Get(ctx context.Context, opts grpc.BalancerGetOptions) (grpc.Address, func(), error) {
+	addr, put, err := b.Balancer.Get(ctx, opts)
+	if err != nil {
+		return addr, put, err
+	}
+
+	grpc_ctxtags.Extract(ctx).Set("grpc.target.resolved_authority", addr.Addr)
+	return addr, put, err
+}
+
 func buildClientConn(cnf *pb.Backend, target string, resolver naming.Resolver) (*grpc.ClientConn, error) {
-	opts := []grpc.DialOption{}
+	var opts []grpc.DialOption
 	opts = append(opts, chooseDialFuncOpt(cnf))
 	opts = append(opts, chooseSecurityOpt(cnf))
 	opts = append(opts, grpc.WithCodec(proxy.Codec())) // needed for the director to function at all.
 	opts = append(opts, chooseInterceptors(cnf)...)
-	opts = append(opts, grpc.WithBalancer(chooseBalancerPolicy(cnf, resolver)))
+	opts = append(opts, grpc.WithBalancer(&addrTagBalancer{chooseBalancerPolicy(cnf, resolver)}))
 	return grpc.Dial(target, opts...)
 }
 
@@ -125,6 +142,8 @@ func chooseDialFuncOpt(cnf *pb.Backend) grpc.DialOption {
 	return grpc.WithDialer(func(addr string, t time.Duration) (net.Conn, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), t)
 		defer cancel()
+
+		// We have always raw IP here, since we use custom resolvers via gRPC balancer.
 		return dialFunc(ctx, "tcp", addr)
 	})
 }
@@ -143,8 +162,11 @@ func chooseSecurityOpt(cnf *pb.Backend) grpc.DialOption {
 }
 
 func chooseInterceptors(cnf *pb.Backend) []grpc.DialOption {
-	unary := []grpc.UnaryClientInterceptor{}
-	stream := []grpc.StreamClientInterceptor{}
+	var (
+		unary  []grpc.UnaryClientInterceptor
+		stream []grpc.StreamClientInterceptor
+	)
+
 	for _, i := range cnf.GetInterceptors() {
 		if prom := i.GetPrometheus(); prom {
 			unary = append(unary, grpc_prometheus.UnaryClientInterceptor)

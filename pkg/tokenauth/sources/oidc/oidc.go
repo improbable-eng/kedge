@@ -76,9 +76,8 @@ func (s *source) Name() string {
 }
 
 // Token returns valid ID token or error.
-func (s *source) Token(_ context.Context) (string, error) {
-	// TODO(bplotka): Add support for ctx.
-	token, err := s.tokenSource.OIDCToken()
+func (s *source) Token(ctx context.Context) (string, error) {
+	token, err := s.tokenSource.OIDCToken(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "Failed to obtain OIDC Token.")
 	}

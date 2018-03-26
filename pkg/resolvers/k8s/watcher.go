@@ -25,9 +25,9 @@ import (
 type watcher struct {
 	logger logrus.FieldLogger
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	target targetEntry
+	ctx      context.Context
+	cancel   context.CancelFunc
+	target   targetEntry
 	epClient endpointClient
 
 	addrsState map[string]struct{}
@@ -48,23 +48,18 @@ func startNewWatcher(
 	watcherErrs prometheus.Counter,
 	watcherGotChanges prometheus.Counter,
 ) (*watcher, error) {
-	s, err := startNewStreamer(target, epClient)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	return &watcher{
-		logger:     logger,
-		ctx:        ctx,
-		cancel:     cancel,
-		target:     target,
+		logger:            logger,
+		ctx:               ctx,
+		cancel:            cancel,
+		target:            target,
 		epClient:          epClient,
 		addrsState:        map[string]struct{}{},
 		resolvedAddrs:     resolvedAddrs,
 		watcherErrs:       watcherErrs,
 		watcherGotChanges: watcherGotChanges,
-		streamer:          s,
+		streamer:          nil,
 	}, nil
 }
 
@@ -72,8 +67,10 @@ func startNewWatcher(
 func (w *watcher) Close() {
 	w.streamerMtx.Lock()
 	defer w.streamerMtx.Unlock()
+	if w.streamer != nil {
+		w.streamer.Close()
+	}
 
-	w.streamer.Close()
 	w.cancel()
 }
 
@@ -89,6 +86,35 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	ctx, cancel := context.WithCancel(w.ctx)
 	defer cancel()
 	for ctx.Err() == nil {
+		w.streamerMtx.Lock()
+		s := w.streamer
+		w.streamerMtx.Unlock()
+
+		if s == nil {
+			// Streamer closed / does not exists yet. Let's start it.
+			streamRetryBackoff := &backoff.Backoff{
+				Min:    50 * time.Millisecond,
+				Jitter: true,
+				Factor: 2,
+				Max:    2 * time.Second,
+			}
+
+			// Start new stream in retry loop.
+			for ctx.Err() == nil {
+				s, err := startNewStreamer(w.target, w.epClient)
+				if err != nil {
+					w.logger.WithError(err).Warnf("k8sresolver: Failed to start watching endpoint events for target %v", w.target)
+					time.Sleep(streamRetryBackoff.Duration())
+					continue
+				}
+
+				w.streamerMtx.Lock()
+				w.streamer = s
+				w.streamerMtx.Unlock()
+				break
+			}
+		}
+
 		u, err := w.next(ctx)
 		if err == nil {
 			// No error.
@@ -104,29 +130,8 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 		w.addrsState = map[string]struct{}{}
 		w.streamerMtx.Lock()
 		w.streamer.Close()
+		w.streamer = nil
 		w.streamerMtx.Unlock()
-
-		streamRetryBackoff := &backoff.Backoff{
-			Min:    50 * time.Millisecond,
-			Jitter: true,
-			Factor: 2,
-			Max:    2 * time.Second,
-		}
-
-		// Start new stream in retry loop.
-		for ctx.Err() == nil {
-			s, err := startNewStreamer(w.target, w.epClient)
-			if err != nil {
-				w.logger.WithError(err).Warnf("k8sresolver: Failed to start watching endpoint events for target %v", w.target)
-				time.Sleep(streamRetryBackoff.Duration())
-				continue
-			}
-
-			w.streamerMtx.Lock()
-			w.streamer = s
-			w.streamerMtx.Unlock()
-			break
-		}
 	}
 
 	return nil, ctx.Err()

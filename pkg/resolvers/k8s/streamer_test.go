@@ -2,11 +2,11 @@ package k8sresolver
 
 import (
 	"context"
-	"encoding/json"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
+
+	"encoding/json"
 
 	"github.com/fortytw2/leaktest"
 	"github.com/stretchr/testify/require"
@@ -16,63 +16,59 @@ import (
 )
 
 type readerCloserMock struct {
-	Ctx      context.Context
-	BytesCh  <-chan []byte
-	ErrCh    <-chan error
-	IsClosed atomic.Value
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	bytesCh <-chan []byte
+	errCh   <-chan error
 }
 
 func (m *readerCloserMock) Read(p []byte) (n int, err error) {
 	select {
-	case <-m.Ctx.Done():
-		return 0, m.Ctx.Err()
-	case chunk := <-m.BytesCh:
+	case <-m.ctx.Done():
+		return 0, m.ctx.Err()
+	case chunk := <-m.bytesCh:
 		n = copy(p, chunk)
 		return n, nil
-	case err := <-m.ErrCh:
+	case err := <-m.errCh:
 		return 0, err
 	}
 }
 
 func (m *readerCloserMock) Close() error {
-	m.IsClosed.Store(true)
+	m.cancel()
 	return nil
 }
 
-func (m *readerCloserMock) isClosed() bool {
-	isClosed, ok := m.IsClosed.Load().(bool)
-	if ok {
-		return isClosed
-	}
-	return false
-}
-
 type endpointClientMock struct {
-	t *testing.T
+	t       *testing.T
+	started bool
+	connCtx context.Context
 
 	expectedTarget          targetEntry
 	expectedResourceVersion int
 
-	connMock *readerCloserMock
+	bytesCh chan []byte
+	errCh   chan error
 }
 
 func (m *endpointClientMock) StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error) {
 	require.Equal(m.t, m.expectedTarget, t)
-	m.connMock.Ctx = ctx
-	return m.connMock, nil
+	require.False(m.t, m.started)
+	m.started = true
+
+	innerCtx, cancel := context.WithCancel(ctx)
+	m.connCtx = innerCtx
+	return &readerCloserMock{
+		ctx:    innerCtx,
+		cancel: cancel,
+
+		bytesCh: m.bytesCh,
+		errCh:   m.errCh,
+	}, nil
 }
 
-func startTestStream(t *testing.T) (chan []byte, chan error, *readerCloserMock, *streamer, func()) {
-	bytesCh := make(chan []byte)
-	errCh := make(chan error)
-	ctx, cancel := context.WithCancel(context.TODO())
-
-	connMock := &readerCloserMock{
-		Ctx:     ctx,
-		BytesCh: bytesCh,
-		ErrCh:   errCh,
-	}
-
+func startTestStream(t *testing.T) (*endpointClientMock, *streamer) {
 	testTarget := targetEntry{
 		service:   "service1",
 		port:      noTargetPort,
@@ -82,36 +78,29 @@ func startTestStream(t *testing.T) (chan []byte, chan error, *readerCloserMock, 
 	epClientMock := &endpointClientMock{
 		t:              t,
 		expectedTarget: testTarget,
-		connMock:       connMock,
+		bytesCh:        make(chan []byte),
+		errCh:          make(chan error),
 	}
 
-	streamWatcherCtx, cancel2 := context.WithCancel(ctx)
-	closeFn := func() {
-		cancel()
-		cancel2()
-	}
-
-	s, err := startNewStreamer(streamWatcherCtx, testTarget, epClientMock)
+	s, err := startNewStreamer(testTarget, epClientMock)
 	if err != nil {
-		closeFn()
 		t.Fatal(err.Error())
 	}
-
-	return bytesCh, errCh, connMock, s, closeFn
+	return epClientMock, s
 }
 
 func TestStreamWatcher_DecodingError_EventErr_ClosesStream(t *testing.T) {
 	defer leaktest.CheckTimeout(t, 10*time.Second)
 
-	bytesCh, _, connMock, streamer, cancel := startTestStream(t)
-	defer cancel()
+	clientMock, streamer := startTestStream(t)
+	defer streamer.Close()
 
 	changeCh, errCh := streamer.ResultChans()
 
 	// Triggering error while decoding.
 	// It should block on connMock.Read by now.
 	// Send some undecodable stuff:
-	bytesCh <- []byte(`{{{{ "temp-err": true}`)
+	clientMock.bytesCh <- []byte(`{{{{ "temp-err": true}`)
 	select {
 	case err := <-errCh:
 		require.Error(t, err, "we expect it fails to decode changeCh")
@@ -120,7 +109,7 @@ func TestStreamWatcher_DecodingError_EventErr_ClosesStream(t *testing.T) {
 		t.FailNow()
 	}
 
-	// Expect connection closed.
+	// Error on streamer, so expect connection closed.
 	select {
 	case <-errCh:
 		t.Error("No err was expected")
@@ -129,14 +118,14 @@ func TestStreamWatcher_DecodingError_EventErr_ClosesStream(t *testing.T) {
 	// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
-	require.True(t, connMock.isClosed())
+	require.Error(t, clientMock.connCtx.Err())
 }
 
 func TestStreamWatcher_NotSupportedType_EventErr_ClosesConn(t *testing.T) {
 	defer leaktest.CheckTimeout(t, 10*time.Second)
 
-	bytesCh, _, connMock, streamer, cancel := startTestStream(t)
-	defer cancel()
+	clientMock, streamer := startTestStream(t)
+	defer streamer.Close()
 
 	changeCh, errCh := streamer.ResultChans()
 
@@ -147,7 +136,7 @@ func TestStreamWatcher_NotSupportedType_EventErr_ClosesConn(t *testing.T) {
 	b, err := json.Marshal(wrongEvent)
 	require.NoError(t, err)
 
-	bytesCh <- []byte(b)
+	clientMock.bytesCh <- []byte(b)
 	select {
 	case err := <-errCh:
 		require.Error(t, err, "we expect invalid event type error")
@@ -157,23 +146,23 @@ func TestStreamWatcher_NotSupportedType_EventErr_ClosesConn(t *testing.T) {
 		t.FailNow()
 	}
 
-	// Expect connection closed.
+	// Error on streamer, so expect connection closed.
 	select {
 	case <-errCh:
 		t.Error("No err was expected")
 	case <-changeCh:
 		t.Error("No event was expected")
-	// Not really nice to use time in tests, but should be enough for now.
+		// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
-	require.True(t, connMock.isClosed())
+	require.Error(t, clientMock.connCtx.Err())
 }
 
 func TestStreamWatcher_ErrorEventType_EventErr_ClosesConn(t *testing.T) {
 	defer leaktest.CheckTimeout(t, 10*time.Second)
 
-	bytesCh, _, connMock, streamer, cancel := startTestStream(t)
-	defer cancel()
+	clientMock, streamer := startTestStream(t)
+	defer streamer.Close()
 
 	changeCh, errCh := streamer.ResultChans()
 
@@ -192,7 +181,7 @@ func TestStreamWatcher_ErrorEventType_EventErr_ClosesConn(t *testing.T) {
 	b, err := json.Marshal(wrongEvent)
 	require.NoError(t, err)
 
-	bytesCh <- []byte(b)
+	clientMock.bytesCh <- []byte(b)
 	select {
 	case err := <-errCh:
 		require.Error(t, err, "we expect event type error")
@@ -202,28 +191,28 @@ func TestStreamWatcher_ErrorEventType_EventErr_ClosesConn(t *testing.T) {
 		t.FailNow()
 	}
 
-	// Expect connection closed.
+	// Error on streamer, so expect connection closed.
 	select {
 	case <-errCh:
 		t.Error("No err was expected")
 	case <-changeCh:
 		t.Error("No event was expected")
-	// Not really nice to use time in tests, but should be enough for now.
+		// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
-	require.True(t, connMock.isClosed())
+	require.Error(t, clientMock.connCtx.Err())
 }
 
 func TestStreamWatcher_EOF_EventErr_ClosesConn(t *testing.T) {
 	defer leaktest.CheckTimeout(t, 10*time.Second)
 
-	_, connErrCh, connMock, streamer, cancel := startTestStream(t)
-	defer cancel()
+	clientMock, streamer := startTestStream(t)
+	defer streamer.Close()
 
 	changeCh, errCh := streamer.ResultChans()
 
 	// Triggering EOF.
-	connErrCh <- io.EOF
+	clientMock.errCh <- io.EOF
 	select {
 	case err := <-errCh:
 		require.Error(t, err, "we expect EOF error")
@@ -233,16 +222,16 @@ func TestStreamWatcher_EOF_EventErr_ClosesConn(t *testing.T) {
 		t.FailNow()
 	}
 
-	// Expect connection closed.
+	// Error on streamer, so expect connection closed.
 	select {
 	case <-errCh:
 		t.Error("No err was expected")
 	case <-changeCh:
 		t.Error("No event was expected")
-	// Not really nice to use time in tests, but should be enough for now.
+		// Not really nice to use time in tests, but should be enough for now.
 	case <-time.After(200 * time.Millisecond):
 	}
-	require.True(t, connMock.isClosed())
+	require.Error(t, clientMock.connCtx.Err())
 }
 
 func newTestChange(typ watch.EventType, subs ...v1.EndpointSubset) change {
@@ -266,8 +255,8 @@ func changeToEvent(change change) event {
 func TestStreamWatcher_OK_TwoOKEvents(t *testing.T) {
 	defer leaktest.CheckTimeout(t, 10*time.Second)
 
-	bytesCh, _, _, streamer, cancel := startTestStream(t)
-	defer cancel()
+	clientMock, streamer := startTestStream(t)
+	defer streamer.Close()
 
 	changeCh, errCh := streamer.ResultChans()
 
@@ -275,7 +264,7 @@ func TestStreamWatcher_OK_TwoOKEvents(t *testing.T) {
 	expectedChange := newTestChange(watch.Added, testAddr1)
 	b, err := json.Marshal(changeToEvent(expectedChange))
 	require.NoError(t, err)
-	bytesCh <- b
+	clientMock.bytesCh <- b
 
 	select {
 	case err := <-errCh:
@@ -288,7 +277,7 @@ func TestStreamWatcher_OK_TwoOKEvents(t *testing.T) {
 	expectedChange2 := newTestChange(watch.Deleted, testAddr1)
 	b2, err2 := json.Marshal(changeToEvent(expectedChange2))
 	require.NoError(t, err2)
-	bytesCh <- b2
+	clientMock.bytesCh <- b2
 
 	select {
 	case err := <-errCh:

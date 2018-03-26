@@ -21,22 +21,22 @@ type change struct {
 type streamer struct {
 	changeCh chan change
 	errCh    chan error
+	cancel   context.CancelFunc
 }
 
 // startNewStreamer starts a stream that in go routine reads from connection for every change event.
 // Since watcher.Next() errors are assumed irrecoverable, it is a caller responsibility to re-resolve on EOF, error event etc.
-// We read connection from separate go routine because read is blocking with no timeout/cancel logic.
-func startNewStreamer(ctx context.Context, target targetEntry, epClient endpointClient) (*streamer, error) {
-	innerCtx, innerCancel := context.WithCancel(ctx)
-	stream, err := epClient.StartChangeStream(innerCtx, target)
+func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := epClient.StartChangeStream(ctx, target)
 	if err != nil {
-		innerCancel()
+		cancel()
 		return nil, errors.Wrapf(err, "Failed to do start stream for target %v", target)
 	}
 
 	go func() {
 		select {
-		case <-innerCtx.Done():
+		case <-ctx.Done():
 			// Request is cancelled, so we need to read what is left there to not leak go routines.
 			_, _ = ioutil.ReadAll(stream)
 			err = stream.Close()
@@ -48,11 +48,12 @@ func startNewStreamer(ctx context.Context, target targetEntry, epClient endpoint
 	s := &streamer{
 		changeCh: make(chan change),
 		errCh:    make(chan error, 1),
+		cancel:   cancel,
 	}
 	go func() {
-		defer innerCancel()
+		defer cancel()
 
-		if err := proxy(innerCtx, json.NewDecoder(stream), s.changeCh); err != nil {
+		if err := proxy(ctx, json.NewDecoder(stream), s.changeCh); err != nil {
 			s.errCh <- err
 		}
 	}()
@@ -62,6 +63,10 @@ func startNewStreamer(ctx context.Context, target targetEntry, epClient endpoint
 
 func (s *streamer) ResultChans() (<-chan change, <-chan error) {
 	return s.changeCh, s.errCh
+}
+
+func (s *streamer) Close() {
+	s.cancel()
 }
 
 // We don't want to use special, internal decoder, so we need to have all typed.

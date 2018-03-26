@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"net"
 
+	"io"
+
+	"sync"
+	"time"
+
+	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -22,13 +28,16 @@ type watcher struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	target targetEntry
+	epClient endpointClient
 
-	streamer   *streamer
 	addrsState map[string]struct{}
 
 	resolvedAddrs     prometheus.Gauge
 	watcherErrs       prometheus.Counter
 	watcherGotChanges prometheus.Counter
+
+	streamer    *streamer
+	streamerMtx sync.Mutex
 }
 
 func startNewWatcher(
@@ -39,30 +48,32 @@ func startNewWatcher(
 	watcherErrs prometheus.Counter,
 	watcherGotChanges prometheus.Counter,
 ) (*watcher, error) {
-	// NOTE(bplotka): Would love to have proper context from above but naming.Resolver does not allow that.
-	ctx, cancel := context.WithCancel(context.Background())
-
-	s, err := startNewStreamer(ctx, target, epClient)
+	s, err := startNewStreamer(target, epClient)
 	if err != nil {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	return &watcher{
 		logger:     logger,
 		ctx:        ctx,
 		cancel:     cancel,
 		target:     target,
-		streamer:   s,
-		addrsState: map[string]struct{}{},
-
+		epClient:          epClient,
+		addrsState:        map[string]struct{}{},
 		resolvedAddrs:     resolvedAddrs,
 		watcherErrs:       watcherErrs,
 		watcherGotChanges: watcherGotChanges,
+		streamer:          s,
 	}, nil
 }
 
 // Close closes the watcher, cleaning up any open connections.
 func (w *watcher) Close() {
+	w.streamerMtx.Lock()
+	defer w.streamerMtx.Unlock()
+
+	w.streamer.Close()
 	w.cancel()
 }
 
@@ -71,31 +82,61 @@ func (w *watcher) Close() {
 func (w *watcher) Next() ([]*naming.Update, error) {
 	if w.ctx.Err() != nil {
 		// We already stopped.
-		return []*naming.Update(nil), errors.Wrap(w.ctx.Err(), "k8sresolver: watcher.Next already stopped or Next returned error already. "+
+		return nil, errors.Wrap(w.ctx.Err(), "k8sresolver: watcher.Next already stopped or Next returned error already. "+
 			"Note that watcher errors are not recoverable.")
 	}
-	u, err := w.next()
-	if err != nil {
-		if w.ctx.Err() == nil {
-			// Only update those if watcher is not cancelled.
-			w.watcherErrs.Inc()
-			w.resolvedAddrs.Set(float64(0))
+
+	ctx, cancel := context.WithCancel(w.ctx)
+	defer cancel()
+	for ctx.Err() == nil {
+		u, err := w.next(ctx)
+		if err == nil {
+			// No error.
+			w.resolvedAddrs.Set(float64(len(w.addrsState)))
+			return u, nil
 		}
 
-		// Just in case.
-		w.Close()
-		return nil, errors.Wrap(err, "k8sresolver: ")
+		w.logger.WithError(err).Warnf("k8sresolver: failed to watch endpoint events stream for target %v", w.target)
+		w.watcherErrs.Inc()
+		w.resolvedAddrs.Set(float64(0))
+
+		// Re-connect stream and reset state.
+		w.addrsState = map[string]struct{}{}
+		w.streamerMtx.Lock()
+		w.streamer.Close()
+		w.streamerMtx.Unlock()
+
+		streamRetryBackoff := &backoff.Backoff{
+			Min:    50 * time.Millisecond,
+			Jitter: true,
+			Factor: 2,
+			Max:    2 * time.Second,
+		}
+
+		// Start new stream in retry loop.
+		for ctx.Err() == nil {
+			s, err := startNewStreamer(w.target, w.epClient)
+			if err != nil {
+				w.logger.WithError(err).Warnf("k8sresolver: Failed to start watching endpoint events for target %v", w.target)
+				time.Sleep(streamRetryBackoff.Duration())
+				continue
+			}
+
+			w.streamerMtx.Lock()
+			w.streamer = s
+			w.streamerMtx.Unlock()
+			break
+		}
 	}
 
-	w.resolvedAddrs.Set(float64(len(w.addrsState)))
-	return u, nil
+	return nil, ctx.Err()
 }
 
 // next gathers kube api endpoint watch changes and translates them to naming.Update set.
 // The main complexity is fact that naming.Update can be either Add or Delete. However kube events can be Add,
-// Delete or Modified. As a result we are required to maintain state. If the state is malformed we immediately return error
-// which will cause resync on caller side (new resolver).
-func (w *watcher) next() ([]*naming.Update, error) {
+// Delete or Modified. As a result we are required to maintain state.
+// If the state is malformed we immediately return error which will resync for our streamer.
+func (w *watcher) next(ctx context.Context) ([]*naming.Update, error) {
 	var (
 		updates         []*naming.Update
 		change          change
@@ -105,11 +146,15 @@ func (w *watcher) next() ([]*naming.Update, error) {
 
 	for len(updates) == 0 {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			// We already stopped.
-			return []*naming.Update(nil), w.ctx.Err()
+			return nil, ctx.Err()
 		case err := <-errCh:
-			return []*naming.Update(nil), errors.Wrap(err, "error on reading change stream")
+			if err == io.EOF {
+				// Don't wrap EOF.
+				return nil, err
+			}
+			return nil, errors.Wrap(err, "error on reading change stream")
 		case change = <-changeCh:
 		}
 		w.watcherGotChanges.Inc()
@@ -118,7 +163,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			var err error
 			newAddrsState, err = subsetToAddresses(w.target, subset)
 			if err != nil {
-				return []*naming.Update(nil), errors.Wrap(err, "failed to convert k8s endpoint subset to update Addr")
+				return nil, errors.Wrap(err, "failed to convert k8s endpoint subset to update Addr")
 			}
 
 			if len(newAddrsState) > 0 {
@@ -135,7 +180,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 		switch change.typ {
 		case watch.Added:
 			if len(w.addrsState) > 0 {
-				return []*naming.Update(nil), errors.Errorf("malformed internal state for addresses for target %v. "+
+				return nil, errors.Errorf("malformed internal state for addresses for target %v. "+
 					"We got added event type, but we already have some addresses from old updates: %v. Doing resync...", w.target, w.addrsState)
 			}
 
@@ -166,7 +211,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			}
 		case watch.Deleted:
 			if len(w.addrsState) != len(newAddrsState) {
-				return []*naming.Update(nil), errors.Errorf("malformed internal state for addresses for target %v. "+
+				return nil, errors.Errorf("malformed internal state for addresses for target %v. "+
 					"We got delete event type with state before deletion and it does not match with that we tracked %v. "+
 					"State before deletion %v. Doing resync...", w.target, w.addrsState, newAddrsState)
 			}
@@ -174,7 +219,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			for addr := range w.addrsState {
 				_, ok := newAddrsState[addr]
 				if !ok {
-					return []*naming.Update(nil), errors.Errorf("malformed internal state for addresses for target %v. "+
+					return nil, errors.Errorf("malformed internal state for addresses for target %v. "+
 						"We got delete event type with state before deletion and it does not match with that we tracked %v. "+
 						"State before deletion %v. Doing resync...", w.target, w.addrsState, newAddrsState)
 				}
@@ -182,7 +227,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 				updates = append(updates, w.delAddr(addr))
 			}
 		default:
-			return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
+			return nil, errors.Errorf("unexpected change type %v", change.typ)
 		}
 	}
 

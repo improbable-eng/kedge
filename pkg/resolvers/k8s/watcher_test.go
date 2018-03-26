@@ -312,11 +312,11 @@ func TestWatcher_Next_OK(t *testing.T) {
 			errCh := make(chan error, 1)
 			w := &watcher{
 				ctx:    ctx,
-				cancel: cancel,
 				target: targetEntry{port: tcase.watchedTargetPort},
 				streamer: &streamer{
 					changeCh: changeCh,
 					errCh:    errCh,
+					cancel:   func() {},
 				},
 				addrsState: map[string]struct{}{},
 
@@ -324,7 +324,6 @@ func TestWatcher_Next_OK(t *testing.T) {
 				watcherErrs:       watcherErrs.WithLabelValues(""),
 				watcherGotChanges: watcherGotChanges.WithLabelValues(""),
 			}
-			defer w.Close()
 
 			for i, change := range tcase.changes {
 				changeCh <- change
@@ -333,7 +332,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 					continue
 				}
 
-				u, err := w.next()
+				u, err := w.next(ctx)
 				if len(tcase.expectedErrs) > i && tcase.expectedErrs[i] != nil {
 					require.Error(t, err)
 					require.Equal(t, tcase.expectedErrs[i].Error(), err.Error())

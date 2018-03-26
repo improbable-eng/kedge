@@ -101,10 +101,12 @@ func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr 
 		localCurrentTargets := []*Target{}
 		// Starting getting Next updates. On Error we will retry.
 		for ctx.Err() == nil {
+			// TODO(bplotka): Watcher next errors are irrecoverable. We should just fail here kedge if that happens.
+			// This can be done later though.
 			updates, err := watcher.Next() // blocking call until new updates are there
 			if err != nil {
 				lastNextError = err
-				break // watcher.Errors are unrecoverable, so try to Resolve again from the beginning.
+				break
 			}
 
 			for _, u := range updates {

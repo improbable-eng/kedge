@@ -6,6 +6,8 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/naming"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -15,15 +17,28 @@ import (
 // It works by watching endpoint Watch API (retries if connection broke). Returned events with
 // changes inside endpoints are translated to resolution naming.Updates.
 type watcher struct {
+	logger logrus.FieldLogger
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	target targetEntry
 
 	streamer   *streamer
 	addrsState map[string]struct{}
+
+	resolvedAddrs     prometheus.Gauge
+	watcherErrs       prometheus.Counter
+	watcherGotChanges prometheus.Counter
 }
 
-func startNewWatcher(target targetEntry, epClient endpointClient) (*watcher, error) {
+func startNewWatcher(
+	logger logrus.FieldLogger,
+	target targetEntry,
+	epClient endpointClient,
+	resolvedAddrs prometheus.Gauge,
+	watcherErrs prometheus.Counter,
+	watcherGotChanges prometheus.Counter,
+) (*watcher, error) {
 	// NOTE(bplotka): Would love to have proper context from above but naming.Resolver does not allow that.
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -33,11 +48,16 @@ func startNewWatcher(target targetEntry, epClient endpointClient) (*watcher, err
 	}
 
 	return &watcher{
+		logger:     logger,
 		ctx:        ctx,
 		cancel:     cancel,
 		target:     target,
 		streamer:   s,
 		addrsState: map[string]struct{}{},
+
+		resolvedAddrs:     resolvedAddrs,
+		watcherErrs:       watcherErrs,
+		watcherGotChanges: watcherGotChanges,
 	}, nil
 }
 
@@ -56,10 +76,18 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	}
 	u, err := w.next()
 	if err != nil {
+		if w.ctx.Err() == nil {
+			// Only update those if watcher is not cancelled.
+			w.watcherErrs.Inc()
+			w.resolvedAddrs.Set(float64(0))
+		}
+
 		// Just in case.
 		w.Close()
-		return u, errors.Wrap(err, "k8sresolver: ")
+		return nil, errors.Wrap(err, "k8sresolver: ")
 	}
+
+	w.resolvedAddrs.Set(float64(len(w.addrsState)))
 	return u, nil
 }
 
@@ -84,6 +112,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			return []*naming.Update(nil), errors.Wrap(err, "error on reading change stream")
 		case change = <-changeCh:
 		}
+		w.watcherGotChanges.Inc()
 
 		for _, subset := range change.Subsets {
 			var err error
@@ -156,6 +185,7 @@ func (w *watcher) next() ([]*naming.Update, error) {
 			return []*naming.Update(nil), errors.Errorf("unexpected change type %v", change.typ)
 		}
 	}
+
 	return updates, nil
 }
 

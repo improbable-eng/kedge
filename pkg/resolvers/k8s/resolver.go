@@ -9,6 +9,8 @@ import (
 
 	"github.com/improbable-eng/kedge/pkg/k8s"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/naming"
 )
 
@@ -18,25 +20,54 @@ const (
 	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<port_name>|:<value number>)"
 )
 
-// resolver resolves service names using Kubernetes endpoints instead of usual SRV DNS lookup.
-type resolver struct {
-	cl *client
+var (
+	resolvedAddrs     *prometheus.GaugeVec
+	watcherErrs       *prometheus.CounterVec
+	watcherGotChanges *prometheus.CounterVec
+)
+
+func init() {
+	resolvedAddrs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_up_addresses",
+		Help:      "Number of IPs that are correct from the point of view of this k8sresolver.",
+	}, []string{"target"})
+
+	watcherErrs = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_watcher_next_errors_total",
+		Help:      "Count of all watcher next() irrecoverable errors.",
+	}, []string{"target"})
+
+	watcherGotChanges = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "kedge",
+		Name:      "k8sresolver_watcher_next_got_changes_total",
+		Help:      "Count of all changes that watcher got from streamer to update the addresses.",
+	}, []string{"target"})
+	prometheus.MustRegister(resolvedAddrs, watcherErrs, watcherGotChanges)
 }
 
-func NewFromFlags() (name naming.Resolver, err error) {
+// resolver resolves service names using Kubernetes endpoints instead of usual SRV DNS lookup.
+type resolver struct {
+	cl     *client
+	logger logrus.FieldLogger
+}
+
+func NewFromFlags(logger logrus.FieldLogger) (name naming.Resolver, err error) {
 	apiClient, err := k8s.NewFromFlags()
 	if err != nil {
 		return nil, err
 	}
-	return NewWithClient(apiClient), nil
+	return NewWithClient(logger, apiClient), nil
 }
 
 // NewWithClient returns a new Kubernetes resolver using given k8s.APIClient configured to be used against kube-apiserver.
-func NewWithClient(apiClient *k8s.APIClient) naming.Resolver {
+func NewWithClient(logger logrus.FieldLogger, apiClient *k8s.APIClient) naming.Resolver {
 	return &resolver{
 		cl: &client{
 			k8sClient: apiClient,
 		},
+		logger: logger,
 	}
 }
 
@@ -108,5 +139,12 @@ func (r *resolver) Resolve(target string) (naming.Watcher, error) {
 	}
 
 	// Now the tricky part begins (:
-	return startNewWatcher(t, r.cl)
+	return startNewWatcher(
+		r.logger,
+		t,
+		r.cl,
+		resolvedAddrs.WithLabelValues(target),
+		watcherErrs.WithLabelValues(target),
+		watcherGotChanges.WithLabelValues(target),
+	)
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/improbable-eng/kedge/pkg/k8s"
-	pb "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/naming"
 )
@@ -24,12 +23,12 @@ type resolver struct {
 	cl *client
 }
 
-func NewFromConfig(conf *pb.K8SResolver) (target string, name naming.Resolver, err error) {
+func NewFromFlags() (name naming.Resolver, err error) {
 	apiClient, err := k8s.NewFromFlags()
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	return conf.GetDnsPortName(), NewWithClient(apiClient), nil
+	return NewWithClient(apiClient), nil
 }
 
 // NewWithClient returns a new Kubernetes resolver using given k8s.APIClient configured to be used against kube-apiserver.

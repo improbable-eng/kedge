@@ -137,7 +137,7 @@ func (d *RoutingDiscovery) DiscoverAndSetFlags(
 		err := startWatchingServicesChanges(streamCtx, d.labelSelectorKey, d.serviceClient, watchResultCh)
 		if err != nil {
 			streamCancel()
-			d.logger.WithError(err).Errorf("discovery: Failed to start watching services by %s selector stream", d.labelSelectorKey)
+			d.logger.WithError(err).Warnf("discovery: Failed to start watching services by %s selector stream", d.labelSelectorKey)
 
 			time.Sleep(streamRetryBackoff.Duration())
 			continue

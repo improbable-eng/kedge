@@ -10,6 +10,7 @@ import (
 	"github.com/improbable-eng/kedge/pkg/k8s"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/naming"
 )
 
@@ -48,23 +49,25 @@ func init() {
 
 // resolver resolves service names using Kubernetes endpoints instead of usual SRV DNS lookup.
 type resolver struct {
-	cl *client
+	cl     *client
+	logger logrus.FieldLogger
 }
 
-func NewFromFlags() (name naming.Resolver, err error) {
+func NewFromFlags(logger logrus.FieldLogger) (name naming.Resolver, err error) {
 	apiClient, err := k8s.NewFromFlags()
 	if err != nil {
 		return nil, err
 	}
-	return NewWithClient(apiClient), nil
+	return NewWithClient(logger, apiClient), nil
 }
 
 // NewWithClient returns a new Kubernetes resolver using given k8s.APIClient configured to be used against kube-apiserver.
-func NewWithClient(apiClient *k8s.APIClient) naming.Resolver {
+func NewWithClient(logger logrus.FieldLogger, apiClient *k8s.APIClient) naming.Resolver {
 	return &resolver{
 		cl: &client{
 			k8sClient: apiClient,
 		},
+		logger: logger,
 	}
 }
 
@@ -137,6 +140,7 @@ func (r *resolver) Resolve(target string) (naming.Watcher, error) {
 
 	// Now the tricky part begins (:
 	return startNewWatcher(
+		r.logger,
 		t,
 		r.cl,
 		resolvedAddrs.WithLabelValues(target),

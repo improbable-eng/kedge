@@ -116,20 +116,8 @@ func (b *addrTagBalancer) Get(ctx context.Context, opts grpc.BalancerGetOptions)
 		return addr, put, err
 	}
 
-	// Retrieve IPs if exists and append new address for it. This way we can track all the Addresses which were used for this
-	// request on reries (if any).
-	const addressesCtxTag = "grpc.target.addresses"
-	var retriedAddrs []string
-
-	tags := grpc_ctxtags.Extract(ctx)
-	oldAddrs, ok := tags.Values()[addressesCtxTag]
-	if ok {
-		retriedAddrs = oldAddrs.([]string)
-	}
-
-	retriedAddrs = append(retriedAddrs, addr.Addr)
-	tags.Set(addressesCtxTag, retriedAddrs)
-
+	// Retrieve resolved IP that will be used for this call. All retries will have separate log line with resolved IP.
+	grpc_ctxtags.Extract(ctx).Set("grpc.target.address", addr.Addr)
 	return addr, put, err
 }
 
@@ -198,7 +186,7 @@ func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 		return srvresolver.NewFromConfig(s)
 	}
 	if k := cnf.GetK8S(); k != nil {
-		rsv, err := k8sresolver.NewFromFlags()
+		rsv, err := k8sresolver.NewFromFlags(logrus.StandardLogger())
 		return k.GetDnsPortName(), rsv, err
 	}
 	if k := cnf.GetHost(); k != nil {

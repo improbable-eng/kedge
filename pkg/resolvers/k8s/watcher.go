@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/naming"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -16,6 +17,8 @@ import (
 // It works by watching endpoint Watch API (retries if connection broke). Returned events with
 // changes inside endpoints are translated to resolution naming.Updates.
 type watcher struct {
+	logger logrus.FieldLogger
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	target targetEntry
@@ -29,6 +32,7 @@ type watcher struct {
 }
 
 func startNewWatcher(
+	logger logrus.FieldLogger,
 	target targetEntry,
 	epClient endpointClient,
 	resolvedAddrs prometheus.Gauge,
@@ -44,6 +48,7 @@ func startNewWatcher(
 	}
 
 	return &watcher{
+		logger:     logger,
 		ctx:        ctx,
 		cancel:     cancel,
 		target:     target,
@@ -75,10 +80,6 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 			// Only update those if watcher is not cancelled.
 			w.watcherErrs.Inc()
 			w.resolvedAddrs.Set(float64(0))
-
-			if w.debugTarget() {
-				fmt.Println("Watcher error: ", err.Error())
-			}
 		}
 
 		// Just in case.
@@ -88,10 +89,6 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 
 	w.resolvedAddrs.Set(float64(len(w.addrsState)))
 	return u, nil
-}
-
-func (w *watcher) debugTarget() bool {
-	return w.target.service == "scarlet" && w.target.port.value == "grpc"
 }
 
 // next gathers kube api endpoint watch changes and translates them to naming.Update set.
@@ -117,10 +114,6 @@ func (w *watcher) next() ([]*naming.Update, error) {
 		}
 		w.watcherGotChanges.Inc()
 
-		if w.debugTarget() {
-			// TODO(bplotka): Debug only - remove that.
-			fmt.Println("Got change: ", change, "initial state ", w.addrsState)
-		}
 		for _, subset := range change.Subsets {
 			var err error
 			newAddrsState, err = subsetToAddresses(w.target, subset)
@@ -193,14 +186,6 @@ func (w *watcher) next() ([]*naming.Update, error) {
 		}
 	}
 
-	if w.debugTarget() {
-		// TODO(bplotka): Debug only - remove that.
-		var msg string
-		for _, up := range updates {
-			msg += fmt.Sprintf("[op: %v, addr: %s]", up.Op, up.Addr)
-		}
-		fmt.Printf("Returning Updates: %s\nOverall state: %v\n", msg, w.addrsState)
-	}
 	return updates, nil
 }
 

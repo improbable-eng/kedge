@@ -32,7 +32,7 @@ func main() {
 	logrus.SetLevel(lvl)
 	logrus.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
 
-	resolver, err := k8sresolver.NewFromFlags()
+	resolver, err := k8sresolver.NewFromFlags(logrus.StandardLogger())
 	if err != nil {
 		logrus.WithError(err).Fatal("Cannot create k8s resolver")
 	}

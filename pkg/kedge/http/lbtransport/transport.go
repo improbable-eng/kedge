@@ -5,13 +5,11 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
 	"github.com/improbable-eng/kedge/pkg/reporter"
 	"github.com/improbable-eng/kedge/pkg/reporter/errtypes"
-	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
@@ -20,13 +18,12 @@ import (
 type tripper struct {
 	targetName string
 
-	parent           http.RoundTripper
-	policy           LBPolicy
-	lastResolveError error
+	parent http.RoundTripper
+	policy LBPolicy
 
-	currentTargets []*Target
-	mu             sync.RWMutex
-	cancel         context.CancelFunc
+	mu               sync.RWMutex
+	currentTargets   []*Target
+	irrecoverableErr error
 }
 
 var (
@@ -52,81 +49,54 @@ func init() {
 //
 // For resolving backend addresses it uses a grpc.naming.Resolver, allowing for generic use.
 func New(ctx context.Context, targetAddr string, parent http.RoundTripper, resolver naming.Resolver, policy LBPolicy) (*tripper, error) {
-	innerCtx, cancel := context.WithCancel(ctx)
 	s := &tripper{
 		targetName:     targetAddr,
 		parent:         parent,
 		policy:         policy,
 		currentTargets: []*Target{},
-		cancel:         cancel,
 	}
 
-	go s.run(innerCtx, resolver, targetAddr)
+	watcher, err := resolver.Resolve(targetAddr)
+	if err != nil {
+		return nil, errors.Wrapf(err, "tripper: failed to do initial resolve for target %s", targetAddr)
+	}
+	go func() {
+		<-ctx.Done()
+		watcher.Close()
+	}()
+	go s.run(ctx, watcher)
 	return s, nil
 }
 
-func (s *tripper) run(ctx context.Context, resolver naming.Resolver, targetAddr string) {
-	resolveRetryBackoff := &backoff.Backoff{
-		Min:    50 * time.Millisecond,
-		Jitter: true,
-		Factor: 2,
-		Max:    2 * time.Second,
-	}
-	var lastNextError error
-
+func (s *tripper) run(ctx context.Context, watcher naming.Watcher) {
+	var localCurrentTargets []*Target
 	for ctx.Err() == nil {
-		watcher, err := resolver.Resolve(targetAddr)
+		updates, err := watcher.Next() // blocking call until new updates are there
 		if err != nil {
+			// Watcher next errors are irrecoverable.
 			s.mu.Lock()
+			s.irrecoverableErr = err
 			s.currentTargets = []*Target{}
-			// Don't loose lastNextError if there.
-			if lastNextError != nil {
-				err = errors.Wrap(lastNextError, err.Error())
-			}
-			s.lastResolveError = errors.Wrapf(err, "Failed to Resolver target %s. Retrying with backoff.", targetAddr)
 			s.mu.Unlock()
-			time.Sleep(resolveRetryBackoff.Duration())
-			continue
+			return
 		}
-		resolveRetryBackoff.Reset()
 
-		innerCtx, innerCancel := context.WithCancel(ctx)
-		go func() {
-			select {
-			case <-innerCtx.Done():
-				watcher.Close()
-			}
-		}()
-
-		localCurrentTargets := []*Target{}
-		// Starting getting Next updates. On Error we will retry.
-		for ctx.Err() == nil {
-			// TODO(bplotka): Watcher next errors are irrecoverable. We should just fail here kedge if that happens.
-			// This can be done later though.
-			updates, err := watcher.Next() // blocking call until new updates are there
-			if err != nil {
-				lastNextError = err
-				break
-			}
-
-			for _, u := range updates {
-				if u.Op == naming.Add {
-					localCurrentTargets = append(localCurrentTargets, &Target{DialAddr: u.Addr})
-				} else if u.Op == naming.Delete {
-					kept := []*Target{}
-					for _, t := range localCurrentTargets {
-						if u.Addr != t.DialAddr {
-							kept = append(kept, t)
-						}
+		for _, u := range updates {
+			if u.Op == naming.Add {
+				localCurrentTargets = append(localCurrentTargets, &Target{DialAddr: u.Addr})
+			} else if u.Op == naming.Delete {
+				var kept []*Target
+				for _, t := range localCurrentTargets {
+					if u.Addr != t.DialAddr {
+						kept = append(kept, t)
 					}
-					localCurrentTargets = kept
 				}
+				localCurrentTargets = kept
 			}
-			s.mu.Lock()
-			s.currentTargets = localCurrentTargets
-			s.mu.Unlock()
 		}
-		innerCancel()
+		s.mu.Lock()
+		s.currentTargets = localCurrentTargets
+		s.mu.Unlock()
 	}
 }
 
@@ -136,13 +106,16 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	s.mu.RLock()
 	targetsRef := s.currentTargets
-	lastResolvErr := s.lastResolveError
+	irrecoverableErr := s.irrecoverableErr
 	s.mu.RUnlock()
+	if irrecoverableErr != nil {
+		err := errors.Wrapf(irrecoverableErr, "lb: critical naming.Watcher error for target %s. Tripper is closed.", s.targetName)
+		reporter.Extract(r).ReportError(errtypes.IrrecoverableWatcherError, err)
+		return nil, err
+	}
+
 	if len(targetsRef) == 0 {
-		if lastResolvErr == nil {
-			lastResolvErr = errors.New("0 resolved addresses")
-		}
-		err := errors.Wrapf(lastResolvErr, "lb: no resolution available for %s", s.targetName)
+		err := errors.Errorf("lb: no backend is available for %s. 0 resolved addresses.", s.targetName)
 		reporter.Extract(r).ReportError(errtypes.NoResolutionAvailable, err)
 		return nil, err
 	}

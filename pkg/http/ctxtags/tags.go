@@ -27,6 +27,9 @@ const (
 	// TagForBackendTarget specifies the target name used to resolve in lbtransport by backend
 	TagForBackendTarget = "http.backend.target"
 
+	// TagForTargetAddress specifies the resolved address used by request in lbtransport.
+	TagForTargetAddress = "http.target.address"
+
 	// TagRequestID specified request ID of the request.
 	TagRequestID = "http.request_id"
 )

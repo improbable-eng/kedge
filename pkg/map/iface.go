@@ -34,13 +34,18 @@ type ErrorNotKedgeDestination struct {
 }
 
 func NotKedgeDestinationErr(host string, port string) error {
-	return &ErrorNotKedgeDestination{host: host, port: port}
+	return ErrorNotKedgeDestination{host: host, port: port}
 }
 
-func (e *ErrorNotKedgeDestination) Error() string {
+func (e ErrorNotKedgeDestination) Error() string {
 	msg := e.host
 	if e.port != "" {
 		msg += ":" + e.port
 	}
 	return msg + " is not a kedge destination"
+}
+
+func IsNotKedgeDestinationError(err error) bool {
+	_, ok := err.(ErrorNotKedgeDestination)
+	return ok
 }

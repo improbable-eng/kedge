@@ -304,7 +304,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 		ok := t.Run("", func(t *testing.T) {
 			defer leaktest.CheckTimeout(t, 10*time.Second)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			changeCh := make(chan change, 10)

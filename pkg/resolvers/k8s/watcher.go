@@ -99,6 +99,7 @@ func (w *watcher) startNewStreamerWithRetry(ctx context.Context) (s *streamer) {
 		}
 		s.Close()
 		w.logger.WithError(err).Warnf("k8sresolver: failed to start watching endpoint events for target %v", w.target)
+
 		select {
 		case <-time.After(w.streamRetryBackoff.Duration()):
 		case <-ctx.Done():
@@ -196,8 +197,7 @@ func (w *watcher) next(ctx context.Context) ([]*naming.Update, error) {
 		// This way we can safely treat the object for Added and Modified as new state.
 		// Deleted event gives state before deletion, but we don't care. The whole object was deleted.
 		switch change.typ {
-		case watch.Added:
-		case watch.Modified:
+		case watch.Modified, watch.Added:
 			for addr := range newAddrsState {
 				_, ok := w.addrsState[addr]
 				if ok {

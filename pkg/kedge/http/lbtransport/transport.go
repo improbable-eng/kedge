@@ -134,6 +134,7 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		// We override it to make sure it enters the appropriate dial method and the appropriate connection pool.
 		// See http.connectMethodKey.
 		r.URL.Host = target.DialAddr
+		tags.Set(ctxtags.TagForTargetAddress, target.DialAddr)
 		resp, err := s.parent.RoundTrip(r)
 		if err == nil {
 			return resp, nil

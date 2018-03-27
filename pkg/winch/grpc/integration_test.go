@@ -255,7 +255,7 @@ func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_NoRoute() {
 	resp := &unknownResponse{}
 	// ServiceName/Method does not matter here. We are now matching based on authority only.
 	err = grpc.Invoke(s.SimpleCtx(), "/test.SomeService/Method", &unknownResponse{}, resp, cc)
-	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = not a kedge destination", "error on simple call")
+	require.EqualError(s.T(), err, "rpc error: code = Unimplemented desc = resourceXXX.ext.example.com is not a kedge destination", "error on simple call")
 }
 
 func (s *WinchIntegrationSuite) TestCallKedgeThroughWinch_DirectRoute_ValidAuth() {

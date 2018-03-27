@@ -37,7 +37,7 @@ func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.Stre
 
 		route, err := mapper.Map(stripPort(targetAuthority), portOnly(targetAuthority))
 		if err != nil {
-			if err == kedge_map.ErrNotKedgeDestination {
+			if kedge_map.IsNotKedgeDestinationError(err) {
 				return ctx, nil, status.Error(codes.Unimplemented, err.Error())
 			}
 			return ctx, nil, err

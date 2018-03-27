@@ -14,7 +14,7 @@ func SimpleHost(mapping map[string]*Route) Mapper {
 func (s *simpleHost) Map(targetAuthorityDnsName string, _ string) (*Route, error) {
 	r, ok := s.mapping[targetAuthorityDnsName]
 	if !ok {
-		return nil, ErrNotKedgeDestination
+		return nil, NotKedgeDestinationErr(targetAuthorityDnsName, "")
 	}
 
 	return r, nil
@@ -32,7 +32,7 @@ func SimpleHostPort(mapping map[string]*Route) Mapper {
 func (s *simpleHostPort) Map(targetAuthorityDnsName string, port string) (*Route, error) {
 	r, ok := s.mapping[fmt.Sprintf("%s:%s", targetAuthorityDnsName, port)]
 	if !ok {
-		return nil, ErrNotKedgeDestination
+		return nil, NotKedgeDestinationErr(targetAuthorityDnsName, port)
 	}
 
 	return r, nil

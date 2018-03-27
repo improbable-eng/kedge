@@ -1,14 +1,9 @@
 package kedge_map
 
 import (
-	"errors"
 	"net/url"
 
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
-)
-
-var (
-	ErrNotKedgeDestination = errors.New("not a kedge destination")
 )
 
 // Mapper is an interface that allows you to direct traffic to different kedges including various auth.
@@ -29,4 +24,28 @@ type Route struct {
 	BackendAuth tokenauth.Source
 	// ProxyAuth represents optional auth for kedge.
 	ProxyAuth tokenauth.Source
+}
+
+// ErrorKedgeDestination displays that host/port is not a kedge destination. We are not using errors.New, because sometimes we need
+// to check for type of the error (for example in winch/grpc/proxy.go).
+type ErrorNotKedgeDestination struct {
+	host string
+	port string
+}
+
+func NotKedgeDestinationErr(host string, port string) error {
+	return ErrorNotKedgeDestination{host: host, port: port}
+}
+
+func (e ErrorNotKedgeDestination) Error() string {
+	msg := e.host
+	if e.port != "" {
+		msg += ":" + e.port
+	}
+	return msg + " is not a kedge destination"
+}
+
+func IsNotKedgeDestinationError(err error) bool {
+	_, ok := err.(ErrorNotKedgeDestination)
+	return ok
 }

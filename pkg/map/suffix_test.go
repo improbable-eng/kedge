@@ -15,36 +15,36 @@ func TestSuffix_MatchesOne(t *testing.T) {
 	for _, tcase := range []struct {
 		target      string
 		kedgeUrl    string
-		expectedErr error
+		expectedErr string
 	}{
 		{
 			target:      "myservice.mynamespace.us1.clusters.local",
 			kedgeUrl:    "https://us1.example.com",
-			expectedErr: nil,
+			expectedErr: "",
 		},
 		{
 			target:      "somethingmore.myservice.mynamespace.eu1.clusters.local",
 			kedgeUrl:    "https://eu1.example.com",
-			expectedErr: nil,
+			expectedErr: "",
 		},
 		{
 			target:      "something.google.com",
 			kedgeUrl:    "",
-			expectedErr: kedge_map.ErrNotKedgeDestination,
+			expectedErr: "something.google.com is not a kedge destination",
 		},
 		{
 			target:      "another.local",
 			kedgeUrl:    "",
-			expectedErr: kedge_map.ErrNotKedgeDestination,
+			expectedErr: "another.local is not a kedge destination",
 		},
 	} {
 		t.Run(tcase.target, func(t *testing.T) {
 			route, err := mapper.Map(tcase.target, "does not matter")
-			if tcase.expectedErr == nil {
+			if tcase.expectedErr == "" {
 				require.NoError(t, err, "no error")
 				assert.Equal(t, tcase.kedgeUrl, route.URL.String(), "urls must match")
 			} else {
-				require.Equal(t, tcase.expectedErr, err, "error expected")
+				require.Equal(t, tcase.expectedErr, err.Error(), "error expected")
 			}
 		})
 	}
@@ -57,36 +57,36 @@ func TestSuffix_MatchesMulti(t *testing.T) {
 	for _, tcase := range []struct {
 		target      string
 		kedgeUrl    string
-		expectedErr error
+		expectedErr string
 	}{
 		{
 			target:      "myservice.mynamespace.us1.prod.clusters.local",
 			kedgeUrl:    "https://us1.prod.example.com",
-			expectedErr: nil,
+			expectedErr: "",
 		},
 		{
 			target:      "somethingmore.myservice.mynamespace.eu1.staging.clusters.local",
 			kedgeUrl:    "https://eu1.staging.example.com",
-			expectedErr: nil,
+			expectedErr: "",
 		},
 		{
 			target:      "something.something.google.com",
 			kedgeUrl:    "",
-			expectedErr: kedge_map.ErrNotKedgeDestination,
+			expectedErr: "something.something.google.com is not a kedge destination",
 		},
 		{
 			target:      "tooshort.clusters.local",
 			kedgeUrl:    "",
-			expectedErr: kedge_map.ErrNotKedgeDestination,
+			expectedErr: "tooshort.clusters.local is not a kedge destination",
 		},
 	} {
 		t.Run(tcase.target, func(t *testing.T) {
 			route, err := mapper.Map(tcase.target, "does not matter")
-			if tcase.expectedErr == nil {
+			if tcase.expectedErr == "" {
 				require.NoError(t, err, "no error")
 				assert.Equal(t, tcase.kedgeUrl, route.URL.String(), "urls must match")
 			} else {
-				require.Equal(t, tcase.expectedErr, err, "error expected")
+				require.Equal(t, tcase.expectedErr, err.Error(), "error expected")
 			}
 		})
 	}

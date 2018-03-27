@@ -87,15 +87,16 @@ func (w *watcher) Close() {
 	w.cancel()
 }
 
-func (w *watcher) startNewStreamerWithRetry(ctx context.Context) (s *streamer) {
+func (w *watcher) startNewStreamerWithRetry(ctx context.Context) *streamer {
 	if ctx.Err() != nil {
 		return nil
 	}
-	var err error
+
 	for {
-		s, err = startNewStreamer(w.target, w.epClient)
+		s, err := startNewStreamer(w.target, w.epClient)
 		if err == nil {
-			break
+			w.streamRetryBackoff.Reset()
+			return s
 		}
 		s.Close()
 		w.logger.WithError(err).Warnf("k8sresolver: failed to start watching endpoint events for target %v", w.target)
@@ -106,8 +107,6 @@ func (w *watcher) startNewStreamerWithRetry(ctx context.Context) (s *streamer) {
 			return nil
 		}
 	}
-	w.streamRetryBackoff.Reset()
-	return s
 }
 
 // Next updates the endpoints for the targetEntry being watched.

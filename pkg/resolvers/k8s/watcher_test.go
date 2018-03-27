@@ -319,6 +319,10 @@ func TestWatcher_Next_OK(t *testing.T) {
 					errCh:    errCh,
 				},
 				addrsState: map[string]struct{}{},
+
+				resolvedAddrs:     resolvedAddrs.WithLabelValues(""),
+				watcherErrs:       watcherErrs.WithLabelValues(""),
+				watcherGotChanges: watcherGotChanges.WithLabelValues(""),
 			}
 			defer w.Close()
 

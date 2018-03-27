@@ -14,11 +14,13 @@ type defaultTripper struct {
 func Default(config *tls.Config) http.RoundTripper {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
+		// TODO(bplotka): Switch back to DialCtx when it will be safe to use.
+		// https://groups.google.com/forum/#!topic/golang-nuts/oiBBZfUb2hM
+		Dial: (&net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: false,
-		}).DialContext,
+		}).Dial,
 		MaxIdleConns:          4,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,

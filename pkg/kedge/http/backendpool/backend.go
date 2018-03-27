@@ -192,7 +192,7 @@ func chooseNamingResolver(cnf *pb.Backend) (string, naming.Resolver, error) {
 		return srvresolver.NewFromConfig(s)
 	}
 	if k := cnf.GetK8S(); k != nil {
-		rsv, err := k8sresolver.NewFromFlags()
+		rsv, err := k8sresolver.NewFromFlags(logrus.StandardLogger())
 		return k.GetDnsPortName(), rsv, err
 	}
 	if k := cnf.GetHost(); k != nil {

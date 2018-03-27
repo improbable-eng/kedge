@@ -159,7 +159,7 @@ func (rr *roundRobinPolicyPicker) Pick(r *http.Request, currentTargets []*Target
 
 		return currentTargets[targetId], nil
 	}
-	return nil, fmt.Errorf("All targets %d are failing, try later.", len(currentTargets))
+	return nil, fmt.Errorf("All targets %v are failing, try later.", currentTargets)
 }
 
 func (rr *roundRobinPolicyPicker) ExcludeTarget(target *Target) {

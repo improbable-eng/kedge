@@ -135,6 +135,10 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 			return u, nil
 		}
 
+		if w.ctx.Err() != nil {
+			return nil, w.ctx.Err()
+		}
+
 		if err != staleStreamError && err != io.EOF {
 			// Errors worth to log.
 			w.logger.WithError(err).Warnf("k8sresolver: failed to watch endpoint events stream for target %v", w.target)
@@ -144,7 +148,6 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 		// Re-connect stream.
 		w.streamer.Close()
 		w.streamer = nil
-
 	}
 	return nil, w.ctx.Err()
 }

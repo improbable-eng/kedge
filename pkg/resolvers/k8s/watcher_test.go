@@ -322,7 +322,6 @@ func TestWatcher_Next_OK(t *testing.T) {
 				resolvedAddrs:     resolvedAddrs.WithLabelValues(""),
 				watcherErrs:       watcherErrs.WithLabelValues(""),
 				watcherGotChanges: watcherGotChanges.WithLabelValues(""),
-				resyncTimeout:     2000 * time.Minute,
 			}
 
 			for i, change := range tcase.changes {

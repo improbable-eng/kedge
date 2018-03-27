@@ -124,15 +124,15 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 			w.streamer = w.startNewStreamerWithRetry(w.ctx)
 		}
 
-		if w.ctx.Err() != nil {
-			return nil, w.ctx.Err()
-		}
-
 		u, err := w.next(w.ctx)
 		if err == nil {
 			// No error.
 			w.resolvedAddrs.Set(float64(len(w.addrsState)))
 			return u, nil
+		}
+
+		if w.ctx.Err() != nil {
+			return nil, w.ctx.Err()
 		}
 
 		if err != staleStreamError && err != io.EOF {
@@ -144,7 +144,6 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 		// Re-connect stream.
 		w.streamer.Close()
 		w.streamer = nil
-
 	}
 	return nil, w.ctx.Err()
 }

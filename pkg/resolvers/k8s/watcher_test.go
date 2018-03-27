@@ -284,6 +284,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 				"we tracked map[]. State before deletion map[1.2.3.4:8080:{}]. Doing resync...")},
 		},
 		{
+			// This can happen (two adds) when we do resync.
 			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
@@ -296,10 +297,8 @@ func TestWatcher_Next_OK(t *testing.T) {
 						Op:   naming.Add,
 					},
 				},
+				nil,
 			},
-			expectedErrs: []error{nil, errors.New("malformed internal state for addresses for target {  " +
-				"{true someName}}. We got added event type, but we already have some addresses from old updates: " +
-				"map[1.2.3.4:8080:{}]. Doing resync...")},
 		},
 	} {
 		ok := t.Run("", func(t *testing.T) {
@@ -323,6 +322,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 				resolvedAddrs:     resolvedAddrs.WithLabelValues(""),
 				watcherErrs:       watcherErrs.WithLabelValues(""),
 				watcherGotChanges: watcherGotChanges.WithLabelValues(""),
+				resyncTimeout:     2000 * time.Minute,
 			}
 
 			for i, change := range tcase.changes {

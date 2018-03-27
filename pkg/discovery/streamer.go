@@ -116,8 +116,7 @@ func proxyAllEvents(ctx context.Context, decoder *json.Decoder, eventsCh chan<- 
 			}
 			switch err {
 			case io.EOF:
-				// Watch closed normally - weird.
-				eventErr = errors.Wrap(err, "EOF during watch stream event decoding")
+				eventErr = io.EOF
 			case io.ErrUnexpectedEOF:
 				eventErr = errors.Wrap(err, "Unexpected EOF during watch stream event decoding")
 			default:

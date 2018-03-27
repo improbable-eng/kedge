@@ -9,6 +9,7 @@ import (
 
 	"time"
 
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +17,12 @@ import (
 	"google.golang.org/grpc/naming"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
+)
+
+var (
+	flagResyncTimeout = sharedflags.Set.Duration("k8sresolver_resync_timouet", 15*time.Minute,
+		"Time without updates after which stream is assumed stale.")
+	staleStreamError = errors.New("stream is stale. reconnecting")
 )
 
 // A Watcher provides name resolution updates by watching endpoints API.
@@ -35,8 +42,7 @@ type watcher struct {
 	watcherErrs       prometheus.Counter
 	watcherGotChanges prometheus.Counter
 
-	streamer *streamer
-
+	streamer           *streamer
 	streamRetryBackoff *backoff.Backoff
 }
 
@@ -123,16 +129,17 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 			return u, nil
 		}
 
-		w.logger.WithError(err).Warnf("k8sresolver: failed to watch endpoint events stream for target %v", w.target)
-		w.watcherErrs.Inc()
-		w.resolvedAddrs.Set(float64(0))
+		if err != staleStreamError && err != io.EOF {
+			// Errors worth to log.
+			w.logger.WithError(err).Warnf("k8sresolver: failed to watch endpoint events stream for target %v", w.target)
+			w.watcherErrs.Inc()
+		}
 
-		// Re-connect stream and reset state.
-		w.addrsState = map[string]struct{}{}
+		// Re-connect stream.
 		w.streamer.Close()
 		w.streamer = nil
-	}
 
+	}
 	return nil, ctx.Err()
 }
 
@@ -153,10 +160,11 @@ func (w *watcher) next(ctx context.Context) ([]*naming.Update, error) {
 		case <-ctx.Done():
 			// We already stopped.
 			return nil, ctx.Err()
+		case <-time.After(*flagResyncTimeout):
+			return nil, staleStreamError
 		case err := <-errCh:
 			if err == io.EOF {
-				// Don't wrap EOF.
-				return nil, err
+				return nil, io.EOF
 			}
 			return nil, errors.Wrap(err, "error on reading change stream")
 		case change = <-changeCh:
@@ -183,12 +191,13 @@ func (w *watcher) next(ctx context.Context) ([]*naming.Update, error) {
 		// Deleted event gives state before deletion, but we don't care. The whole object was deleted.
 		switch change.typ {
 		case watch.Added:
-			if len(w.addrsState) > 0 {
-				return nil, errors.Errorf("malformed internal state for addresses for target %v. "+
-					"We got added event type, but we already have some addresses from old updates: %v. Doing resync...", w.target, w.addrsState)
-			}
-
 			for addr := range newAddrsState {
+				_, ok := w.addrsState[addr]
+				if ok {
+					// Address already exists in old state, nothing to do.
+					continue
+				}
+
 				updates = append(updates, w.addAddr(addr))
 			}
 		case watch.Modified:

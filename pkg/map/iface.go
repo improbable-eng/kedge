@@ -1,7 +1,6 @@
 package kedge_map
 
 import (
-	"errors"
 	"net/url"
 
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
@@ -27,10 +26,21 @@ type Route struct {
 	ProxyAuth tokenauth.Source
 }
 
+// ErrorKedgeDestination displays that host/port is not a kedge destination. We are not using errors.New, because sometimes we need
+// to check for type of the error (for example in winch/grpc/proxy.go).
+type ErrorNotKedgeDestination struct {
+	host string
+	port string
+}
+
 func NotKedgeDestinationErr(host string, port string) error {
-	dst := host
-	if port != "" {
-		dst += ":" + port
+	return &ErrorNotKedgeDestination{host: host, port: port}
+}
+
+func (e *ErrorNotKedgeDestination) Error() string {
+	msg := e.host
+	if e.port != "" {
+		msg += ":" + e.port
 	}
-	return errors.New(dst + " is not a kedge destination")
+	return msg + " is not a kedge destination"
 }

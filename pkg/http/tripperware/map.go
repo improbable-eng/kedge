@@ -35,7 +35,7 @@ func requestWithRoute(req *http.Request, r *kedge_map.Route) *http.Request {
 func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Get routing based on request Host and optional port.
 	route, err := t.mapper.Map(req.URL.Hostname(), req.URL.Port())
-	if err == kedge_map.ErrNotKedgeDestination {
+	if _, errNotKedgeDestination := err.(*kedge_map.ErrorNotKedgeDestination); errNotKedgeDestination {
 		tags := http_ctxtags.ExtractInbound(req)
 		tags.Set(ctxtags.TagForProxyDestURL, "not-kedge-destination")
 		return t.parent.RoundTrip(

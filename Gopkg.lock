@@ -7,7 +7,6 @@
   revision = "fb68edbdf1b1bd8d8aa291f9ddc48e6fe54841f0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/Bplotka/oidc"
   packages = [
     ".",
@@ -18,7 +17,8 @@
     "login/k8scache",
     "xerrors"
   ]
-  revision = "35680c395e118f942be5c3e15cca396f66772d56"
+  revision = "3d81b3525b29526aef66765974a68c3fdeb79836"
+  version = "v0.2.0"
 
 [[projects]]
   name = "github.com/PuerkitoBio/purell"
@@ -553,6 +553,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "26715210ce6b4dafab06781bfac255d57d046ded880d6b289c6793408cc02b21"
+  inputs-digest = "9f2e02c29ce9aec835057a191eddb96ef6d4b873eea16c4f8c929e0d5ba73a8c"
   solver-name = "gps-cdcl"
   solver-version = 1

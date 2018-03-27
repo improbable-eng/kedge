@@ -1,13 +1,11 @@
 package winch
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"reflect"
-
-	"io/ioutil"
-
-	"context"
 	"time"
 
 	"github.com/Bplotka/oidc/login"

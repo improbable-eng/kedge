@@ -6,4 +6,4 @@ required = ["github.com/mwitkow/go-proto-validators/protoc-gen-govalidators", "g
 
 [[constraint]]
   name = "github.com/Bplotka/oidc"
-  version = "v0.1.0"
+  version = "v0.2.0"

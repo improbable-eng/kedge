@@ -41,7 +41,7 @@ func Suffix(matchPattern string, suffix string, scheme string) (Mapper, error) {
 func (s *suffixMapper) Map(targetAuthorityDnsName string, _ string) (*Route, error) {
 	reverseTargetParts := reverse(strings.Split(targetAuthorityDnsName, "."))
 	if len(reverseTargetParts) < len(s.reverseMatchParts) {
-		return nil, ErrNotKedgeDestination // target is shorter than the match, definitely no point.
+		return nil, NotKedgeDestinationErr(targetAuthorityDnsName, "") // target is shorter than the match, definitely no point.
 	}
 	wildcardParts := []string{}
 	for i, part := range s.reverseMatchParts {
@@ -50,7 +50,7 @@ func (s *suffixMapper) Map(targetAuthorityDnsName string, _ string) (*Route, err
 			continue
 		}
 		if reverseTargetParts[i] != part {
-			return nil, ErrNotKedgeDestination
+			return nil, NotKedgeDestinationErr(targetAuthorityDnsName, "")
 		}
 	}
 	kedgeUrl := s.scheme + "://" + strings.Join(reverse(wildcardParts), ".") + s.suffix

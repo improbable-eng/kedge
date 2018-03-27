@@ -7,10 +7,6 @@ import (
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 )
 
-var (
-	ErrNotKedgeDestination = errors.New("not a kedge destination")
-)
-
 // Mapper is an interface that allows you to direct traffic to different kedges including various auth.
 // These are used by client libraries.
 type Mapper interface {
@@ -29,4 +25,12 @@ type Route struct {
 	BackendAuth tokenauth.Source
 	// ProxyAuth represents optional auth for kedge.
 	ProxyAuth tokenauth.Source
+}
+
+func NotKedgeDestinationErr(host string, port string) error {
+	dst := host
+	if port != "" {
+		dst += ":" + port
+	}
+	return errors.New(dst + " is not a kedge destination")
 }

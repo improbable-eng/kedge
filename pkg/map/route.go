@@ -35,5 +35,5 @@ func (m *routeMapper) Map(targetDnsName string, targetPort string) (*Route, erro
 		return r, nil
 	}
 
-	return nil, ErrNotKedgeDestination
+	return nil, NotKedgeDestinationErr(targetDnsName, targetPort)
 }

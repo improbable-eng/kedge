@@ -284,6 +284,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 				"we tracked map[]. State before deletion map[1.2.3.4:8080:{}]. Doing resync...")},
 		},
 		{
+			// This can happen (two adds) when we do resync.
 			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
@@ -296,27 +297,25 @@ func TestWatcher_Next_OK(t *testing.T) {
 						Op:   naming.Add,
 					},
 				},
+				nil,
 			},
-			expectedErrs: []error{nil, errors.New("malformed internal state for addresses for target {  " +
-				"{true someName}}. We got added event type, but we already have some addresses from old updates: " +
-				"map[1.2.3.4:8080:{}]. Doing resync...")},
 		},
 	} {
 		ok := t.Run("", func(t *testing.T) {
 			defer leaktest.CheckTimeout(t, 10*time.Second)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			changeCh := make(chan change, 10)
 			errCh := make(chan error, 1)
 			w := &watcher{
 				ctx:    ctx,
-				cancel: cancel,
 				target: targetEntry{port: tcase.watchedTargetPort},
 				streamer: &streamer{
 					changeCh: changeCh,
 					errCh:    errCh,
+					cancel:   func() {},
 				},
 				addrsState: map[string]struct{}{},
 
@@ -324,7 +323,6 @@ func TestWatcher_Next_OK(t *testing.T) {
 				watcherErrs:       watcherErrs.WithLabelValues(""),
 				watcherGotChanges: watcherGotChanges.WithLabelValues(""),
 			}
-			defer w.Close()
 
 			for i, change := range tcase.changes {
 				changeCh <- change
@@ -333,7 +331,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 					continue
 				}
 
-				u, err := w.next()
+				u, err := w.next(ctx)
 				if len(tcase.expectedErrs) > i && tcase.expectedErrs[i] != nil {
 					require.Error(t, err)
 					require.Equal(t, tcase.expectedErrs[i].Error(), err.Error())

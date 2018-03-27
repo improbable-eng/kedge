@@ -38,4 +38,7 @@ const (
 	// This includes EOF's (kedge server timeout) and context cancellations (winch tripperware timeout), as well as any
 	// other winch internal error.
 	TransportUnknownError Type = "transport-unknown-error"
+
+	// IrrecoverableWatcherError indicates unlikely irrecoverable error from resolver's naming.Watcher.
+	IrrecoverableWatcherError Type = "resolver-watcher-irrecoverable"
 )

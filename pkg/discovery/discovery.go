@@ -28,6 +28,9 @@ var (
 		"that will be added to service name to constructs external domain for director route")
 	flagAnnotationLabelPrefix = sharedflags.Set.String("discovery_label_annotation_prefix", "kedge.com/",
 		"Expected annotation/label prefix for all kedge annotations and kedge-exposed label")
+	// TODO(bplotka): Check if that is really needed. I observed stale stream when you kill network interface that
+	// this connection is using. The HTTP Get request is then watching on response that will never happen.
+	// Ensure there is no better solution to fix this.
 	flagResyncTimeout = sharedflags.Set.Duration("discovery_resync_timouet", 15*time.Minute,
 		"Time without updates after which stream is assumed stale.")
 	staleStreamError = errors.New("stream is stale. reconnecting")

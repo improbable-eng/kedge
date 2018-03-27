@@ -35,14 +35,12 @@ func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, e
 	}
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			// Request is cancelled, so we need to read what is left there to not leak go routines.
-			_, _ = ioutil.ReadAll(stream)
-			err = stream.Close()
-			if err != nil {
-				logrus.WithError(err).Warn("Failed to Close cancelled stream connection")
-			}
+		<-ctx.Done()
+		// Request is cancelled, so we need to read what is left there to not leak go routines.
+		_, _ = ioutil.ReadAll(stream)
+		err = stream.Close()
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to Close cancelled stream connection")
 		}
 	}()
 	s := &streamer{

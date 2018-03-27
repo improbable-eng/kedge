@@ -20,7 +20,10 @@ import (
 )
 
 var (
-	flagResyncTimeout = sharedflags.Set.Duration("k8sresolver_resync_timouet", 15*time.Minute,
+	// TODO(bplotka): Check if that is really needed. I observed stale stream when you kill network interface that
+	// this connection is using. The HTTP Get request is then watching on response that will never happen.
+	// Ensure there is no better solution to fix this.
+	flagResyncTimeout = sharedflags.Set.Duration("k8sresolver_resync_timouet", 30*time.Minute,
 		"Time without updates after which stream is assumed stale.")
 	staleStreamError = errors.New("stream is stale. reconnecting")
 )
@@ -84,21 +87,26 @@ func (w *watcher) Close() {
 	w.cancel()
 }
 
-func (w *watcher) startNewStreamerWithRetry(ctx context.Context) *streamer {
-	for ctx.Err() == nil {
-		s, err := startNewStreamer(w.target, w.epClient)
-		if err != nil {
-			s.Close()
-			w.logger.WithError(err).Warnf("k8sresolver: failed to start watching endpoint events for target %v", w.target)
-			time.Sleep(w.streamRetryBackoff.Duration())
-			continue
-		}
-		w.streamRetryBackoff.Reset()
-
-		return s
+func (w *watcher) startNewStreamerWithRetry(ctx context.Context) (s *streamer) {
+	if ctx.Err() != nil {
+		return nil
 	}
-
-	return nil
+	var err error
+	for {
+		s, err = startNewStreamer(w.target, w.epClient)
+		if err == nil {
+			break
+		}
+		s.Close()
+		w.logger.WithError(err).Warnf("k8sresolver: failed to start watching endpoint events for target %v", w.target)
+		select {
+		case <-time.After(w.streamRetryBackoff.Duration()):
+		case <-ctx.Done():
+			return nil
+		}
+	}
+	w.streamRetryBackoff.Reset()
+	return s
 }
 
 // Next updates the endpoints for the targetEntry being watched.
@@ -110,19 +118,17 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 			"Note that watcher errors are not recoverable.")
 	}
 
-	ctx, cancel := context.WithCancel(w.ctx)
-	defer cancel()
 	for {
 		if w.streamer == nil {
 			// Streamer closed / does not exists yet. Let's start it.
-			w.streamer = w.startNewStreamerWithRetry(ctx)
+			w.streamer = w.startNewStreamerWithRetry(w.ctx)
 		}
 
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
+		if w.ctx.Err() != nil {
+			return nil, w.ctx.Err()
 		}
 
-		u, err := w.next(ctx)
+		u, err := w.next(w.ctx)
 		if err == nil {
 			// No error.
 			w.resolvedAddrs.Set(float64(len(w.addrsState)))
@@ -140,7 +146,7 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 		w.streamer = nil
 
 	}
-	return nil, ctx.Err()
+	return nil, w.ctx.Err()
 }
 
 // next gathers kube api endpoint watch changes and translates them to naming.Update set.
@@ -191,15 +197,6 @@ func (w *watcher) next(ctx context.Context) ([]*naming.Update, error) {
 		// Deleted event gives state before deletion, but we don't care. The whole object was deleted.
 		switch change.typ {
 		case watch.Added:
-			for addr := range newAddrsState {
-				_, ok := w.addrsState[addr]
-				if ok {
-					// Address already exists in old state, nothing to do.
-					continue
-				}
-
-				updates = append(updates, w.addAddr(addr))
-			}
 		case watch.Modified:
 			for addr := range newAddrsState {
 				_, ok := w.addrsState[addr]

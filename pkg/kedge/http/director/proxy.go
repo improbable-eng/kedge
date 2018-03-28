@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"regexp"
 	"time"
 
 	"github.com/Bplotka/oidc/authorize"
@@ -27,7 +26,6 @@ import (
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/oxtoacart/bpool"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -57,15 +55,9 @@ var (
 //
 // If Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
 func New(pool backendpool.Pool, router router.Router, adhocRouter adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
-	ipMatchRegexp, err := regexp.Compile(`^\d+\.\d+\.\d+\.\d+$`)
-	if err != nil {
-		// This should never panic in production, only in unit tests.
-		panic(fmt.Sprintf("failed to compile regular expression: %v", err))
-	}
 	p := &Proxy{
-		router:        router,
-		adhocRouter:   adhocRouter,
-		ipMatchRegexp: ipMatchRegexp,
+		router:      router,
+		adhocRouter: adhocRouter,
 	}
 
 	clientMetrics := http_prometheus.ClientMetrics()
@@ -101,7 +93,6 @@ type Proxy struct {
 
 	backendReverseProxy *httputil.ReverseProxy
 	adhocReverseProxy   *httputil.ReverseProxy
-	ipMatchRegexp       *regexp.Regexp
 }
 
 func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -150,7 +141,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	p.respondWithError(err, req, resp)
+	respondWithError(err, req, resp)
 }
 
 // backendPoolTripper assumes the response has been rewritten by the proxy to have the backend as req.URL.Host
@@ -167,15 +158,10 @@ func (t *backendPoolTripper) RoundTrip(req *http.Request) (*http.Response, error
 	return tripper.RoundTrip(req)
 }
 
-func (p *Proxy) respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
+func respondWithError(err error, req *http.Request, resp http.ResponseWriter) {
 	errType := errtypes.RouteUnknownError
 	if err == router.ErrRouteNotFound {
 		errType = errtypes.NoRoute
-
-		// Add additional information if user is trying to connect to a specific IP address.
-		if p.ipMatchRegexp.MatchString(req.URL.Hostname()) {
-			err = errors.Wrapf(err, "kedge requires hostname to proxy to but was given IP address %s instead", req.URL.Hostname())
-		}
 	}
 	tracker := reporter.Extract(req)
 	tracker.ReportError(errType, err)

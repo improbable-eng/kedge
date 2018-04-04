@@ -28,6 +28,12 @@ type streamer struct {
 // Since watcher.Next() errors are assumed irrecoverable, it is a caller responsibility to re-resolve on EOF, error event etc.
 func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+	initial, err := epClient.GetState(ctx, target)
+	if err != nil {
+		cancel()
+		return nil, errors.Wrapf(err, "Failed to do get initial state for target %v", target)
+	}
+
 	stream, err := epClient.StartChangeStream(ctx, target)
 	if err != nil {
 		cancel()
@@ -47,6 +53,9 @@ func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, e
 		changeCh: make(chan change),
 		errCh:    make(chan error, 1),
 		cancel:   cancel,
+	}
+	if err := proxy(ctx, json.NewDecoder(initial), s.changeCh); err != nil {
+		return nil, err
 	}
 	go func() {
 		defer cancel()

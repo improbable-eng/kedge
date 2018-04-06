@@ -44,13 +44,17 @@ func authorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {
 		condition = append(condition, authorize.Contains(permToWhitelist))
 	}
 
+	cond, err := authorize.OR(condition...)
+	if err != nil {
+		return nil, err
+	}
 	return authorize.New(
 		context.Background(),
 		authorize.Config{
 			Provider:      *flagOIDCProvider,
 			ClientID:      *flagOIDCClientID,
 			PermsClaim:    *flagOIDCPermsClaim,
-			PermCondition: authorize.OR(condition...),
+			PermCondition: cond,
 		},
 	)
 }

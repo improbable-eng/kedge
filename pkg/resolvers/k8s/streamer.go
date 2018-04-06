@@ -135,7 +135,7 @@ func proxy(ctx context.Context, decoder *json.Decoder, endpCh chan<- change, fir
 			typ:       event.Type,
 		}
 		if firstUpdate {
-			firstUpdateCh <- struct{}{}
+			close(firstUpdateCh)
 			firstUpdate = false
 		}
 	}

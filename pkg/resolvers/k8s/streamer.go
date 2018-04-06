@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -28,12 +29,6 @@ type streamer struct {
 // Since watcher.Next() errors are assumed irrecoverable, it is a caller responsibility to re-resolve on EOF, error event etc.
 func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	initial, err := epClient.GetState(ctx, target)
-	if err != nil {
-		cancel()
-		return nil, errors.Wrapf(err, "Failed to do get initial state for target %v", target)
-	}
-
 	stream, err := epClient.StartChangeStream(ctx, target)
 	if err != nil {
 		cancel()
@@ -54,16 +49,19 @@ func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, e
 		errCh:    make(chan error, 1),
 		cancel:   cancel,
 	}
-	if err := proxy(ctx, json.NewDecoder(initial), s.changeCh); err != nil {
-		return nil, err
-	}
+	firstUpdateCh := make(chan struct{})
 	go func() {
 		defer cancel()
 
-		if err := proxy(ctx, json.NewDecoder(stream), s.changeCh); err != nil {
+		if err := proxy(ctx, json.NewDecoder(stream), s.changeCh, firstUpdateCh); err != nil {
 			s.errCh <- err
 		}
 	}()
+	select {
+	case <-firstUpdateCh:
+	case <-time.After(100 * time.Millisecond):
+		logrus.Warnf("Timed out while waiting for initial update from kubernetes.")
+	}
 
 	return s, nil
 }
@@ -91,8 +89,9 @@ type eventObject struct {
 
 // proxy receives events in loop and proxies to changeCh. If event include some error, or stream errors, it always returns
 // error. This is because watchers.Next errors are meant to irrecoverable. On cancelled context, no error is returned.
-func proxy(ctx context.Context, decoder *json.Decoder, endpCh chan<- change) error {
+func proxy(ctx context.Context, decoder *json.Decoder, endpCh chan<- change, firstUpdateCh chan<- struct{}) error {
 	var event event
+	firstUpdate := true
 
 	for ctx.Err() == nil {
 		// Blocking read.
@@ -134,6 +133,10 @@ func proxy(ctx context.Context, decoder *json.Decoder, endpCh chan<- change) err
 		endpCh <- change{
 			Endpoints: event.Object.Endpoints,
 			typ:       event.Type,
+		}
+		if firstUpdate {
+			firstUpdateCh <- struct{}{}
+			firstUpdate = false
 		}
 	}
 	return nil

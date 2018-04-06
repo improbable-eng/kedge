@@ -12,7 +12,6 @@ import (
 
 type endpointClient interface {
 	StartChangeStream(ctx context.Context, t targetEntry) (io.ReadCloser, error)
-	GetState(ctx context.Context, t targetEntry) (io.ReadCloser, error)
 }
 
 type client struct {
@@ -30,24 +29,6 @@ func (c *client) StartChangeStream(ctx context.Context, t targetEntry) (io.ReadC
 	)
 
 	return c.startGET(ctx, epWatchURL)
-}
-
-// GetState will get state before we start running StartChangeStream.
-func (c *client) GetState(ctx context.Context, t targetEntry) (io.ReadCloser, error) {
-	epWatchURL := fmt.Sprintf("%s/api/v1/namespaces/%s/endpoints/%s",
-		c.k8sClient.Address,
-		t.namespace,
-		t.service,
-	)
-
-	data, err := c.startGET(ctx, epWatchURL)
-	if err != nil {
-		return nil, err
-	}
-	if err = data.Close(); err != nil {
-		return nil, errors.Wrapf(err, "failed to close stream")
-	}
-	return data, nil
 }
 
 // NOTE: It is caller responsibility to read body through and close it.

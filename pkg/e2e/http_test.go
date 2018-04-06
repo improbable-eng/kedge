@@ -51,7 +51,7 @@ func TestHTTPEndpointCall(t *testing.T) {
 				return errors.New("not ready")
 			}
 
-			t.Errorf("Unexpected status code: %s. Resp: %v", status, body)
+			t.Errorf("Unexpected status code: %v. Resp: %v", status, body)
 			return nil
 		}
 

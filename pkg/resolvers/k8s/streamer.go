@@ -60,7 +60,7 @@ func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, e
 	select {
 	case <-firstUpdateCh:
 	case <-time.After(100 * time.Millisecond):
-		logrus.Warnf("Timed out while waiting for initial update from kubernetes.")
+		logrus.Warnf("Timed out while waiting for initial update from kubernetes for %s in %s.", target.service, target.namespace)
 	}
 
 	return s, nil

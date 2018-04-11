@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/improbable-eng/kedge/protogen/e2e"
-	"github.com/improbable-eng/thanos/pkg/runutil"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -33,7 +32,7 @@ func TestGRPCEndpointCall(t *testing.T) {
 		<-exit
 	}()
 
-	err = runutil.Retry(time.Second, ctx.Done(), func() error {
+	err = Retry(time.Second, ctx.Done(), func() error {
 		if err = assertRunning(exit); err != nil {
 			t.Error(err)
 			return nil

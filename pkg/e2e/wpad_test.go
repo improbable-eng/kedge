@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/improbable-eng/thanos/pkg/runutil"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +54,7 @@ func TestWinchPAC(t *testing.T) {
 		<-exit
 	}()
 
-	err = runutil.Retry(time.Second, ctx.Done(), func() error {
+	err = Retry(time.Second, ctx.Done(), func() error {
 		if err = assertRunning(exit); err != nil {
 			t.Error(err)
 			return nil

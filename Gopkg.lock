@@ -201,12 +201,6 @@
   revision = "3c3372fdcde8456476c314f805e8e15f929bd35f"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/improbable-eng/thanos"
-  packages = ["pkg/runutil"]
-  revision = "ed6099df6b21c5d8a0ddf3c9af109392dc1c94db"
-
-[[projects]]
   name = "github.com/jonboulle/clockwork"
   packages = ["."]
   revision = "72f9bd7c4e0c2a40055ab3d0f09654f730cce982"
@@ -553,6 +547,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f0ddf2001093d134293ee4fc6e8b4ba2ead4549aff7b04cf4f1cbf73cd920589"
+  inputs-digest = "ab7cca79e0ff60f0dc763b2857748e8b4dcfc034c332e7754a857739da003aa1"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -44,9 +44,14 @@ func authorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {
 		condition = append(condition, authorize.Contains(permToWhitelist))
 	}
 
-	cond, err := authorize.OR(condition...)
-	if err != nil {
-		return nil, err
+	cond := condition[0] // Condition array is always non-empty.
+	if len(condition) > 1 {
+		// authorize.OR has to be used with 2 or more conditions.
+		var err error
+		cond, err = authorize.OR(condition...)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return authorize.New(
 		context.Background(),

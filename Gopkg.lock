@@ -17,8 +17,8 @@
     "login/k8scache",
     "xerrors"
   ]
-  revision = "9281f315499f2c726355690f18691c9071e13690"
-  version = "v0.3.0"
+  revision = "b7fdf312bc7ce1ea7749fbe4dc5148961bb1667a"
+  version = "v0.4.0"
 
 [[projects]]
   name = "github.com/PuerkitoBio/purell"
@@ -547,6 +547,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ab7cca79e0ff60f0dc763b2857748e8b4dcfc034c332e7754a857739da003aa1"
+  inputs-digest = "31e8c291236b73f5e80b724762275364563cd570c524c64c5f9bf9293f32f7a6"
   solver-name = "gps-cdcl"
   solver-version = 1

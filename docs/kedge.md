@@ -190,8 +190,10 @@ And HTTP backend in form of:
 }
 ```
 
-This is assumed to be HTTP because the name starts `http-` (it can be as well exactly named `http`).
-Similar for GRPC if name is `grpc` or starts from `grpc-`
+This is assumed to be HTTP because the name starts `http-<...>` (it can be as well exactly named `http`).
+Similar for GRPC if name is `grpc` or starts from `grpc-<...>`
+
+NOTE: If you your backend is behind TLS, name your port `httptls` or `httptls-<...>` for HTTPS or `grpctls` or `grpctls-<...>` for setup insecure TLS between kedge and backend. Currently only `insecure` local cluster traffic is allowed, since there is no easy way to configure proper certs for port in k8s `service.yaml` itself. This can be implemented in future though.
 
 If you wish to override host_matcher or service_name_matcher use annotations:
   `<--discovery_label_annotation_prefix>host-matcher = <domain>`

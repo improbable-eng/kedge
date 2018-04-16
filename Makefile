@@ -26,8 +26,10 @@ vet:
 install-tools:
 	@echo ">> fetching goimports"
 	@go get -u golang.org/x/tools/cmd/goimports
+	@go install golang.org/x/tools/cmd/goimports
 	@echo ">> fetching dep"
 	@go get -u github.com/golang/dep/cmd/dep
+	@go install github.com/golang/dep/cmd/dep
 
 proto: 
 	@echo ">> generating protobufs"

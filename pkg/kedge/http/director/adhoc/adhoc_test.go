@@ -2,10 +2,12 @@ package adhoc
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/golang/protobuf/jsonpb"
+	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,9 +46,10 @@ func TestAdhocMatches(t *testing.T) {
 	config := &pb.DirectorConfig_Http{}
 	require.NoError(t, jsonpb.UnmarshalString(configJson, config))
 
-	oldLookup := DefaultALookup
-	defer func() { DefaultALookup = oldLookup }()
-	DefaultALookup = func(addr string) (names []string, err error) {
+	oldLookup := common.DefaultALookup
+	defer func() { common.DefaultALookup = oldLookup }()
+	common.DefaultALookup = func(addr string) (names []string, err error) {
+		fmt.Printf("adhoc_test.go:51 debugging %#v\n", addr)
 		switch addr {
 		case "1-2-3-4.namespace.pods.cluster.local":
 			return []string{"1.2.3.4"}, nil
@@ -107,7 +110,7 @@ func TestAdhocMatches(t *testing.T) {
 			req, err := http.NewRequest("GET", "/foo", nil)
 			require.NoError(t, err, "parsing the request shouldn't fail")
 			req.URL.Host = tcase.hostPort
-			be, err := a.Address(req)
+			be, err := a.Address(req.URL.Host)
 			if tcase.expectedErr != "" {
 				assert.EqualError(t, err, tcase.expectedErr)
 			} else {

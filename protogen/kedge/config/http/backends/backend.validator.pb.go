@@ -27,7 +27,7 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-var _regex_Backend_Name = regexp.MustCompile("^[a-z_0-9.]{2,64}$")
+var _regex_Backend_Name = regexp.MustCompile(`^[a-z_0-9.]{2,64}$`)
 
 func (this *Backend) Validate() error {
 	if !_regex_Backend_Name.MatchString(this.Name) {

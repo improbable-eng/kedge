@@ -17,8 +17,8 @@ import (
 	"github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
 	"github.com/improbable-eng/kedge/pkg/http/tripperware"
+	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/backendpool"
-	"github.com/improbable-eng/kedge/pkg/kedge/http/director/adhoc"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director/proxyreq"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director/router"
 	"github.com/improbable-eng/kedge/pkg/reporter"
@@ -53,8 +53,8 @@ var (
 // The Router decides which "well-known" routes a given request matches, and which backend from the Pool it should be
 // sent to. The backends in the Pool have pre-dialed connections and are load balanced.
 //
-// If Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
-func New(pool backendpool.Pool, router router.Router, adhocRouter adhoc.Addresser, logEntry logrus.FieldLogger) *Proxy {
+// Adhoc routing supports dialing to whitelisted DNS names either through DNS A or SRV records for undefined backends.
+func New(pool backendpool.Pool, router router.Router, adhocRouter common.Addresser, logEntry logrus.FieldLogger) *Proxy {
 	p := &Proxy{
 		router:      router,
 		adhocRouter: adhocRouter,
@@ -89,7 +89,7 @@ func New(pool backendpool.Pool, router router.Router, adhocRouter adhoc.Addresse
 // Proxy is a forward/reverse proxy that implements Route+Backend and Adhoc Rules forwarding.
 type Proxy struct {
 	router      router.Router
-	adhocRouter adhoc.Addresser
+	adhocRouter common.Addresser
 
 	backendReverseProxy *httputil.ReverseProxy
 	adhocReverseProxy   *httputil.ReverseProxy
@@ -120,7 +120,7 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if err == router.ErrRouteNotFound {
 		// Try adhoc.
 		var addr string
-		addr, err = p.adhocRouter.Address(req)
+		addr, err = p.adhocRouter.Address(req.URL.Host)
 		if err == nil {
 			// We need to explicitly overwrite scheme to plain HTTP.
 			normReq.URL.Scheme = "http"

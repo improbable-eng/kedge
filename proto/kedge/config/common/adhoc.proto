@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package kedge.config.http.routes;
+package kedge.config.common;
 
 
 /// Adhoc describes an adhoc proxying method that is not backed by a backend, but dials a "free form" DNS record.

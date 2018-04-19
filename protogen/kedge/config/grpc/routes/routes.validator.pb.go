@@ -24,7 +24,7 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-var _regex_Route_BackendName = regexp.MustCompile("^[a-z_0-9.]{2,64}$")
+var _regex_Route_BackendName = regexp.MustCompile(`^[a-z_0-9.]{2,64}$`)
 
 func (this *Route) Validate() error {
 	if !_regex_Route_BackendName.MatchString(this.BackendName) {

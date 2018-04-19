@@ -37,6 +37,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/improbable-eng/go-srvlb/srv"
 	"github.com/improbable-eng/kedge/pkg/http/header"
+	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/backendpool"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/client"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director"
@@ -45,6 +46,7 @@ import (
 	"github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/reporter"
 	"github.com/improbable-eng/kedge/pkg/resolvers/srv"
+	"github.com/improbable-eng/kedge/protogen/kedge/config/common"
 	pb_res "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	pb_be "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
 	pb_route "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
@@ -143,11 +145,11 @@ var (
 		},
 	}
 
-	adhocConfig = []*pb_route.Adhoc{
+	adhocConfig = []*kedge_config_common.Adhoc{
 		{
 			DnsNameMatcher: "*.pods.test.local",
-			Port: &pb_route.Adhoc_Port{
-				AllowedRanges: []*pb_route.Adhoc_Port_Range{
+			Port: &kedge_config_common.Adhoc_Port{
+				AllowedRanges: []*kedge_config_common.Adhoc_Port_Range{
 					{
 						// This will be started on local host. God knows what port it will be.
 						From: 1024,
@@ -334,8 +336,8 @@ func (s *HttpProxyingIntegrationSuite) SetupSuite() {
 	s.originalSrvResolver = srvresolver.ParentSrvResolver
 	srvresolver.ParentSrvResolver = s
 	// Make ourselves the A resolver for backends for the Addresser.
-	s.originalAResolver = adhoc.DefaultALookup
-	adhoc.DefaultALookup = s.LookupAddr
+	s.originalAResolver = common.DefaultALookup
+	common.DefaultALookup = s.LookupAddr
 
 	s.buildBackends()
 
@@ -692,7 +694,7 @@ func (s *HttpProxyingIntegrationSuite) TearDownSuite() {
 		srvresolver.ParentSrvResolver = s.originalSrvResolver
 	}
 	if s.originalAResolver != nil {
-		adhoc.DefaultALookup = s.originalAResolver
+		common.DefaultALookup = s.originalAResolver
 	}
 
 	time.Sleep(10 * time.Millisecond)

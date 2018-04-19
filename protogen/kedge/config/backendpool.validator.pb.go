@@ -70,7 +70,7 @@ func (this *BackendPoolConfig_Http) Validate() error {
 	return nil
 }
 
-var _regex_TlsServerConfig_Name = regexp.MustCompile("^[a-z_.]{2,64}$")
+var _regex_TlsServerConfig_Name = regexp.MustCompile(`^[a-z_.]{2,64}$`)
 
 func (this *TlsServerConfig) Validate() error {
 	if !_regex_TlsServerConfig_Name.MatchString(this.Name) {

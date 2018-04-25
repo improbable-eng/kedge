@@ -1,5 +1,35 @@
 # Kedge & Winch Release Notes
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
+and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+
+Types of changes:
+`Added` for new features.
+`Changed` for changes in existing functionality.
+`Deprecated` for soon-to-be removed features.
+`Removed` for now removed features.
+`Fixed` for any bug fixes.
+`Security` in case of vulnerabilities.
+
+## [Unreleased]
+### Added
+- kedge: gRPC adhoc!
+### Fixed
+- winch: Fixed go routine leaks in gRPC path (client connection not closed)
+- winch: Allow Debug endpoints to be exposed on different port.
+
+## [0.1.0](https://github.com/improbable-eng/kedge/releases/tag/v0.1.0) - 2018-04-13
+### Added
+- winch: Early error check if user tries to connect to IP instead of hostname
+### Changed
+- kedge: Improved not-kedge-destination error message.
+### Fixed
+- kedge: More reliable even stream for k8sresolver.
+
+
+Old Releases (format not applicable)
 ### [v1.0.0-beta.12](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.12)
 Kedge service:
 * [x] Fixed critical bug(s) in k8sresolver

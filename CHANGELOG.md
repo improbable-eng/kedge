@@ -16,9 +16,9 @@ Types of changes:
 ## [Unreleased]
 ### Added
 - kedge: gRPC adhoc!
+- winch: Allow Debug endpoints to be exposed on different port.
 ### Fixed
 - winch: Fixed go routine leaks in gRPC path (client connection not closed)
-- winch: Allow Debug endpoints to be exposed on different port.
 
 ## [0.1.0](https://github.com/improbable-eng/kedge/releases/tag/v0.1.0) - 2018-04-13
 ### Added
@@ -28,8 +28,7 @@ Types of changes:
 ### Fixed
 - kedge: More reliable even stream for k8sresolver.
 
-
-Old Releases (format not applicable)
+# Old Releases (format not applicable)
 ### [v1.0.0-beta.12](https://github.com/improbable-eng/kedge/releases/tag/v1.0.0-beta.12)
 Kedge service:
 * [x] Fixed critical bug(s) in k8sresolver

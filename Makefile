@@ -28,6 +28,8 @@ install-tools:
 	@go get -u golang.org/x/tools/cmd/goimports
 	@echo ">> fetching dep"
 	@go get -u github.com/golang/dep/cmd/dep
+	@go get -u github.com/mwitkow/go-proto-validators/protoc-gen-govalidators
+	@go get -u github.com/golang/protobuf/protoc-gen-go
 
 proto: 
 	@echo ">> generating protobufs"

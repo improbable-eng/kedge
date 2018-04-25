@@ -8,27 +8,53 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/improbable-eng/kedge/pkg/grpcutils"
+	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/backendpool"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/director/router"
 	"github.com/mwitkow/grpc-proxy/proxy"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
 // New builds a StreamDirector based off a backend pool and a router.
-func New(pool backendpool.Pool, router router.Router) proxy.StreamDirector {
+func New(pool backendpool.Pool, adhocRouter common.Addresser, grpcRouter router.Router) proxy.StreamDirector {
 	return func(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
-		beName, err := router.Route(ctx, fullMethodName)
+		beName, err := grpcRouter.Route(ctx, fullMethodName)
 		if err != nil {
+			if err == router.ErrRouteNotFound {
+				ipPort, err := adhocRouter.Address(metautils.ExtractIncoming(ctx).Get(":authority"))
+				if err != nil {
+					return ctx, nil, err
+				}
+
+				var opts []grpc.DialOption
+				opts = append(opts,
+					grpc.WithInsecure(),
+					grpc.WithBlock(),
+					grpc.WithAuthority(fullMethodName),
+					grpc.WithCodec(proxy.Codec()),
+				)
+				cc, err := grpc.Dial(ipPort, opts...)
+				if err != nil {
+					return ctx, nil, errors.Wrap(err, "dial")
+				}
+
+				go func() {
+					<-ctx.Done()
+					cc.Close()
+				}()
+
+				return grpcutils.CloneIncomingToOutgoingMD(ctx), cc, err
+			}
 			return ctx, nil, err
 		}
 
 		grpc_ctxtags.Extract(ctx).Set("grpc.proxy.backend", beName)
-		ctx = grpcutils.CloneIncomingToOutgoingMD(ctx)
 
 		cc, err := pool.Conn(beName)
-		return ctx, cc, err
+		return grpcutils.CloneIncomingToOutgoingMD(ctx), cc, err
 	}
 }
 

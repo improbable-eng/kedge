@@ -65,7 +65,7 @@ func (b *backend) Conn() (*grpc.ClientConn, error) {
 	b.target = target
 	b.resolver = resolver
 
-	cc, err = buildClientConn(b.config, target, resolver)
+	cc, err = BuildClientConn(b.config, target, resolver)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func newBackend(cnf *pb.Backend) (*backend, error) {
 	b.target = target
 	b.resolver = resolver
 
-	cc, err := buildClientConn(cnf, target, resolver)
+	cc, err := BuildClientConn(cnf, target, resolver)
 	if err != nil && err.Error() == "grpc: there is no address available to dial" {
 		return b, nil // make this lazy
 	} else if err != nil {
@@ -121,7 +121,7 @@ func (b *addrTagBalancer) Get(ctx context.Context, opts grpc.BalancerGetOptions)
 	return addr, put, err
 }
 
-func buildClientConn(cnf *pb.Backend, target string, resolver naming.Resolver) (*grpc.ClientConn, error) {
+func BuildClientConn(cnf *pb.Backend, target string, resolver naming.Resolver) (*grpc.ClientConn, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, chooseDialFuncOpt(cnf))
 	opts = append(opts, chooseSecurityOpt(cnf))

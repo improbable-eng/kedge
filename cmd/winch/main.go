@@ -36,6 +36,8 @@ import (
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/pressly/chi"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/trace"
@@ -43,8 +45,9 @@ import (
 )
 
 var (
-	flagHttpPort = sharedflags.Set.Int("server_http_port", 8070, "TCP port to listen on for HTTP1.1/REST calls.")
-	flagGrpcPort = sharedflags.Set.Int("server_grpc_port", 8071, "TCP non-TLS port to listen on for insecure gRPC calls.")
+	flagHttpPort              = sharedflags.Set.Int("server_http_port", 8070, "TCP port to listen on for HTTP1.1/REST calls.")
+	flagGrpcPort              = sharedflags.Set.Int("server_grpc_port", 8071, "TCP non-TLS port to listen on for insecure gRPC calls.")
+	flagMonitoringAddressPort = sharedflags.Set.String("server_http_monitoring_address", "", "HTTP host:port to serve debug and metrics endpoints on. If empty, server_http_port will be used for that.")
 
 	flagHttpMaxWriteTimeout = sharedflags.Set.Duration("server_http_max_write_timeout", 15*time.Second, "HTTP server config, max write duration.")
 	flagHttpMaxReadTimeout  = sharedflags.Set.Duration("server_http_max_read_timeout", 15*time.Second, "HTTP server config, max read duration.")
@@ -74,6 +77,19 @@ func validateMapper(msg proto.Message) error {
 	return nil
 }
 
+func registerDebugEndpoints(reg *prometheus.Registry, mux *http.ServeMux) {
+	mux.Handle("/_metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	mux.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
+	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+	mux.Handle("/debug/traces", http.HandlerFunc(trace.Traces))
+	mux.Handle("/debug/events", http.HandlerFunc(trace.Events))
+	mux.Handle("/version", http.HandlerFunc(handleVersion))
+}
+
 func main() {
 	if err := sharedflags.Set.Parse(os.Args); err != nil {
 		log.WithError(err).Fatal("failed parsing flags")
@@ -99,23 +115,21 @@ func main() {
 		log.WithError(err).Fatal("failed building TLS config from flags")
 	}
 
+	// TODO(bplotka): Add metrics.
+	reg := prometheus.NewRegistry()
+
 	httpPlainListener := buildListenerOrFail("http_plain", *flagHttpPort)
 
-	mux := http.NewServeMux()
-	mux.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
-	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	mux.Handle("/debug/traces", http.HandlerFunc(trace.Traces))
-	mux.Handle("/debug/events", http.HandlerFunc(trace.Events))
-	mux.Handle("/version", http.HandlerFunc(handleVersion))
 	pacHandle, err := winch.NewPacFromFlags(httpPlainListener.Addr().String())
 	if err != nil {
 		log.WithError(err).Fatalf("failed to init PAC handler")
 	}
+	mux := http.NewServeMux()
 	mux.Handle("/wpad.dat", pacHandle)
+
+	if *flagMonitoringAddressPort == "" {
+		registerDebugEndpoints(reg, mux)
+	}
 
 	routes, err := winch.NewStaticRoutes(
 		winch.NewAuthFactory(httpPlainListener.Addr().String(), mux),
@@ -123,7 +137,7 @@ func main() {
 		flagAuthConfig.Get().(*pb_config.AuthConfig),
 	)
 	if err != nil {
-		log.WithError(err).Fatal("failed reading flagz from files")
+		log.WithError(err).Fatal("failed creating static routes")
 	}
 
 	var g run.Group
@@ -141,7 +155,7 @@ func main() {
 			AllowedOrigins: *flagCORSAllowedOrigins,
 		}).Handler(httpWinchHandler)
 
-		httpWinchServer := &http.Server{
+		srv := &http.Server{
 			WriteTimeout: *flagHttpMaxWriteTimeout,
 			ReadTimeout:  *flagHttpMaxReadTimeout,
 			ErrorLog:     http_logrus.AsHttpLogger(logEntry),
@@ -154,7 +168,7 @@ func main() {
 		}
 		g.Add(func() error {
 			log.Infof("listening for HTTP Plain on: %v", httpPlainListener.Addr().String())
-			err := httpWinchServer.Serve(httpPlainListener)
+			err := srv.Serve(httpPlainListener)
 			if err != nil {
 				return errors.Wrap(err, "http_plain server error")
 			}
@@ -162,20 +176,49 @@ func main() {
 		}, func(error) {
 			log.Infof("\nReceived an interrupt, stopping services...\n")
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			err := httpWinchServer.Shutdown(ctx)
-			if err != nil {
+			if err := srv.Shutdown(ctx); err != nil {
 				log.WithError(err).Errorf("Failed to gracefully shutdown server.")
 			}
 			cancel()
 			httpPlainListener.Close()
 		})
 	}
+	// Setup optional external monitoring address.
+	// This is useful when running winch as a sidecar. Thanks to this we can setup separate endpoint for monitoring.
+	// It is not safe to expose normal HTTP and gRPC ports out of the local pod, because there is no auth in front of winch.
+	if *flagMonitoringAddressPort != "" {
+		mux := http.NewServeMux()
+		registerDebugEndpoints(reg, mux)
+
+		listener, err := net.Listen("tcp", *flagMonitoringAddressPort)
+		if err != nil {
+			log.WithError(err).Fatalf("failed listening for http monitor address on %v", *flagMonitoringAddressPort)
+		}
+
+		srv := &http.Server{Handler: mux}
+		g.Add(func() error {
+			log.Infof("listening for HTTP Monitoring endpoint on: %v", listener.Addr().String())
+			err := srv.Serve(listener)
+			if err != nil {
+				return errors.Wrap(err, "HTTP monitoring server error")
+			}
+			return nil
+		}, func(error) {
+			log.Infof("\nReceived an interrupt, stopping services...\n")
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if err := srv.Shutdown(ctx); err != nil {
+				log.WithError(err).Errorf("Failed to gracefully shutdown server.")
+			}
+			cancel()
+			listener.Close()
+		})
+	}
 	{
 		// Setup gRPC proxy (plain, no HTTP CONNECT yet).
-		grpcPlainListener := buildListenerOrFail("grpc_plain", *flagGrpcPort)
+		listener := buildListenerOrFail("grpc_plain", *flagGrpcPort)
 
 		grpcWinchHandler := grpc_winch.New(kedge_map.RouteMapper(routes.GRPC()), tlsConfig, *flagDebugMode)
-		grpcWinchServer := grpc.NewServer(
+		srv := grpc.NewServer(
 			grpc.CustomCodec(proxy.Codec()), // needed for winch to function.
 			grpc.UnknownServiceHandler(proxy.TransparentHandler(grpcWinchHandler)),
 			grpc_middleware.WithUnaryServerChain(
@@ -191,15 +234,15 @@ func main() {
 		)
 
 		g.Add(func() error {
-			log.Infof("listening for gRPC Plain on: %v", grpcPlainListener.Addr().String())
-			err := grpcWinchServer.Serve(grpcPlainListener)
+			log.Infof("listening for gRPC Plain on: %v", listener.Addr().String())
+			err := srv.Serve(listener)
 			if err != nil {
 				return errors.Wrap(err, "grpc_plain server error")
 			}
 			return nil
 		}, func(error) {
-			grpcWinchServer.GracefulStop()
-			grpcPlainListener.Close()
+			srv.GracefulStop()
+			listener.Close()
 		})
 	}
 

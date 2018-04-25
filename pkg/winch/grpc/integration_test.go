@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fortytw2/leaktest"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/winch"
@@ -108,6 +109,8 @@ type WinchIntegrationSuite struct {
 }
 
 func TestWinchIntegrationSuite(t *testing.T) {
+	defer leaktest.CheckTimeout(t, 10*time.Second)()
+
 	suite.Run(t, &WinchIntegrationSuite{})
 }
 

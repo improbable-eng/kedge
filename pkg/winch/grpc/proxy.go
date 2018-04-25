@@ -78,6 +78,11 @@ func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.Stre
 			net.JoinHostPort(route.URL.Hostname(), route.URL.Port()),
 			dialOpts...,
 		)
+
+		go func() {
+			<-ctx.Done()
+			conn.Close()
+		}()
 		return ctx, conn, err
 	}
 }

@@ -184,14 +184,11 @@ func main() {
 		})
 	}
 	// Setup optional external monitoring address.
-	// This is useful when running winch as a sidecar. Thanks of this we can setup separate endpoint for monitoring.
-	// It is not safe to expose normal HTTP and gRPC ports out of the local pod, because there is no auth in front of winch,
-	// so it would allow impersonate attack.
+	// This is useful when running winch as a sidecar. Thanks to this we can setup separate endpoint for monitoring.
+	// It is not safe to expose normal HTTP and gRPC ports out of the local pod, because there is no auth in front of winch.
 	if *flagMonitoringAddressPort != "" {
 		mux := http.NewServeMux()
-		if *flagMonitoringAddressPort == "" {
-			registerDebugEndpoints(reg, mux)
-		}
+		registerDebugEndpoints(reg, mux)
 
 		listener, err := net.Listen("tcp", *flagMonitoringAddressPort)
 		if err != nil {

@@ -73,17 +73,21 @@ func New(mapper kedge_map.Mapper, config *tls.Config, debugMode bool) proxy.Stre
 			dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(newTokenCredentials(route.BackendAuth, "authorization")))
 		}
 
+		// TODO(bplotka): Consider connection pooling towards static number of kedges.
 		conn, err := grpc.DialContext(
 			ctx,
 			net.JoinHostPort(route.URL.Hostname(), route.URL.Port()),
 			dialOpts...,
 		)
+		if err != nil {
+			return ctx, nil, err
+		}
 
 		go func() {
 			<-ctx.Done()
 			conn.Close()
 		}()
-		return ctx, conn, err
+		return ctx, conn, nil
 	}
 }
 

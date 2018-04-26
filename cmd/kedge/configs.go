@@ -6,9 +6,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	grpc_bp "github.com/improbable-eng/kedge/pkg/kedge/grpc/backendpool"
+	grpc_adhoc "github.com/improbable-eng/kedge/pkg/kedge/grpc/director/adhoc"
 	grpc_router "github.com/improbable-eng/kedge/pkg/kedge/grpc/director/router"
 	http_bp "github.com/improbable-eng/kedge/pkg/kedge/http/backendpool"
-	"github.com/improbable-eng/kedge/pkg/kedge/http/director/adhoc"
+	http_adhoc "github.com/improbable-eng/kedge/pkg/kedge/http/director/adhoc"
 	http_router "github.com/improbable-eng/kedge/pkg/kedge/http/director/router"
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
@@ -44,7 +45,8 @@ var (
 	httpBackendPool = http_bp.NewDynamic(logrus.StandardLogger())
 	grpcRouter      = grpc_router.NewDynamic(logrus.StandardLogger())
 	httpRouter      = http_router.NewDynamic()
-	httpAddresser   = common.NewDynamic(adhoc.NewStaticAddresser([]*kedge_config_common.Adhoc{}))
+	httpAddresser   = common.NewDynamic(http_adhoc.NewStaticAddresser([]*kedge_config_common.Adhoc{}))
+	grpcAddresser   = common.NewDynamic(grpc_adhoc.NewStaticAddresser([]*kedge_config_common.Adhoc{}))
 
 	backendMu sync.Mutex
 )
@@ -63,8 +65,9 @@ func directorConfigReload(_ proto.Message, newValue proto.Message) {
 
 	// The gRPC and HTTP fields are guaranteed to be there because of validation.
 	grpcRouter.Update(newConfig.GetGrpc().Routes)
+	grpcAddresser.Update(grpc_adhoc.NewStaticAddresser(newConfig.Grpc.AdhocRules))
 	httpRouter.Update(newConfig.GetHttp().Routes)
-	httpAddresser.Update(adhoc.NewStaticAddresser(newConfig.Http.AdhocRules))
+	httpAddresser.Update(http_adhoc.NewStaticAddresser(newConfig.Http.AdhocRules))
 }
 
 func backendConfigReloaded(_ proto.Message, newValue proto.Message) {

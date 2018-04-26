@@ -1,5 +1,3 @@
-// Copyright (c) Improbable Worlds Ltd, All Rights Reserved
-
 package common
 
 import (
@@ -7,6 +5,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"errors"
+	"fmt"
 
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/common"
 )
@@ -88,4 +89,15 @@ func PortAllowed(port int, portRule *pb.Adhoc_Port) bool {
 		}
 	}
 	return false
+}
+
+func ResolveHost(hostStr string) (string, error) {
+	addrs, err := DefaultALookup(hostStr)
+	if err != nil {
+		return "", err
+	}
+	if len(addrs) == 0 {
+		return "", errors.New(fmt.Sprintf("did not find any A records for host %v", hostStr))
+	}
+	return addrs[0], nil
 }

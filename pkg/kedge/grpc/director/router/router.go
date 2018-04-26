@@ -1,26 +1,23 @@
 package router
 
 import (
-	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
-
-	"strings"
-
-	"sync"
-
 	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
+	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var (
-	emptyMd       = metadata.Pairs()
-	routeNotFound = grpc.Errorf(codes.Unimplemented, "unknown route to service")
+	emptyMd          = metadata.Pairs()
+	ErrRouteNotFound = status.Errorf(codes.Unimplemented, "unknown route to service")
 )
 
 // Router is an interface that decides what backend a given stream should be directed to.
@@ -88,7 +85,7 @@ func (r *static) Route(ctx context.Context, fullMethodName string) (backendName 
 		}
 		return route.BackendName, nil
 	}
-	return "", routeNotFound
+	return "", ErrRouteNotFound
 }
 
 func (r *static) serviceNameMatches(fullMethodName string, matcher string) bool {

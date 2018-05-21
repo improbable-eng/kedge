@@ -46,6 +46,7 @@ import (
 
 var (
 	flagHttpPort              = sharedflags.Set.Int("server_http_port", 8070, "TCP port to listen on for HTTP1.1/REST calls.")
+	flagMetricsPath           = sharedflags.Set.String("server_metrics_path", "/metrics", "path on which to serve metrics")
 	flagGrpcPort              = sharedflags.Set.Int("server_grpc_port", 8071, "TCP non-TLS port to listen on for insecure gRPC calls.")
 	flagMonitoringAddressPort = sharedflags.Set.String("server_http_monitoring_address", "", "HTTP host:port to serve debug and metrics endpoints on. If empty, server_http_port will be used for that.")
 
@@ -78,7 +79,7 @@ func validateMapper(msg proto.Message) error {
 }
 
 func registerDebugEndpoints(reg *prometheus.Registry, mux *http.ServeMux) {
-	mux.Handle("/_metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	mux.Handle(*flagMetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	mux.Handle("/debug/flagz", http.HandlerFunc(flagz.NewStatusEndpoint(sharedflags.Set).ListFlags))
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
 	mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))

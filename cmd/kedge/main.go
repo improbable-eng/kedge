@@ -148,7 +148,7 @@ func main() {
 		})
 	}
 
-	// authorizer decides how to auth the endpoint.
+	// Authorizer decides how to auth the endpoint.
 	authorizer, err := authorizerFromFlags(logEntry)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create authorizer.")

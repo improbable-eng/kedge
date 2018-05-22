@@ -118,6 +118,10 @@ func main() {
 
 	// TODO(bplotka): Add metrics.
 	reg := prometheus.NewRegistry()
+	reg.MustRegister(
+		prometheus.NewProcessCollector(os.Getpid(), ""),
+		prometheus.NewGoCollector(),
+	)
 
 	httpPlainListener := buildListenerOrFail("http_plain", *flagHttpPort)
 
@@ -218,6 +222,9 @@ func main() {
 		// Setup gRPC proxy (plain, no HTTP CONNECT yet).
 		listener := buildListenerOrFail("grpc_plain", *flagGrpcPort)
 
+		srvMetrics := grpc_prometheus.NewServerMetrics()
+		reg.MustRegister(srvMetrics)
+
 		grpcWinchHandler := grpc_winch.New(kedge_map.RouteMapper(routes.GRPC()), tlsConfig, *flagDebugMode)
 		srv := grpc.NewServer(
 			grpc.CustomCodec(proxy.Codec()), // needed for winch to function.
@@ -225,12 +232,12 @@ func main() {
 			grpc_middleware.WithUnaryServerChain(
 				grpc_ctxtags.UnaryServerInterceptor(),
 				grpc_logrus.UnaryServerInterceptor(logEntry),
-				grpc_prometheus.UnaryServerInterceptor,
+				srvMetrics.UnaryServerInterceptor(),
 			),
 			grpc_middleware.WithStreamServerChain(
 				grpc_ctxtags.StreamServerInterceptor(),
 				grpc_logrus.StreamServerInterceptor(logEntry),
-				grpc_prometheus.StreamServerInterceptor,
+				srvMetrics.StreamServerInterceptor(),
 			),
 		)
 

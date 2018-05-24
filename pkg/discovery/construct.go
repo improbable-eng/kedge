@@ -73,6 +73,10 @@ func cloneBaseConfigs(baseDirector *pb_config.DirectorConfig, baseBackendpool *p
 		for _, route := range baseDirector.GetGrpc().GetRoutes() {
 			resultDirectorConfig.GetGrpc().Routes = append(resultDirectorConfig.GetGrpc().Routes, route)
 		}
+
+		for _, route := range baseDirector.GetGrpc().GetAdhocRules() {
+			resultDirectorConfig.GetGrpc().AdhocRules = append(resultDirectorConfig.GetGrpc().AdhocRules, route)
+		}
 	}
 	if baseBackendpool.GetGrpc() != nil {
 		for _, backend := range baseBackendpool.GetGrpc().GetBackends() {

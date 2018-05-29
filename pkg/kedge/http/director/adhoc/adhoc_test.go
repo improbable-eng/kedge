@@ -41,6 +41,28 @@ func TestAdhocMatches(t *testing.T) {
 				}
 			]
 		}
+	},
+	{
+		"dnsNameMatcher": "*.pods.cluster.local.with.replace",
+		"dnsNameReplace": {
+			"pattern": "local.with.replace",
+			"substitution": "replaced"
+		},
+		"port": {
+			"default": 80,
+			"allowed": [80]
+		}
+	},
+	{
+		"dnsNameMatcher": "*.misconfigured",
+		"dnsNameReplace": {
+			"pattern": "non-existing-pattern",
+			"substitution": "should-not-replace"
+		},
+		"port": {
+			"default": 80,
+			"allowed": [80]
+		}
 	}
 ]}`
 	config := &pb.DirectorConfig_Http{}
@@ -57,6 +79,8 @@ func TestAdhocMatches(t *testing.T) {
 			return []string{"2.3.4.5", "2.3.4.6"}, nil
 		case "weird.cluster.local":
 			return []string{"7.6.5.4", "9.8.7.6"}, nil
+		case "pod-0.namespace.pods.cluster.replaced":
+			return []string{"1.2.3.10"}, nil
 		default:
 			return nil, errors.New("test lookup error")
 		}
@@ -104,6 +128,16 @@ func TestAdhocMatches(t *testing.T) {
 			name:        "fails dial errors",
 			hostPort:    "otherbackend.somenamespace.svc.cluster.local:8081",
 			expectedErr: "adhoc: cannot resolve otherbackend.somenamespace.svc.cluster.local:8081 host: test lookup error",
+		},
+		{
+			name:         "matches and replaces host",
+			hostPort:     "pod-0.namespace.pods.cluster.local.with.replace",
+			expectedAddr: "1.2.3.10:80",
+		},
+		{
+			name:        "fail not matched pattern",
+			hostPort:    "pod-0.namespace.misconfigured",
+			expectedErr: "adhoc: cannot resolve pod-0.namespace.misconfigured host: replace pattern non-existing-pattern does match given host pod-0.namespace.misconfigured. Configuration error",
 		},
 	} {
 		t.Run(tcase.name, func(t *testing.T) {

@@ -2,19 +2,29 @@ syntax = "proto3";
 
 package kedge.config.common;
 
+import "github.com/mwitkow/go-proto-validators/validator.proto";
 
 /// Adhoc describes an adhoc proxying method that is not backed by a backend, but dials a "free form" DNS record.
 message Adhoc {
-    /// dns_name_matcher matches the hostname that will be resolved using A records.
+    /// dns_name_matcher matches the hostname that will be used to resolve A records.
     /// The names are matched with a * prefix. For example:
     /// - *.pod.cluster.local
     /// - *.my_namespace.svc.cluster.local
     /// - *.local
     /// The first rule that matches a DNS name will be used, and its ports will be checked.
-    string dns_name_matcher = 1;
+    string dns_name_matcher = 1 [(validator.field) = {msg_exists : true}];
 
     /// Port controls the :port behaviour of the URI requested.
-    Port port = 2;
+    Port port = 2 [(validator.field) = {msg_exists : true}];
+
+    /// dns_name_replace is an optional replacement pattern to alter hostname before A records resolution.
+    /// This is useful when exposed domain is different than local resolvable one.
+    ///
+    /// Example:
+    /// Inside cluster you can resolve only 'abc.default.svc.cluster.local' however since you have multiple clusters
+    /// you want this abc service/pod to be accessible as 'abc.default.svc.cluster1.example.com'. In this case you want
+    /// to set dns_name_replace.pattern "cluster1.example.com" , dns_name_replace.substitution="cluster.local"
+    Replace dns_name_replace = 3;
 
     /// Port controls how the :port part of the URI is processed.
     message Port {
@@ -37,5 +47,10 @@ message Adhoc {
         }
     }
 
+    message Replace {
+        // pattern specified pattern to substitute the hostname with. If not pattern is not found error is returned (!).
+        string pattern = 1 [(validator.field) = {msg_exists : true}];
+        string substitution = 2 [(validator.field) = {msg_exists : true}];
+    }
     // TODO(mwitkow): Add authorization.
 }

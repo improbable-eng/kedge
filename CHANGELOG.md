@@ -15,6 +15,7 @@ Types of changes:
 
 ## [Unreleased]
 ### Added
+- kedge: Adhoc supports basic hostname rewrite.
 - kedge: gRPC adhoc!
 - winch: Allow Debug endpoints to be exposed on different port.
 ### Fixed

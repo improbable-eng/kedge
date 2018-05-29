@@ -39,7 +39,8 @@ func (a *static) Address(hostString string) (string, error) {
 		if !common.PortAllowed(portForRule, rule.Port) {
 			return "", status.Errorf(codes.InvalidArgument, "adhoc: port %d is not allowed", portForRule)
 		}
-		ipAddr, err := common.ResolveHost(hostName)
+
+		ipAddr, err := common.AdhocResolveHost(hostName, rule.DnsNameReplace)
 		if err != nil {
 			return "", status.Errorf(codes.NotFound, "adhoc: cannot resolve %s host: %v", hostString, err)
 		}

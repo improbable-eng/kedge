@@ -12,10 +12,11 @@ It has these top-level messages:
 */
 package kedge_config_common
 
+import fmt "fmt"
 import go_proto_validators "github.com/mwitkow/go-proto-validators"
 import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
 import math "math"
+import _ "github.com/mwitkow/go-proto-validators"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -23,9 +24,17 @@ var _ = fmt.Errorf
 var _ = math.Inf
 
 func (this *Adhoc) Validate() error {
+	if nil == this.Port {
+		return go_proto_validators.FieldError("Port", fmt.Errorf("message must exist"))
+	}
 	if this.Port != nil {
 		if err := go_proto_validators.CallValidatorIfExists(this.Port); err != nil {
 			return go_proto_validators.FieldError("Port", err)
+		}
+	}
+	if this.DnsNameReplace != nil {
+		if err := go_proto_validators.CallValidatorIfExists(this.DnsNameReplace); err != nil {
+			return go_proto_validators.FieldError("DnsNameReplace", err)
 		}
 	}
 	return nil
@@ -41,5 +50,8 @@ func (this *Adhoc_Port) Validate() error {
 	return nil
 }
 func (this *Adhoc_Port_Range) Validate() error {
+	return nil
+}
+func (this *Adhoc_Replace) Validate() error {
 	return nil
 }

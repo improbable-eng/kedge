@@ -6,10 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"errors"
-	"fmt"
-
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/common"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -91,13 +89,20 @@ func PortAllowed(port int, portRule *pb.Adhoc_Port) bool {
 	return false
 }
 
-func ResolveHost(hostStr string) (string, error) {
+func AdhocResolveHost(hostStr string, replace *pb.Adhoc_Replace) (string, error) {
+	if replace != nil {
+		if !strings.Contains(hostStr, replace.Pattern) {
+			return "", errors.Errorf("replace pattern %s does match given host %s. Configuration error", replace.Pattern, hostStr)
+		}
+
+		hostStr = strings.Replace(hostStr, replace.Pattern, replace.Substitution, -1)
+	}
 	addrs, err := DefaultALookup(hostStr)
 	if err != nil {
 		return "", err
 	}
 	if len(addrs) == 0 {
-		return "", errors.New(fmt.Sprintf("did not find any A records for host %v", hostStr))
+		return "", errors.Errorf("did not find any A records for host %v", hostStr)
 	}
 	return addrs[0], nil
 }

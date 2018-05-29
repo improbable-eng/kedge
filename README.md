@@ -3,7 +3,6 @@
 [![Travis Build](https://travis-ci.org/improbable-eng/kedge.svg?branch=master)](https://travis-ci.org/improbable-eng/kedge)
 [![Go Report Card](https://goreportcard.com/badge/github.com/improbable-eng/kedge)](https://goreportcard.com/report/github.com/improbable-eng/kedge)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![quality: WIF](https://img.shields.io/badge/quality-BETA-blue.svg)](#status)
 
  > [kedge](https://www.merriam-webster.com/dictionary/kedge) (verb) to move (a ship) by means of a line attached to a small anchor dropped at the distance and in the direction desired
 

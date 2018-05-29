@@ -39,7 +39,8 @@ func (a *static) Address(hostPort string) (string, error) {
 		if !common.PortAllowed(portForRule, rule.Port) {
 			return "", router.NewError(http.StatusBadRequest, fmt.Sprintf("adhoc: port %d is not allowed", portForRule))
 		}
-		ipAddr, err := common.ResolveHost(hostName)
+
+		ipAddr, err := common.AdhocResolveHost(hostName, rule.DnsNameReplace)
 		if err != nil {
 			return "", router.NewError(http.StatusBadGateway, fmt.Sprintf("adhoc: cannot resolve %s host: %v", hostPort, err))
 		}

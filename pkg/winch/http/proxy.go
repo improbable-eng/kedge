@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 	"time"
 
 	"github.com/improbable-eng/go-httpwares"
@@ -55,7 +56,8 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 
 	bufferpool := bpool.NewBytePool(*flagBufferCount, *flagBufferSizeBytes)
 	return &Proxy{
-		mux: mux,
+		logEntry: logEntry,
+		mux:      mux,
 		kedgeReverseProxy: &httputil.ReverseProxy{
 			Director:      func(r *http.Request) {},
 			Transport:     parentTransport,
@@ -79,6 +81,7 @@ func New(mapper winchMapper, config *tls.Config, logEntry *logrus.Entry, mux *ht
 // Proxy is a forward/reverse proxy that implements Mapper+Kedge forwarding.
 // Mux is for routes that are directed to winch directly (debug endpoints).
 type Proxy struct {
+	logEntry          *logrus.Entry
 	kedgeReverseProxy *httputil.ReverseProxy
 	mux               *http.ServeMux
 }
@@ -90,7 +93,8 @@ func (p *Proxy) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	// Is this request directly to us, or just to be proxied?
 	// This is to handle case when winch have /debug/xxx endpoint and we want to proxy through winch to same endpoint's path.
-	if req.URL.Scheme == "" {
+	if req.URL.Scheme == "" && (strings.HasPrefix(req.Host, "127.0.0.1") || strings.HasPrefix(req.Host, "localhost")) {
+		p.logEntry.Debug("Assuming request directly to winch")
 		p.mux.ServeHTTP(resp, req)
 		return
 	}

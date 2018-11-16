@@ -127,7 +127,7 @@ func main() {
 
 	pacHandle, err := winch.NewPacFromFlags(httpPlainListener.Addr().String())
 	if err != nil {
-		log.WithError(err).Fatalf("failed to init PAC handler")
+		log.WithError(err).Fatal("failed to init PAC handler")
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/wpad.dat", pacHandle)
@@ -136,9 +136,14 @@ func main() {
 		registerDebugEndpoints(reg, mux)
 	}
 
+	mapperConfig := flagMapperConfig.Get().(*pb_config.MapperConfig)
+	if len(mapperConfig.Routes) == 0 {
+		log.Fatalf("no winch mapper routes defined")
+	}
+
 	routes, err := winch.NewStaticRoutes(
 		winch.NewAuthFactory(httpPlainListener.Addr().String(), mux),
-		flagMapperConfig.Get().(*pb_config.MapperConfig),
+		mapperConfig,
 		flagAuthConfig.Get().(*pb_config.AuthConfig),
 	)
 	if err != nil {

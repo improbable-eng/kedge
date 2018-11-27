@@ -7,12 +7,18 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+var flagFirstUpdateTimeout = sharedflags.Set.Duration("k8sresolver_first_update_timouet", 300*time.Millisecond,
+	"Time to wait for first update before returning stream for usage. Longer time means longer delay for request "+
+		"processing, shorter means higher risk of returning stream that gives empty result (thus no resolutions), causing"+
+		"request to fail and being retried by client.")
 
 type change struct {
 	*v1.Endpoints
@@ -35,6 +41,7 @@ func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, e
 		return nil, errors.Wrapf(err, "Failed to do start stream for target %v", target)
 	}
 
+	// Schedule cleanup go routine in case of context cancel.
 	go func() {
 		<-ctx.Done()
 		// Request is cancelled, so we need to read what is left there to not leak go routines.
@@ -50,6 +57,8 @@ func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, e
 		cancel:   cancel,
 	}
 	firstUpdateCh := make(chan struct{})
+
+	// Schedule go routine that gets forward and translates stream messages as endpoint changes.
 	go func() {
 		defer cancel()
 
@@ -57,9 +66,11 @@ func startNewStreamer(target targetEntry, epClient endpointClient) (*streamer, e
 			s.errCh <- err
 		}
 	}()
+
+	// Try to return valid streamer only when we have the first update. Otherwise we might have empty resolution for some initial time.
 	select {
 	case <-firstUpdateCh:
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(*flagFirstUpdateTimeout):
 		logrus.Warnf("Timed out while waiting for initial update from kubernetes for %s in %s.", target.service, target.namespace)
 	}
 
@@ -87,7 +98,7 @@ type eventObject struct {
 	*v1.Endpoints
 }
 
-// proxy receives events in loop and proxies to changeCh. If event include some error, or stream errors, it always returns
+// proxy receives events in loop and proxies to changeCh. If event includes some error, or stream errors, it always returns
 // error. This is because watchers.Next errors are meant to irrecoverable. On cancelled context, no error is returned.
 func proxy(ctx context.Context, decoder *json.Decoder, endpCh chan<- change, firstUpdateCh chan<- struct{}) error {
 	var event event

@@ -334,8 +334,6 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	m.Handle("/debug/events", middlewares.HandlerFunc(trace.Events))
 
 	return &http.Server{
-		WriteTimeout: *flagHttpMaxWriteTimeout,
-		ReadTimeout:  *flagHttpMaxReadTimeout,
 		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
 		Handler:      m,
 	}, nil

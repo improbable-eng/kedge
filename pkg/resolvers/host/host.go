@@ -2,7 +2,10 @@ package hostresolver
 
 import (
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"net"
+	"os"
+	"time"
 
 	"github.com/improbable-eng/go-srvlb/grpc"
 	"github.com/improbable-eng/go-srvlb/srv"
@@ -15,6 +18,32 @@ type hostResolverFn func(host string) (addrs []string, err error)
 var (
 	ParentHostResolver hostResolverFn = net.LookupHost
 )
+
+var (
+	res = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "kedge",
+			Subsystem: "dns_host",
+			Name:      "resolutions",
+			Help:      "debug.",
+		},
+		[]string{"target"},
+	)
+	resHist = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "kedge",
+			Subsystem: "dns_host",
+			Name:      "resolutions",
+			Help:      "debug.",
+		},
+		[]string{"target"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(res)
+	prometheus.MustRegister(resHist)
+}
 
 func NewFromConfig(conf *pb.HostResolver) (target string, namer naming.Resolver, err error) {
 	parent := ParentHostResolver
@@ -35,8 +64,12 @@ func newHostResolver(port uint32, hostResolverFn hostResolverFn) srv.Resolver {
 }
 
 func (r *hostResolver) Lookup(domainName string) ([]*srv.Target, error) {
+	res.WithLabelValues(domainName).Inc()
+	start := time.Now()
 	ips, err := r.hostResolverFn(domainName)
+	resHist.WithLabelValues(domainName).Observe(float64(time.Since(start)))
 	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error", err)
 		return nil, err
 	}
 

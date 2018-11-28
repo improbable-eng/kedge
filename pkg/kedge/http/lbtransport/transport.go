@@ -88,6 +88,7 @@ func (s *tripper) run(ctx context.Context, watcher naming.Watcher) {
 		}
 		fmt.Fprintln(os.Stderr, "After next ", len(updates))
 
+		
 		for _, u := range updates {
 			if u.Op == naming.Add {
 				localCurrentTargets = append(localCurrentTargets, &Target{DialAddr: u.Addr})

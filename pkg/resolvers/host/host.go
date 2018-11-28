@@ -34,13 +34,14 @@ var (
 			Namespace: "kedge",
 			Subsystem: "dns_host",
 			Name:      "resolutions_hist",
-			Help:      "debug.",
+			Help:      "debug2.",
 		},
 		[]string{"target"},
 	)
 )
 
 func init() {
+	fmt.Fprintln(os.Stderr, "what.")
 	prometheus.MustRegister(res)
 	prometheus.MustRegister(resHist)
 }

@@ -2,8 +2,10 @@ package lbtransport
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/improbable-eng/go-httpwares/tags"
@@ -56,12 +58,14 @@ func New(ctx context.Context, targetAddr string, parent http.RoundTripper, resol
 		currentTargets: []*Target{},
 	}
 
+	fmt.Fprintln(os.Stderr, "New watcher for target ", targetAddr)
 	watcher, err := resolver.Resolve(targetAddr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "tripper: failed to do initial resolve for target %s", targetAddr)
 	}
 	go func() {
 		<-ctx.Done()
+		fmt.Fprintln(os.Stderr, "Closing watcher for target ", targetAddr)
 		watcher.Close()
 	}()
 	go s.run(ctx, watcher)
@@ -71,8 +75,10 @@ func New(ctx context.Context, targetAddr string, parent http.RoundTripper, resol
 func (s *tripper) run(ctx context.Context, watcher naming.Watcher) {
 	var localCurrentTargets []*Target
 	for ctx.Err() == nil {
+		fmt.Fprintln(os.Stderr, "Waiting for Next ", s.targetName)
 		updates, err := watcher.Next() // blocking call until new updates are there
 		if err != nil {
+			fmt.Fprintln(os.Stderr, "err ", err)
 			// Watcher next errors are irrecoverable.
 			s.mu.Lock()
 			s.irrecoverableErr = err
@@ -80,6 +86,7 @@ func (s *tripper) run(ctx context.Context, watcher naming.Watcher) {
 			s.mu.Unlock()
 			return
 		}
+		fmt.Fprintln(os.Stderr, "After next ", len(updates))
 
 		for _, u := range updates {
 			if u.Op == naming.Add {

@@ -1,22 +1,39 @@
 package srvresolver
 
 import (
-	"time"
-
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/improbable-eng/go-srvlb/grpc"
 	"github.com/improbable-eng/go-srvlb/srv"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/naming"
 )
 
 var (
-	ParentSrvResolver = srv.NewGoResolver(5 * time.Second)
+	ParentSrvResolver = srv.NewGoResolver(resolutionTTL)
+
+	resolutions = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "kedge",
+			Subsystem: "srv_resolver",
+			Name:      "resolutions_attempts_total",
+			Help:      "Counter of all DNS resolutions attempts made by SRV resolver.",
+		},
+	)
+
+	// TODO(bwplotka): Use real TTL for this. https://github.com/improbable-eng/kedge/issues/147
+	resolutionTTL = 5 * time.Second
 )
 
+func init() {
+	prometheus.MustRegister(resolutions)
+}
+
+// NewFromConfig creates SRV resolver wrapped by grpcsrvlb that polls SRV resolver in frequency defined by returned TTL.
 func NewFromConfig(conf *pb.SrvResolver) (target string, namer naming.Resolver, err error) {
 	parent := ParentSrvResolver
 	if conf.PortOverride != 0 {
@@ -41,6 +58,7 @@ type portOverrideSRVResolver struct {
 
 func (r *portOverrideSRVResolver) Lookup(domainName string) ([]*srv.Target, error) {
 	targets, err := r.parent.Lookup(domainName)
+	resolutions.Inc()
 	if err != nil {
 		return targets, err
 	}

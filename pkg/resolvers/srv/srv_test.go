@@ -2,7 +2,6 @@ package srvresolver
 
 import (
 	"testing"
-	"time"
 
 	"github.com/improbable-eng/go-srvlb/srv"
 	"github.com/stretchr/testify/assert"
@@ -20,18 +19,19 @@ func (l *testLookup) Lookup(domainName string) ([]*srv.Target, error) {
 	return []*srv.Target{
 		{
 			DialAddr: "1.1.1.1:80",
-			Ttl:      10 * time.Second,
+			Ttl:      resolutionTTL,
 		},
 		{
 			DialAddr: "1.1.1.2",
-			Ttl:      10 * time.Second,
+			Ttl:      resolutionTTL,
 		},
 		{
 			DialAddr: "1.1.1.10:81",
-			Ttl:      10 * time.Second,
+			Ttl:      resolutionTTL,
 		},
 	}, nil
 }
+
 func TestPortOverrideSRVResolver_Lookup(t *testing.T) {
 	l := &testLookup{
 		t: t,
@@ -42,6 +42,9 @@ func TestPortOverrideSRVResolver_Lookup(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "1.1.1.1:99", targets[0].DialAddr)
+	assert.Equal(t, resolutionTTL, targets[0].Ttl)
 	assert.Equal(t, "1.1.1.2:99", targets[1].DialAddr)
+	assert.Equal(t, resolutionTTL, targets[0].Ttl)
 	assert.Equal(t, "1.1.1.10:99", targets[2].DialAddr)
+	assert.Equal(t, resolutionTTL, targets[0].Ttl)
 }

@@ -98,7 +98,6 @@ func (w *watcher) startNewStreamerWithRetry(ctx context.Context) *streamer {
 			w.streamRetryBackoff.Reset()
 			return s
 		}
-		s.Close()
 		w.logger.WithError(err).Warnf("k8sresolver: failed to start watching endpoint events for target %v", w.target)
 
 		select {
@@ -145,7 +144,6 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 		w.streamer.Close()
 		w.streamer = nil
 	}
-	return nil, w.ctx.Err()
 }
 
 // next gathers kube api endpoint watch changes and translates them to naming.Update set.

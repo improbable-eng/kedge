@@ -24,6 +24,9 @@ func TestPortOverrideSRVResolver_Lookup(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "1.1.1.1:99", targets[0].DialAddr)
+	assert.Equal(t, resolutionTTL, targets[0].Ttl)
 	assert.Equal(t, "1.1.1.2:99", targets[1].DialAddr)
+	assert.Equal(t, resolutionTTL, targets[1].Ttl)
 	assert.Equal(t, "1.1.1.10:99", targets[2].DialAddr)
+	assert.Equal(t, resolutionTTL, targets[2].Ttl)
 }

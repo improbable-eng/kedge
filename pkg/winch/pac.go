@@ -2,11 +2,14 @@ package winch
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
 	"text/template"
 	"time"
 
-	"github.com/improbable-eng/go-httpwares/tags"
+	"github.com/pkg/errors"
+
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 )
 
@@ -15,18 +18,34 @@ var (
 	flagShExpressions = sharedflags.Set.StringSlice("pac_redirect_sh_expressions", []string{},
 		"Comma delimited array of shExpMatch expressions for host in the PAC. They will influence on what host"+
 			" browser will redirect to winch. If empty it will redirect everything via winch.")
+	flagPACFile = sharedflags.Set.String("pac_file", "",
+		"Path to PAC file that should be read. This flag has priority over 'pac_redirect_sh_expressions'")
 )
 
-func NewPacFromFlags(winchHostPort string) (*Pac, error) {
-	pac, err := generatePAC(winchHostPort, *flagShExpressions)
+func NewPacFromFlags(winchHostPort string) (pac *Pac, err error) {
+	pac = &Pac{modTime: time.Now()}
+
+	if *flagPACFile != "" {
+		if len(*flagShExpressions) > 0 {
+			return nil, errors.New("flag 'pac_redirect_sh_expressions' cannot be specified with 'pac_file'")
+		}
+
+		b, err := ioutil.ReadFile(*flagPACFile)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read PAC bytes from %s file", *flagPACFile)
+
+		}
+		pac.PAC = b
+		return pac, nil
+	}
+
+	b, err := generatePAC(winchHostPort, *flagShExpressions)
 	if err != nil {
 		return nil, err
 	}
-	p := &Pac{
-		PAC:     pac,
-		modTime: time.Now(),
-	}
-	return p, nil
+
+	pac.PAC = b
+	return pac, nil
 }
 
 // Pac is a handler that serves auto generated PAC file based on mapping routes.

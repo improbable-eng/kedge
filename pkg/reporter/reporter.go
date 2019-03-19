@@ -36,7 +36,7 @@ func (t *Tracker) ReportError(errType errtypes.Type, err error) {
 	defer t.mu.Unlock()
 
 	if t.err != nil {
-		logrus.Warn("Reporting %q error ignored, hidden by existing %q", string(errType), string(t.errType))
+		logrus.Warnf("Reporting %v error ignored, hidden by existing %v", string(errType), t.err)
 		return
 	}
 

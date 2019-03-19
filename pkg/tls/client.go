@@ -42,7 +42,7 @@ func BuildClientTLSConfigFromFlags() (*tls.Config, error) {
 		var err error
 		tlsConfig, err = connhelpers.TlsConfigForServerCerts(*flagTLSClientCert, *flagTLSClientKey)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed reading TLS client keys. ", err)
+			return nil, errors.Wrapf(err, "failed reading TLS client keys.")
 		}
 	}
 	tlsConfig.MinVersion = tls.VersionTLS12
@@ -53,7 +53,7 @@ func BuildClientTLSConfigFromFlags() (*tls.Config, error) {
 		for _, path := range *flagTLSRootCAFiles {
 			data, err := ioutil.ReadFile(path)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed reading root CA file %v: %v", path)
+				return nil, errors.Wrapf(err, "failed reading root CA file %v", path)
 			}
 			if ok := tlsConfig.RootCAs.AppendCertsFromPEM(data); !ok {
 				return nil, errors.Errorf("failed processing root CA file %v", path)

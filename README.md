@@ -4,7 +4,10 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/improbable-eng/kedge)](https://goreportcard.com/report/github.com/improbable-eng/kedge)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-:warning: WARNING :warning: This project is planned to be deprecated in future. What does it mean? It is essentially used in production in many places, but there is plan to replace kedge with something based on envoy or linkerd, thus stop actively maintaining this project. Currently kEdge has still many advantages like OpenID Connect support, k8s resolver and adhoc & auto discovered backends routings, but we plan to migrate those to the new solution over time.
+:warning: WARNING :warning: This project is planned to be deprecated in unspecify future. 
+What does it mean? 
+
+Improbable plans to replace kedge, thus stop actively maintaining this project. Currently kEdge has still many advantages like OpenID Connect support, k8s resolver and adhoc & auto discovered backends routings, but we plan to migrate those to the new solution over time. Since this project has zero known users to us, we plan to archive this project once new solution will be choosen & migrated onto. 
 
 If you use kEdge and you would be affected, reach us via GH issue or slack! 
 

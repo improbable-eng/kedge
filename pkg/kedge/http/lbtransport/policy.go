@@ -140,7 +140,7 @@ func (rr *roundRobinPolicyPicker) isTargetLocallyBlacklisted(target *Target) boo
 	return ok
 }
 
-func (rr *roundRobinPolicyPicker) Pick(r *http.Request, currentTargets []*Target) (*Target, error) {
+func (rr *roundRobinPolicyPicker) Pick(_ *http.Request, currentTargets []*Target) (*Target, error) {
 	for range currentTargets {
 		count := uint64(len(currentTargets))
 		id := atomic.AddUint64(&(rr.base.atomicCounter), 1)
@@ -159,7 +159,7 @@ func (rr *roundRobinPolicyPicker) Pick(r *http.Request, currentTargets []*Target
 
 		return currentTargets[targetId], nil
 	}
-	return nil, fmt.Errorf("All targets %v are failing, try later.", currentTargets)
+	return nil, fmt.Errorf("all targets %v are failing, try later.", currentTargets)
 }
 
 func (rr *roundRobinPolicyPicker) ExcludeTarget(target *Target) {

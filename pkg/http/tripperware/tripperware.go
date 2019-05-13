@@ -2,6 +2,7 @@ package tripperware
 
 import (
 	"crypto/tls"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -33,4 +34,11 @@ func Default(config *tls.Config) http.RoundTripper {
 func DefaultWithTransport(transport *http.Transport, config *tls.Config) http.RoundTripper {
 	transport.TLSClientConfig = config
 	return &defaultTripper{Transport: transport}
+}
+
+func Close(r io.Closer) error {
+	if r != nil {
+		return r.Close()
+	}
+	return nil
 }

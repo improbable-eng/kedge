@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/improbable-eng/go-httpwares/tags"
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
 	"github.com/improbable-eng/kedge/pkg/http/header"
 )

@@ -1,6 +1,7 @@
 package lbtransport
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -171,12 +172,13 @@ func (s *BalancedRRTransportSuite) callLBTransportAndAssert(requestsPerBackend i
 	for i := 0; i < requestsPerBackend*backendsCount; i++ {
 		wg.Add(1)
 		go func(id int) {
-			resp, err := client.Get("http://my-magic-srv/something")
+			resp, err := client.Post("http://my-magic-srv/something", "spaghetti", bytes.NewReader([]byte("SOMETHING")))
 			if err != nil {
+				fmt.Println(err)
 				s.T().Errorf("Encountered error on request %v: %v", id, err)
 			}
 			_, _ = ioutil.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			wg.Done()
 		}(i)
 	}

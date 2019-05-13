@@ -4,6 +4,12 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/improbable-eng/kedge)](https://goreportcard.com/report/github.com/improbable-eng/kedge)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
+:warning: WARNING :warning: This project is planned to be deprecated in future. What does it mean? It is essentially used in production in many places, but there is plan to replace kedge with something based on envoy or linkerd, thus stop actively maintaining this project. Currently kEdge has still many advantages like OpenID Connect support, k8s resolver and adhoc & auto discovered backends routings, but we plan to migrate those to the new solution over time.
+
+If you use kEdge and you would be affected, reach us via GH issue or slack! 
+
+-----
+
  > [kedge](https://www.merriam-webster.com/dictionary/kedge) (verb) to move (a ship) by means of a line attached to a small anchor dropped at the distance and in the direction desired
 
 Proxy for gRPC, HTTP (1.1/2) microservices with the aim to make cross-cluster

@@ -11,7 +11,7 @@ Improbable plans to replace kedge, thus stop actively maintaining this project. 
 
 Since this project has zero known users to us, we plan to archive this project once new solution will be choosen & migrated onto. 
 
-If you use kEdge and you would be affected, reach us via GH issue or slack! 
+If you use kEdge or you would like to and you would be affected, reach us via GH issue or slack! 
 
 -----
 

@@ -609,7 +609,7 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_BackendEOF() {
 	resp.Body.Close()
 
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "EOF on backend")
-	assert.True(s.T(), resp.Header.Get(header.ResponseKedgeError) != "", "kedge header should be non empty")
+	assert.NotEmpty(s.T(), resp.Header.Get(header.ResponseKedgeError), "kedge header should be non empty")
 }
 
 func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToSecureBackend() {

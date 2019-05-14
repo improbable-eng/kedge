@@ -65,6 +65,14 @@ func TestLazyBufferedReader(t *testing.T) {
 			expectedBytes: [][]byte{{1}, {2, 3}, {1, 2, 3, 4}, {5}},
 			expectedErrs:  []error{nil, nil, nil, nil},
 		},
+		{
+			src:                 bytes.NewReader([]byte{1, 2, 3, 4}),
+			sequentialReadBytes: []int{8192, 2, 3},
+			rewindBeforeRead:    []bool{false, true, false},
+
+			expectedBytes: [][]byte{{1, 2, 3, 4}, {1, 2}, {3, 4}},
+			expectedErrs:  []error{nil, nil, nil},
+		},
 	} {
 		if ok := t.Run("", func(t *testing.T) {
 			b := newLazyBufferedReader(tcase.src)
@@ -76,9 +84,9 @@ func TestLazyBufferedReader(t *testing.T) {
 				toRead := make([]byte, read)
 
 				n, err := b.Read(toRead)
-				require.Equal(t, tcase.expectedErrs[i], err, "read %d", i)
-				require.Len(t, tcase.expectedBytes[i], n, "read %d", i)
-				require.Equal(t, tcase.expectedBytes[i], toRead[:len(tcase.expectedBytes[i])], "read %d", i)
+				require.Equal(t, tcase.expectedErrs[i], err, "read %d", i+1)
+				require.Len(t, tcase.expectedBytes[i], n, "read %d", i+1)
+				require.Equal(t, tcase.expectedBytes[i], toRead[:len(tcase.expectedBytes[i])], "read %d", i+1)
 			}
 
 		}); !ok {

@@ -19,7 +19,7 @@ type routingTripper struct {
 func (t *routingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	route, ok, err := getRoute(req.Context())
 	if err != nil {
-		_ = Close(req.Body)
+		closeIfNotNil(req.Body)
 		return nil, errors.Wrap(err, "routingTripper: Failed to get route from context")
 	}
 	if !ok {

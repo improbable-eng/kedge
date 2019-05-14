@@ -2,11 +2,10 @@ package lbtransport
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"sync"
-
-	"github.com/improbable-eng/kedge/pkg/http/tripperware"
 
 	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
@@ -113,22 +112,22 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if irrecoverableErr != nil {
 		err := errors.Wrapf(irrecoverableErr, "lb: critical naming.Watcher error for target %s. Tripper is closed.", s.targetName)
 		reporter.Extract(r).ReportError(errtypes.IrrecoverableWatcherError, err)
-		_ = tripperware.Close(r.Body)
+		ensureClosed(r.Body)
 		return nil, err
 	}
 
 	if len(targetsRef) == 0 {
 		err := errors.Errorf("lb: no backend is available for %s. 0 resolved addresses.", s.targetName)
 		reporter.Extract(r).ReportError(errtypes.NoResolutionAvailable, err)
-		_ = tripperware.Close(r.Body)
+		ensureClosed(r.Body)
 		return nil, err
 	}
 
 	if r.Body != nil {
-		// We have to own true body for the request because we cannot reuse same reader closer
+		// We have to own the body for the request because we cannot reuse same reader closer
 		// in multiple calls to http.Transport.
 		body := r.Body
-		defer func() { _ = tripperware.Close(body) }()
+		defer ensureClosed(body)
 		r.Body = newLazyBufferedReader(body)
 	}
 
@@ -149,7 +148,7 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		tags.Set(ctxtags.TagForTargetAddress, target.DialAddr)
 
 		if r.Body != nil {
-			r.Body.(*lazyBufferedReader).rewind()
+			r.Body.(*replayableReader).rewind()
 		}
 
 		resp, err := s.parent.RoundTrip(r)
@@ -177,4 +176,10 @@ func isDialError(err error) bool {
 		}
 	}
 	return false
+}
+
+func ensureClosed(r io.Closer) {
+	if r != nil {
+		_ = r.Close()
+	}
 }

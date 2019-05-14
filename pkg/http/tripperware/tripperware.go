@@ -36,9 +36,8 @@ func DefaultWithTransport(transport *http.Transport, config *tls.Config) http.Ro
 	return &defaultTripper{Transport: transport}
 }
 
-func Close(r io.Closer) error {
+func closeIfNotNil(r io.Closer) {
 	if r != nil {
-		return r.Close()
+		_ = r.Close()
 	}
-	return nil
 }

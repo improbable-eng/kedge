@@ -31,7 +31,7 @@ type authTripper struct {
 func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	route, ok, err := getRoute(req.Context())
 	if err != nil {
-		_ = Close(req.Body)
+		closeIfNotNil(req.Body)
 		return nil, errors.Wrap(err, "authTripper: Failed to get route from context")
 	}
 	if !ok {
@@ -51,7 +51,7 @@ func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	val, err := authSource.Token(req.Context())
 	tags.Set(t.authTimeTag, time.Since(now).String())
 	if err != nil {
-		_ = Close(req.Body)
+		closeIfNotNil(req.Body)
 		return nil, errors.Wrapf(err, "authTripper: Failed to get header value from authSource %s", authSource.Name())
 	}
 

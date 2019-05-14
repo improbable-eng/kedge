@@ -45,7 +45,7 @@ func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		)
 	}
 	if err != nil {
-		_ = Close(req.Body)
+		closeIfNotNil(req.Body)
 		return nil, errors.Wrapf(err, "mappingTripper: Failed to map host %s and port %s into route", req.URL.Hostname(), req.URL.Port())
 	}
 

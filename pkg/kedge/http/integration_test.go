@@ -14,12 +14,12 @@
 package http_integration
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -39,14 +39,14 @@ import (
 	"github.com/improbable-eng/kedge/pkg/http/header"
 	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/backendpool"
-	"github.com/improbable-eng/kedge/pkg/kedge/http/client"
+	kedge_http "github.com/improbable-eng/kedge/pkg/kedge/http/client"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director/adhoc"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director/router"
-	"github.com/improbable-eng/kedge/pkg/map"
+	kedge_map "github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/reporter"
-	"github.com/improbable-eng/kedge/pkg/resolvers/srv"
-	"github.com/improbable-eng/kedge/protogen/kedge/config/common"
+	srvresolver "github.com/improbable-eng/kedge/pkg/resolvers/srv"
+	kedge_config_common "github.com/improbable-eng/kedge/protogen/kedge/config/common"
 	pb_res "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	pb_be "github.com/improbable-eng/kedge/protogen/kedge/config/http/backends"
 	pb_route "github.com/improbable-eng/kedge/protogen/kedge/config/http/routes"
@@ -254,6 +254,11 @@ func (l *localBackends) targets() (targets []*srv.Target) {
 			DialAddr: l.listeners[i].Addr().String(),
 		})
 	}
+	// Regression test: Make sure failed target is handled without double close error.
+	targets = append(targets, &srv.Target{
+		Ttl:      backendResolutionDuration,
+		DialAddr: "127.23.45.56:9999",
+	})
 	defer l.mu.RUnlock()
 	return targets
 }
@@ -452,7 +457,8 @@ func (s *HttpProxyingIntegrationSuite) assertSuccessfulPingback(req *http.Reques
 }
 
 func testRequest(url string, backendSecret string, proxySecret string) *http.Request {
-	req := &http.Request{Method: "GET", URL: urlMustParse(url)}
+	// Regression test: Do GET request with body to ensure body is not double closed.
+	req := &http.Request{Method: "GET", URL: urlMustParse(url), Body: ioutil.NopCloser(bytes.NewReader([]byte("POSTME")))}
 	req.Header = http.Header{}
 	if backendSecret != "" {
 		req.Header.Set("Authorization", backendSecret)
@@ -603,7 +609,7 @@ func (s *HttpProxyingIntegrationSuite) TestFailOverReverseProxy_BackendEOF() {
 	resp.Body.Close()
 
 	assert.Equal(s.T(), http.StatusBadGateway, resp.StatusCode, "EOF on backend")
-	assert.Equal(s.T(), io.EOF.Error(), resp.Header.Get(header.ResponseKedgeError), "EOF error should be in the header")
+	assert.NotEmpty(s.T(), resp.Header.Get(header.ResponseKedgeError), "kedge header should be non empty")
 }
 
 func (s *HttpProxyingIntegrationSuite) TestLoadbalancingToSecureBackend() {

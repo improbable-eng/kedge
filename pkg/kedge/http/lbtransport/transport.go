@@ -2,11 +2,12 @@ package lbtransport
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"sync"
 
-	"github.com/improbable-eng/go-httpwares/tags"
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
 	"github.com/improbable-eng/kedge/pkg/reporter"
 	"github.com/improbable-eng/kedge/pkg/reporter/errtypes"
@@ -111,13 +112,23 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if irrecoverableErr != nil {
 		err := errors.Wrapf(irrecoverableErr, "lb: critical naming.Watcher error for target %s. Tripper is closed.", s.targetName)
 		reporter.Extract(r).ReportError(errtypes.IrrecoverableWatcherError, err)
+		closeIfNotNil(r.Body)
 		return nil, err
 	}
 
 	if len(targetsRef) == 0 {
 		err := errors.Errorf("lb: no backend is available for %s. 0 resolved addresses.", s.targetName)
 		reporter.Extract(r).ReportError(errtypes.NoResolutionAvailable, err)
+		closeIfNotNil(r.Body)
 		return nil, err
+	}
+
+	if r.Body != nil {
+		// We have to own the body for the request because we cannot reuse same reader closer
+		// in multiple calls to http.Transport.
+		body := r.Body
+		defer closeIfNotNil(body)
+		r.Body = newReplayableReader(body)
 	}
 
 	picker := s.policy.Picker()
@@ -135,6 +146,11 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		// See http.connectMethodKey.
 		r.URL.Host = target.DialAddr
 		tags.Set(ctxtags.TagForTargetAddress, target.DialAddr)
+
+		if r.Body != nil {
+			r.Body.(*replayableReader).rewind()
+		}
+
 		resp, err := s.parent.RoundTrip(r)
 		if err == nil {
 			return resp, nil
@@ -160,4 +176,10 @@ func isDialError(err error) bool {
 		}
 	}
 	return false
+}
+
+func closeIfNotNil(r io.Closer) {
+	if r != nil {
+		_ = r.Close()
+	}
 }

@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/improbable-eng/go-httpwares/tags"
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
-	"github.com/improbable-eng/kedge/pkg/map"
+	kedge_map "github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	"github.com/pkg/errors"
 )
@@ -31,6 +31,7 @@ type authTripper struct {
 func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	route, ok, err := getRoute(req.Context())
 	if err != nil {
+		closeIfNotNil(req.Body)
 		return nil, errors.Wrap(err, "authTripper: Failed to get route from context")
 	}
 	if !ok {
@@ -50,6 +51,7 @@ func (t *authTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	val, err := authSource.Token(req.Context())
 	tags.Set(t.authTimeTag, time.Since(now).String())
 	if err != nil {
+		closeIfNotNil(req.Body)
 		return nil, errors.Wrapf(err, "authTripper: Failed to get header value from authSource %s", authSource.Name())
 	}
 

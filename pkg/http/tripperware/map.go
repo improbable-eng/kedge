@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/improbable-eng/go-httpwares/tags"
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
-	"github.com/improbable-eng/kedge/pkg/map"
+	kedge_map "github.com/improbable-eng/kedge/pkg/map"
 	"github.com/pkg/errors"
 )
 
@@ -45,6 +45,7 @@ func (t *mappingTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		)
 	}
 	if err != nil {
+		closeIfNotNil(req.Body)
 		return nil, errors.Wrapf(err, "mappingTripper: Failed to map host %s and port %s into route", req.URL.Hostname(), req.URL.Port())
 	}
 

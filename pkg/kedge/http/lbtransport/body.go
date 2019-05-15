@@ -54,9 +54,11 @@ func (b *replayableReader) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
-// newLazyBufferedReader returns replayableReader that lazely read from underlying reader if needed.
-// In worst case scenario all content from src is buffered, in the the best, nothing.
-func newLazyBufferedReader(src io.Reader) *replayableReader {
+// newReplayableReader returns replayableReader.
+// The content read from the source is buffered in a lazy fashion to keep storage requirements
+// limited to a minimum while still allowing for the reader to be rewinded and previously read
+// content to be replayed.
+func newReplayableReader(src io.Reader) *replayableReader {
 	if src == nil {
 		return nil
 	}

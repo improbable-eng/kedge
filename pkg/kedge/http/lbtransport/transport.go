@@ -112,14 +112,14 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if irrecoverableErr != nil {
 		err := errors.Wrapf(irrecoverableErr, "lb: critical naming.Watcher error for target %s. Tripper is closed.", s.targetName)
 		reporter.Extract(r).ReportError(errtypes.IrrecoverableWatcherError, err)
-		ensureClosed(r.Body)
+		closeIfNotNil(r.Body)
 		return nil, err
 	}
 
 	if len(targetsRef) == 0 {
 		err := errors.Errorf("lb: no backend is available for %s. 0 resolved addresses.", s.targetName)
 		reporter.Extract(r).ReportError(errtypes.NoResolutionAvailable, err)
-		ensureClosed(r.Body)
+		closeIfNotNil(r.Body)
 		return nil, err
 	}
 
@@ -127,8 +127,8 @@ func (s *tripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		// We have to own the body for the request because we cannot reuse same reader closer
 		// in multiple calls to http.Transport.
 		body := r.Body
-		defer ensureClosed(body)
-		r.Body = newLazyBufferedReader(body)
+		defer closeIfNotNil(body)
+		r.Body = newReplayableReader(body)
 	}
 
 	picker := s.policy.Picker()
@@ -178,7 +178,7 @@ func isDialError(err error) bool {
 	return false
 }
 
-func ensureClosed(r io.Closer) {
+func closeIfNotNil(r io.Closer) {
 	if r != nil {
 		_ = r.Close()
 	}

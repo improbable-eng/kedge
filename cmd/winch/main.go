@@ -119,7 +119,7 @@ func main() {
 	// TODO(bplotka): Add metrics.
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
-		prometheus.NewProcessCollector(os.Getpid(), ""),
+		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{PidFn: func() (int, error) { return os.Getpid(), nil }, Namespace: ""}),
 		prometheus.NewGoCollector(),
 	)
 

@@ -45,8 +45,11 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.3.0
-	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
+	github.com/ugorji/go/codec/codecgen v1.1.7 // indirect
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	golang.org/x/oauth2 v0.0.0-20170802155448-96fca6c793ec
+	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0 // indirect
+	golang.org/x/tools v0.0.0-20191017035025-0abb09c987dd // indirect
 	google.golang.org/appengine v1.0.1-0.20170801183137-c5a90ac045b7 // indirect
 	google.golang.org/genproto v0.0.0-20170711235230-b0a3dcfcd1a9 // indirect
 	google.golang.org/grpc v1.2.1-0.20170804204618-963eb485d856
@@ -54,7 +57,9 @@ require (
 	gopkg.in/square/go-jose.v2 v2.1.2 // indirect
 	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
 	gopkg.in/yaml.v2 v2.2.2
-	k8s.io/api v0.0.0-20170728134530-e012d1a19ed3
-	k8s.io/apimachinery v0.0.0-20170729134451-dc1f89aff9a7
-	k8s.io/client-go v0.0.0-20170801234653-45673e060eb9
+	k8s.io/api v0.0.0-20180828232432-12444147eb11
+	k8s.io/apimachinery v0.0.0-20190116203031-d49e237a2683
+	k8s.io/client-go v7.0.0+incompatible
+	k8s.io/klog v1.0.0 // indirect
+	k8s.io/utils v0.0.0-20191010214722-8d271d903fe4 // indirect
 )

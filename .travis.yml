@@ -1,13 +1,13 @@
 sudo: false
 language: go
 go:
-  - 1.9.x
+#  - 1.9.x
   - 1.11.x
 
 go_import_path: github.com/improbable-eng/kedge
 
-install:
-- make deps
+#install:
+#- make deps
 
 script:
 - make format test

@@ -9,7 +9,7 @@ format:
 	@echo ">> formatting code"
 	@goimports -w $(FILES)
 
-# deps: install-tools
+deps:   install-tools
 #	@echo ">> downloading dependencies"
 #	@dep ensure
 
@@ -23,9 +23,9 @@ vet:
 	@echo ">> vetting code"
 	@go vet ./...
 
-#install-tools:
-#	@echo ">> fetching goimports"
-#	@go get -u golang.org/x/tools/cmd/goimports
+install-tools:
+	@echo ">> fetching goimports"
+	@go get -u golang.org/x/tools/cmd/goimports
 #	@echo ">> fetching dep"
 #	@go get -u github.com/golang/dep/cmd/dep
 
@@ -41,4 +41,4 @@ docker:
 	@echo ">> building docker image"
 	@docker build --build-arg BUILD_VERSION=$(date +%Y%m%d-%H%M%S)-001 -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
 
-.PHONY: all format build vet install-tools proto test docker
+.PHONY: all format deps build vet install-tools proto test docker

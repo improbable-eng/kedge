@@ -6,8 +6,10 @@ go:
 
 go_import_path: github.com/improbable-eng/kedge
 
-#install:
-#- make deps
+install:
+- export GOBIN="$GOPATH/bin"
+- make deps
 
 script:
 - make format test
+

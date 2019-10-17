@@ -12,7 +12,7 @@ import (
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/jpillora/backoff"
-	"github.com/mwitkow/go-flagz/protobuf"
+	"github.com/improbable-eng/go-flagz/protobuf"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

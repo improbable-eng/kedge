@@ -35,7 +35,7 @@ import (
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/go-flagz"
+	"github.com/improbable-eng/go-flagz"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"

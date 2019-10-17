@@ -14,7 +14,7 @@ import (
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/improbable-eng/kedge/protogen/kedge/config/common"
-	"github.com/mwitkow/go-flagz/protobuf"
+	"github.com/improbable-eng/go-flagz/protobuf"
 	"github.com/mwitkow/go-proto-validators"
 	"github.com/sirupsen/logrus"
 )

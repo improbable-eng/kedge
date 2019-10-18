@@ -63,24 +63,10 @@ func TestParseTarget(t *testing.T) {
 				service:   "service4",
 				namespace: "ns4",
 				port: targetPort{
-					value:   "1010",
-					isNamed: false,
+					value: "1010",
 				},
 			},
 		},
-		// After Go 1.12 non-numeric ports are not accepted by net/url.Parse anymore.
-		// See https://github.com/golang/go/issues/33646, https://play.golang.org/p/5KK1Qdy05b
-		//{
-		//	target: "service5.ns5:some-port",
-		//	expectgedTarget: targetEntry{
-		//		service:   "service5",
-		//		namespace: "ns5",
-		//		port: targetPort{
-		//			value:   "some-port",
-		//			isNamed: true,
-		//		},
-		//	},
-		//},
 		{
 			target: "service6.ns6:",
 			expectgedTarget: targetEntry{

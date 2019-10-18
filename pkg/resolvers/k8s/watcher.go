@@ -270,8 +270,7 @@ func subsetToAddresses(t targetEntry, sub v1.EndpointSubset) (map[string]struct{
 // matchTargetPort searches for specified port in targetPort and returns port number as string. Basically:
 //
 // service.namespace - means no target port specified.
-// service.namespace:123 - means not named port, so we should just use, but only if it's present in endpoint.
-// service.namespace:abc - means named port.
+// service.namespace:123 - target port specified, so we should just use, but only if it's present in endpoint.
 func matchTargetPort(targetPort targetPort, ports []v1.EndpointPort) (string, bool, error) {
 	if len(ports) == 0 {
 		return "", false, errors.Errorf("retrieved subset update contains no port")
@@ -285,12 +284,8 @@ func matchTargetPort(targetPort targetPort, ports []v1.EndpointPort) (string, bo
 	}
 
 	for _, p := range ports {
-		if targetPort.isNamed && p.Name == targetPort.value {
-			return fmt.Sprintf("%v", p.Port), true, nil
-		}
-
 		// Even that we have target specified as number value we want to ensure we have endpoint for it.
-		if !targetPort.isNamed && fmt.Sprintf("%v", p.Port) == targetPort.value {
+		if fmt.Sprintf("%v", p.Port) == targetPort.value {
 			return targetPort.value, true, nil
 		}
 	}

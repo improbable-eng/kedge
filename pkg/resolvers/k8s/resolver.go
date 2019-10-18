@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/improbable-eng/kedge/pkg/k8s"
@@ -72,8 +71,7 @@ func NewWithClient(logger logrus.FieldLogger, apiClient *k8s.APIClient) naming.R
 }
 
 type targetPort struct {
-	isNamed bool
-	value   string
+	value string
 }
 
 var noTargetPort = targetPort{}
@@ -107,10 +105,6 @@ func parseTarget(targetName string) (targetEntry, error) {
 	if p := u.Port(); p != "" {
 		target.port = targetPort{
 			value: p,
-		}
-		if _, err := strconv.Atoi(p); err != nil {
-			// NaN
-			target.port.isNamed = true
 		}
 	}
 

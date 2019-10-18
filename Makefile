@@ -9,9 +9,9 @@ format:
 	@echo ">> formatting code"
 	@goimports -w $(FILES)
 
-deps:   install-tools
-#	@echo ">> downloading dependencies"
-#	@dep ensure
+deps: install-tools
+	@echo ">> downloading dependencies"
+	@go mod download
 
 build:
 	@echo ">> building kedge"

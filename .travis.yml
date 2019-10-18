@@ -11,5 +11,5 @@ install:
 - make deps
 
 script:
-- make test
+- make format test
 

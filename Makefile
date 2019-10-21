@@ -1,5 +1,5 @@
 PREFIX            ?= $(shell pwd)
-FILES             ?= $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+FILES             ?= $(shell find . -type f -name '*.go' -not -path "./vendor/*" -not -name '*pb.go')
 DOCKER_IMAGE_NAME ?= kedge
 DOCKER_IMAGE_TAG  ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
@@ -20,6 +20,9 @@ build:
 	@go install github.com/improbable-eng/kedge/cmd/winch
 
 vet:
+	@goimports -d $(FILES) >> diff.txt
+	@if [ -s diff.txt ]; then echo "Please format your code with 'make format'."; rm diff.txt; exit 1; fi
+	@rm diff.txt
 	@echo ">> vetting code"
 	@go vet ./...
 

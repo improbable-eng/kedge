@@ -14,5 +14,5 @@ install:
 - make deps
 
 script:
-- make format test
+- make vet test
 

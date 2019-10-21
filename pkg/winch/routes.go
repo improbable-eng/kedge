@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/improbable-eng/kedge/pkg/map"
+	kedge_map "github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
 	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/pkg/errors"

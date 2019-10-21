@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/improbable-eng/kedge/pkg/resolvers/k8s"
+	k8sresolver "github.com/improbable-eng/kedge/pkg/resolvers/k8s"
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"

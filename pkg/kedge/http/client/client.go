@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/improbable-eng/kedge/pkg/http/tripperware"
-	"github.com/improbable-eng/kedge/pkg/map"
+	kedge_map "github.com/improbable-eng/kedge/pkg/map"
 	"golang.org/x/net/http2"
 )
 

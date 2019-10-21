@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
-	"github.com/improbable-eng/kedge/protogen/e2e"
+	e2e_helloworld "github.com/improbable-eng/kedge/protogen/e2e"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

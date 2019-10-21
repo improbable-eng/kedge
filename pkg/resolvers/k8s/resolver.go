@@ -16,7 +16,7 @@ import (
 const (
 	// ExpectedTargetFmt is an expected format of the targetEntry Name given to Resolver. This is complainant with
 	// the kubeDNS/CoreDNS entry format.
-	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<port_name>|:<value number>)"
+	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<value number>)"
 )
 
 var (

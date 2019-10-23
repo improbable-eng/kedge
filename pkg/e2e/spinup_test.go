@@ -122,7 +122,7 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 			done := make(chan error)
 
 			// Lauching Wait in a goroutine and killing it if it times out.
-			// On windows it seems the executable starts successfully but Wait never returns.
+			// On windows it seems the executable starts and finishes successfully but Wait never returns.
 			go func() { done <- cmd.Wait() }()
 
 			timeout := time.After(5 * time.Second)
@@ -130,7 +130,7 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 			var doneErr error
 			select {
 			case <-timeout:
-				// Timeout happened first, kill the process and print a message.
+				// Timeout happened first, kill the process
 				cmd.Process.Kill()
 				t.Log("Command timed out")
 			case doneErr = <-done:

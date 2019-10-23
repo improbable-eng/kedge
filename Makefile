@@ -21,7 +21,7 @@ build:
 
 vet:
 	@goimports -d $(FILES) >> diff.txt
-	@if [ -s diff.txt ]; then echo "Please format your code with 'make format'."; rm diff.txt; exit 1; fi
+	@if [ -s diff.txt ]; then echo "Please format your code with 'make format'."; cat diff.txt; rm diff.txt; exit 1; fi
 	@rm diff.txt
 	@echo ">> vetting code"
 	@go vet ./...
@@ -30,7 +30,7 @@ install-tools:
 	@echo ">> fetching goimports"
 	@go get -u golang.org/x/tools/cmd/goimports
 
-proto: 
+proto:
 	@echo ">> generating protobufs"
 	@./scripts/protogen.sh
 

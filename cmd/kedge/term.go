@@ -49,6 +49,10 @@ func waitForAny(ctx context.Context, signals ...os.Signal) {
 		}
 
 		logrus.Infof("Graceful Shutdown after %s timed out, re-sending SIGTERM.", gotSignal.String())
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		p, err := os.FindProcess(os.Getpid())
+		if err != nil {
+			logrus.Errorf("Can't find process %v", err)
+		}
+		p.Signal(syscall.SIGTERM)
 	}()
 }

@@ -130,8 +130,6 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 			var doneErr error
 			select {
 			case <-timeout:
-				// Timeout happened first, kill the process
-				cmd.Process.Kill()
 				t.Log("Command timed out")
 			case doneErr = <-done:
 			}

@@ -127,23 +127,23 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 
 			timeout := time.After(5 * time.Second)
 
+			var doneErr error
 			select {
 			case <-timeout:
 				// Timeout happened first, kill the process and print a message.
 				cmd.Process.Kill()
 				t.Log("Command timed out")
-			case err := <-done:
-				// Command completed before timeout. Print output.
-				if stderr.Len() > 0 {
-					t.Logf("%s STDERR\n %s", cmd.Path, stderr.String())
-				}
-				if stdout.Len() > 0 {
-					t.Logf("%s STDOUT\n %s", cmd.Path, stdout.String())
-				}
-				return err
+			case doneErr = <-done:
 			}
 
-			return nil
+			if stderr.Len() > 0 {
+				t.Logf("%s STDERR\n %s", cmd.Path, stderr.String())
+			}
+			if stdout.Len() > 0 {
+				t.Logf("%s STDOUT\n %s", cmd.Path, stdout.String())
+			}
+
+			return doneErr
 		}, func(error) {
 			cmd.Process.Signal(syscall.SIGTERM)
 		})

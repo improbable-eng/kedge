@@ -23,4 +23,6 @@ install:
 - make deps
 
 script:
-- make vet test
+# Different line endings on windows trigger a reformatting false positive, see https://github.com/golangci/golangci-lint/issues/580
+- if [ "$TRAVIS_OS_NAME" != "windows" ]; make vet
+- make test

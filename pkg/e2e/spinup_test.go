@@ -121,16 +121,17 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 		g.Add(func() error {
 			done := make(chan error)
 
-			// Lauching Wait in a goroutine and killing it if it times out.
-			// On windows it seems the executable starts and finishes successfully but Wait never returns.
 			go func() { done <- cmd.Wait() }()
 
+			// This makes sure we get an output even it the binaries never stop,
+			// like it was the case with a SIGTERM bug.
 			timeout := time.After(5 * time.Second)
 
 			var doneErr error
 			select {
 			case <-timeout:
-				t.Log("Command timed out")
+				t.Log("Command timed out: " + cmd.Path)
+				doneErr = errors.New("Command timed out: " + cmd.Path)
 			case doneErr = <-done:
 			}
 
@@ -143,6 +144,7 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 
 			return doneErr
 		}, func(error) {
+			cmd.Process.Kill()
 			cmd.Process.Signal(syscall.SIGTERM)
 		})
 	}

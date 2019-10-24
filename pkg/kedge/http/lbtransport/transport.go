@@ -5,7 +5,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 
 	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
@@ -175,11 +174,6 @@ func isDialError(err error) bool {
 		if opErr.Op == "dial" {
 			return true
 		}
-	}
-	// On Windows dialing localhost seems to be slow so we don't get back a "dial" error like above
-	// See https://github.com/golang/go/issues/23366
-	if strings.Contains(err.Error(), "request canceled while waiting for connection") {
-		return true
 	}
 	return false
 }

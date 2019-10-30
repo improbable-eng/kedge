@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"strconv"
 
 	"github.com/improbable-eng/kedge/pkg/k8s"
 	"github.com/pkg/errors"
@@ -105,6 +106,9 @@ func parseTarget(targetName string) (targetEntry, error) {
 	if p := u.Port(); p != "" {
 		target.port = targetPort{
 			value: p,
+		}
+		if _, err := strconv.Atoi(p); err != nil {
+			return targetEntry{}, errors.Errorf("Named ports such as '%s' are not allowed", p)
 		}
 	}
 

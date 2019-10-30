@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/improbable-eng/go-srvlb/grpc"
+	grpcsrvlb "github.com/improbable-eng/go-srvlb/grpc"
 	"github.com/improbable-eng/go-srvlb/srv"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/common/resolvers"
 	"github.com/prometheus/client_golang/prometheus"

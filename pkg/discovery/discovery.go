@@ -8,11 +8,11 @@ import (
 	"io"
 
 	"github.com/golang/protobuf/jsonpb"
+	protoflagz "github.com/improbable-eng/go-flagz/protobuf"
 	"github.com/improbable-eng/kedge/pkg/k8s"
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/jpillora/backoff"
-	"github.com/improbable-eng/go-flagz/protobuf"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

@@ -252,7 +252,8 @@ func (s *BalancedRRTransportSuite) TestSrvLbErrorsNoResolution() {
 func (s *BalancedRRTransportSuite) TestSrvLbErrorsAllResolvedAddressesAreWrong() {
 	// Add 5 not accessible backends.
 	backends := []*httptest.Server{}
-	for i := 0; i < 5; i++ {
+	numberOfBackends := 5
+	for i := 0; i < numberOfBackends; i++ {
 		b := httptest.NewUnstartedServer(nil)
 		// Don't even listen on socket - we want dial to fail immediately.
 		b.Close()
@@ -262,7 +263,10 @@ func (s *BalancedRRTransportSuite) TestSrvLbErrorsAllResolvedAddressesAreWrong()
 	// No backends.
 	s.backendSRVWatcher.UpdateBackends(backends)
 	s.waitForSRVPropagation(backends, 1*time.Second)
-	client := &http.Client{Transport: s.lbTrans, Timeout: 1 * time.Second}
+	// On Windows dialing a not open port on localhost seems to take about a second,
+	// hence the long Client timeout
+	// See https://github.com/golang/go/issues/23366
+	client := &http.Client{Transport: s.lbTrans, Timeout: time.Duration(numberOfBackends+1) * time.Second}
 	req, err := http.NewRequest("GET", "http://my-magic-srv/something", nil)
 	s.Require().NoError(err)
 

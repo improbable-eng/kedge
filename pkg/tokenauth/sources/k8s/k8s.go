@@ -3,11 +3,11 @@ package k8sauth
 import (
 	"context"
 
-	"github.com/Bplotka/oidc/login/k8scache"
+	k8s "github.com/Bplotka/oidc/login/k8scache"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/oauth2"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/oidc"
+	directauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
+	oauth2auth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/oauth2"
+	oidcauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/oidc"
 	"github.com/pkg/errors"
 	cfg "k8s.io/client-go/tools/clientcmd"
 )

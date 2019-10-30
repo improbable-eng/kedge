@@ -10,7 +10,7 @@ import (
 
 func TestReplayableReader(t *testing.T) {
 	for _, tcase := range []struct {
-		name string
+		name                string
 		src                 io.Reader
 		sequentialReadBytes []int
 		rewindBeforeRead    []bool
@@ -19,7 +19,7 @@ func TestReplayableReader(t *testing.T) {
 		expectedErrs  []error
 	}{
 		{
-			name: "WrappedNil_Read_ShouldReturnEOF",
+			name:                "WrappedNil_Read_ShouldReturnEOF",
 			src:                 nil,
 			sequentialReadBytes: []int{10},
 			rewindBeforeRead:    []bool{false},
@@ -28,7 +28,7 @@ func TestReplayableReader(t *testing.T) {
 			expectedErrs:  []error{io.EOF},
 		},
 		{
-			name: "WrappedNil_RewindRead_ShouldReturnEOF",
+			name:                "WrappedNil_RewindRead_ShouldReturnEOF",
 			src:                 nil,
 			sequentialReadBytes: []int{10},
 			rewindBeforeRead:    []bool{true},
@@ -37,7 +37,7 @@ func TestReplayableReader(t *testing.T) {
 			expectedErrs:  []error{io.EOF},
 		},
 		{
-			name: "SmallBigBigReads_FinishedWithEOF",
+			name:                "SmallBigBigReads_FinishedWithEOF",
 			src:                 bytes.NewReader([]byte{1, 2, 3, 4}),
 			sequentialReadBytes: []int{1, 8192, 8192},
 			rewindBeforeRead:    []bool{false, false, false},
@@ -46,7 +46,7 @@ func TestReplayableReader(t *testing.T) {
 			expectedErrs:  []error{nil, nil, io.EOF},
 		},
 		{
-			name: "SmallReads_FinishedWithEOF",
+			name:                "SmallReads_FinishedWithEOF",
 			src:                 bytes.NewReader([]byte{1, 2, 3, 4}),
 			sequentialReadBytes: []int{1, 2, 4, 1},
 			rewindBeforeRead:    []bool{false, false, false, false},
@@ -55,7 +55,7 @@ func TestReplayableReader(t *testing.T) {
 			expectedErrs:  []error{nil, nil, nil, io.EOF},
 		},
 		{
-			name: "SmallReadsTakingExactBytes",
+			name:                "SmallReadsTakingExactBytes",
 			src:                 bytes.NewReader([]byte{1, 2, 3, 4, 5}),
 			sequentialReadBytes: []int{1, 2, 2},
 			rewindBeforeRead:    []bool{false, false, false},
@@ -64,7 +64,7 @@ func TestReplayableReader(t *testing.T) {
 			expectedErrs:  []error{nil, nil, nil},
 		},
 		{
-			name: "SmallReadsRewindSmallRead",
+			name:                "SmallReadsRewindSmallRead",
 			src:                 bytes.NewReader([]byte{1, 2, 3, 4, 5}),
 			sequentialReadBytes: []int{1, 2, 4, 2},
 			rewindBeforeRead:    []bool{false, false, true, false},
@@ -73,7 +73,7 @@ func TestReplayableReader(t *testing.T) {
 			expectedErrs:  []error{nil, nil, nil, nil},
 		},
 		{
-			name: "BigReadRewindSmallReads",
+			name:                "BigReadRewindSmallReads",
 			src:                 bytes.NewReader([]byte{1, 2, 3, 4}),
 			sequentialReadBytes: []int{8192, 2, 3},
 			rewindBeforeRead:    []bool{false, true, false},
@@ -82,7 +82,7 @@ func TestReplayableReader(t *testing.T) {
 			expectedErrs:  []error{nil, nil, nil},
 		},
 		{
-			name: "BigReadRewindBigReadSmall_FinishedWithEOF",
+			name:                "BigReadRewindBigReadSmall_FinishedWithEOF",
 			src:                 bytes.NewReader([]byte{1, 2, 3, 4}),
 			sequentialReadBytes: []int{8192, 8192, 3},
 			rewindBeforeRead:    []bool{false, true, false},

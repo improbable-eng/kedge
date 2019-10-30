@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/Bplotka/oidc/login"
-	"github.com/Bplotka/oidc/login/diskcache"
+	disk "github.com/Bplotka/oidc/login/diskcache"
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/oidc"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/test"
+	directauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
+	k8sauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
+	oidcauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/oidc"
+	testauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/test"
 	pb "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/pkg/errors"
 )

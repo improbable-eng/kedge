@@ -3,7 +3,7 @@ package kedge_map_test
 import (
 	"testing"
 
-	"github.com/improbable-eng/kedge/pkg/map"
+	kedge_map "github.com/improbable-eng/kedge/pkg/map"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

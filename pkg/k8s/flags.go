@@ -14,8 +14,8 @@ import (
 
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/improbable-eng/kedge/pkg/tokenauth"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
-	"github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
+	directauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/direct"
+	k8sauth "github.com/improbable-eng/kedge/pkg/tokenauth/sources/k8s"
 	"github.com/pkg/errors"
 )
 

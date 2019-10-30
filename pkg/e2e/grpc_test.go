@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/improbable-eng/kedge/protogen/e2e"
+	e2e_helloworld "github.com/improbable-eng/kedge/protogen/e2e"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"

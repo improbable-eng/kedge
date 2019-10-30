@@ -3,16 +3,26 @@ language: go
 go:
   - 1.13.x
 
-cache:
-  directories:
-    - $GOPATH/pkg/mod
+matrix:
+  include:
+    - os: windows
+      dist: 1803-containers
+      env: VERSION=1.13.2 VARIANT=windows/windowsservercore-1803
+    - os: linux
+      env: VERSION=1.13.2 VARIANT=buster
 
 go_import_path: github.com/improbable-eng/kedge
+
+before_install:
+  # disabling windows defender to make the build quicker
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then powershell -command 'Set-MpPreference -DisableRealtimeMonitoring $true'; fi
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then choco install make; fi
 
 install:
 - export GOBIN="$GOPATH/bin"
 - make deps
 
 script:
-- make vet test
-
+# Different line endings on windows trigger a reformatting false positive, see https://github.com/golangci/golangci-lint/issues/580
+- if [ "$TRAVIS_OS_NAME" != "windows" ]; then make vet; fi
+- make test

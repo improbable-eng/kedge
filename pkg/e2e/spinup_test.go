@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -119,7 +118,21 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 
 		cmd := c
 		g.Add(func() error {
-			err := cmd.Wait()
+			done := make(chan error)
+
+			go func() { done <- cmd.Wait() }()
+
+			// Timeout makes sure we get an output even it the binaries never stop,
+			// like it was the case with a Windows SIGTERM bug.
+			timeout := time.After(5 * time.Second)
+
+			var doneErr error
+			select {
+			case <-timeout:
+				t.Log("Command timed out: " + cmd.Path)
+				doneErr = errors.New("Command timed out: " + cmd.Path)
+			case doneErr = <-done:
+			}
 
 			if stderr.Len() > 0 {
 				t.Logf("%s STDERR\n %s", cmd.Path, stderr.String())
@@ -128,9 +141,9 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 				t.Logf("%s STDOUT\n %s", cmd.Path, stdout.String())
 			}
 
-			return err
+			return doneErr
 		}, func(error) {
-			cmd.Process.Signal(syscall.SIGTERM)
+			cmd.Process.Kill()
 		})
 	}
 

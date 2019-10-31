@@ -49,7 +49,7 @@ require (
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	golang.org/x/oauth2 v0.0.0-20170802155448-96fca6c793ec
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0 // indirect
-	golang.org/x/tools v0.0.0-20191017101817-846f856e7d71 // indirect
+	golang.org/x/tools v0.0.0-20191030232956-1e24073be82c // indirect
 	google.golang.org/appengine v1.0.1-0.20170801183137-c5a90ac045b7 // indirect
 	google.golang.org/genproto v0.0.0-20170711235230-b0a3dcfcd1a9 // indirect
 	google.golang.org/grpc v1.2.1-0.20170804204618-963eb485d856

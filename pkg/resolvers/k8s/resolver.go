@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/improbable-eng/kedge/pkg/k8s"
 	"github.com/pkg/errors"

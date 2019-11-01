@@ -13,25 +13,25 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
-	"github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/improbable-eng/go-httpwares/logging/logrus"
-	"github.com/improbable-eng/go-httpwares/tags"
-	"github.com/improbable-eng/go-httpwares/tracing/debug"
-	"github.com/improbable-eng/kedge/pkg/map"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_logrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
+	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/improbable-eng/go-flagz"
+	protoflagz "github.com/improbable-eng/go-flagz/protobuf"
+	http_logrus "github.com/improbable-eng/go-httpwares/logging/logrus"
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
+	http_debug "github.com/improbable-eng/go-httpwares/tracing/debug"
+	kedge_map "github.com/improbable-eng/kedge/pkg/map"
 	"github.com/improbable-eng/kedge/pkg/reporter"
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
-	"github.com/improbable-eng/kedge/pkg/tls"
+	kedge_tls "github.com/improbable-eng/kedge/pkg/tls"
 	"github.com/improbable-eng/kedge/pkg/winch"
-	"github.com/improbable-eng/kedge/pkg/winch/grpc"
-	"github.com/improbable-eng/kedge/pkg/winch/http"
+	grpc_winch "github.com/improbable-eng/kedge/pkg/winch/grpc"
+	http_winch "github.com/improbable-eng/kedge/pkg/winch/http"
 	pb_config "github.com/improbable-eng/kedge/protogen/winch/config"
 	"github.com/mwitkow/go-conntrack"
-	"github.com/mwitkow/go-flagz"
-	"github.com/mwitkow/go-flagz/protobuf"
-	"github.com/mwitkow/go-proto-validators"
+	validator "github.com/mwitkow/go-proto-validators"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
@@ -119,7 +119,7 @@ func main() {
 	// TODO(bplotka): Add metrics.
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
-		prometheus.NewProcessCollector(os.Getpid(), ""),
+		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{PidFn: func() (int, error) { return os.Getpid(), nil }, Namespace: ""}),
 		prometheus.NewGoCollector(),
 	)
 

@@ -63,19 +63,7 @@ func TestParseTarget(t *testing.T) {
 				service:   "service4",
 				namespace: "ns4",
 				port: targetPort{
-					value:   "1010",
-					isNamed: false,
-				},
-			},
-		},
-		{
-			target: "service5.ns5:some-port",
-			expectgedTarget: targetEntry{
-				service:   "service5",
-				namespace: "ns5",
-				port: targetPort{
-					value:   "some-port",
-					isNamed: true,
+					value: "1010",
 				},
 			},
 		},

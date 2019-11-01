@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	pb "github.com/improbable-eng/kedge/protogen/kedge/config/grpc/routes"
 	"github.com/sirupsen/logrus"

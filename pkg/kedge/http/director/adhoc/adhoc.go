@@ -8,7 +8,7 @@ import (
 
 	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	"github.com/improbable-eng/kedge/pkg/kedge/http/director/router"
-	"github.com/improbable-eng/kedge/protogen/kedge/config/common"
+	kedge_config_common "github.com/improbable-eng/kedge/protogen/kedge/config/common"
 )
 
 type static struct {

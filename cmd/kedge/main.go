@@ -14,16 +14,17 @@ import (
 
 	"strings"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
-	"github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/improbable-eng/go-httpwares/logging/logrus"
-	"github.com/improbable-eng/go-httpwares/metrics"
-	"github.com/improbable-eng/go-httpwares/metrics/prometheus"
-	"github.com/improbable-eng/go-httpwares/tags"
-	"github.com/improbable-eng/go-httpwares/tracing/debug"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
+	grpc_logrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
+	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/improbable-eng/go-flagz"
+	http_logrus "github.com/improbable-eng/go-httpwares/logging/logrus"
+	http_metrics "github.com/improbable-eng/go-httpwares/metrics"
+	http_prometheus "github.com/improbable-eng/go-httpwares/metrics/prometheus"
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
+	http_debug "github.com/improbable-eng/go-httpwares/tracing/debug"
 	"github.com/improbable-eng/kedge/pkg/discovery"
 	"github.com/improbable-eng/kedge/pkg/http/ctxtags"
 	"github.com/improbable-eng/kedge/pkg/http/header"
@@ -35,7 +36,6 @@ import (
 	pb_config "github.com/improbable-eng/kedge/protogen/kedge/config"
 	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/mwitkow/go-flagz"
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
@@ -207,10 +207,10 @@ func main() {
 		// HTTPS proxy chain.
 		httpDirectorChain := chi.Chain(
 			http_ctxtags.Middleware("proxy", http_ctxtags.WithTagExtractor(kedgeRequestIDTagExtractor)), // Tags.
-			http_debug.Middleware(),                                                                     // Traces.
-			http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)),                        // Std Request/Response Logs.
-			http_metrics.Middleware(http_prometheus.ServerMetrics()),                                    // Std Request/Response Metrics.
-			reporter.Middleware(logEntry),                                                               // Kedge proxy metrics/logs
+			http_debug.Middleware(), // Traces.
+			http_logrus.Middleware(logEntry, http_logrus.WithLevels(logAsDebug)), // Std Request/Response Logs.
+			http_metrics.Middleware(http_prometheus.ServerMetrics()),             // Std Request/Response Metrics.
+			reporter.Middleware(logEntry),                                        // Kedge proxy metrics/logs
 		)
 
 		if authorizer != nil {
@@ -334,8 +334,8 @@ func debugServer(logEntry *log.Entry, middlewares chi.Middlewares, noAuthMiddlew
 	m.Handle("/debug/events", middlewares.HandlerFunc(trace.Events))
 
 	return &http.Server{
-		ErrorLog:     http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
-		Handler:      m,
+		ErrorLog: http_logrus.AsHttpLogger(logEntry.WithField(ctxtags.TagForScheme, "tls")),
+		Handler:  m,
 	}, nil
 }
 

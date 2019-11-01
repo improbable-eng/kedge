@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/improbable-eng/go-httpwares"
-	"github.com/improbable-eng/go-httpwares/tags"
+	http_ctxtags "github.com/improbable-eng/go-httpwares/tags"
 	"github.com/improbable-eng/kedge/pkg/http/header"
 	"github.com/improbable-eng/kedge/pkg/metrics"
 	"github.com/improbable-eng/kedge/pkg/reporter/errtypes"

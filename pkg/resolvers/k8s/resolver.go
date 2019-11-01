@@ -17,7 +17,7 @@ import (
 const (
 	// ExpectedTargetFmt is an expected format of the targetEntry Name given to Resolver. This is complainant with
 	// the kubeDNS/CoreDNS entry format.
-	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<port_name>|:<value number>)"
+	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<value number>)"
 )
 
 var (
@@ -72,8 +72,7 @@ func NewWithClient(logger logrus.FieldLogger, apiClient *k8s.APIClient) naming.R
 }
 
 type targetPort struct {
-	isNamed bool
-	value   string
+	value string
 }
 
 var noTargetPort = targetPort{}
@@ -109,8 +108,7 @@ func parseTarget(targetName string) (targetEntry, error) {
 			value: p,
 		}
 		if _, err := strconv.Atoi(p); err != nil {
-			// NaN
-			target.port.isNamed = true
+			return targetEntry{}, errors.Errorf("Named ports such as '%s' are not allowed", p)
 		}
 	}
 

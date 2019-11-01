@@ -1,9 +1,9 @@
 PREFIX            ?= $(shell pwd)
-FILES             ?= $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+FILES             ?= $(shell find . -type f -name '*.go' -not -path "./vendor/*" -not -name '*pb.go')
 DOCKER_IMAGE_NAME ?= kedge
 DOCKER_IMAGE_TAG  ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
-all: deps build
+all: build
 
 format:
 	@echo ">> formatting code"
@@ -11,7 +11,7 @@ format:
 
 deps: install-tools
 	@echo ">> downloading dependencies"
-	@dep ensure
+	@go mod download
 
 build:
 	@echo ">> building kedge"
@@ -20,16 +20,17 @@ build:
 	@go install github.com/improbable-eng/kedge/cmd/winch
 
 vet:
+	@goimports -d $(FILES) >> diff.txt
+	@if [ -s diff.txt ]; then echo "Please format your code with 'make format'."; cat diff.txt; rm diff.txt; exit 1; fi
+	@rm diff.txt
 	@echo ">> vetting code"
 	@go vet ./...
 
 install-tools:
 	@echo ">> fetching goimports"
 	@go get -u golang.org/x/tools/cmd/goimports
-	@echo ">> fetching dep"
-	@go get -u github.com/golang/dep/cmd/dep
 
-proto: 
+proto:
 	@echo ">> generating protobufs"
 	@./scripts/protogen.sh
 

@@ -58,7 +58,7 @@ NOTE: Any auth which is required by Service B / Pod B needs to configured on win
 
 ## Usage
 
-Kedge package is using [dep](https://github.com/golang/dep) for vendoring.
+Kedge package is using [Go modules](https://github.com/golang/go/wiki/Modules) for vendoring.
 
 Please see 
 * the [kedge](docs/kedge.md) for an actual guide.

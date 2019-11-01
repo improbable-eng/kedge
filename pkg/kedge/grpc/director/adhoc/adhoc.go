@@ -6,7 +6,7 @@ import (
 
 	"github.com/improbable-eng/kedge/pkg/kedge/common"
 	"github.com/improbable-eng/kedge/pkg/kedge/grpc/director/router"
-	"github.com/improbable-eng/kedge/protogen/kedge/config/common"
+	kedge_config_common "github.com/improbable-eng/kedge/protogen/kedge/config/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

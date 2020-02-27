@@ -38,8 +38,6 @@ const (
 	noAuthEndpointDNS                    = "no_auth.localhost.internal.example.com"
 	bearerTokenProxyAuthEndpointDNS      = "bearer_token_auth.localhost.internal.example.com"
 	wrongBearerTokenProxyAuthEndpointDNS = "wrong_bearer_token_auth.localhost.internal.example.com"
-
-	proxyBearerToken = "secret-bearer-token"
 )
 
 type config struct {
@@ -70,6 +68,11 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 	}
 
 	if cfg.kedge {
+		var bearerTokenProxyAuth string
+		if cfg.kedgeBearerTokenAuth {
+			// Token is specified in misc/winch_auth.json.
+			bearerTokenProxyAuth = "secret-bearer-token"
+		}
 		commands = append(commands, exec.Command("kedge",
 			"--server_http_port", httpKedgePort,
 			"--server_http_tls_port", httpTLSKedgePort,
@@ -82,7 +85,7 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 			"--kedge_config_backendpool_config_path", miscDir+"backendpool.json",
 			"--unsafe_bearer_token_proxy_auth", func() string {
 				if cfg.kedgeBearerTokenAuth {
-					return proxyBearerToken
+					return bearerTokenProxyAuth
 				}
 				return ""
 			}(),
@@ -176,9 +179,9 @@ func startTestEndpoints(g *run.Group, requireAuth bool, requiredHTTPToken string
 	log := logrus.New().WithField("bin", "testEndpoints")
 
 	s := &greetingsServer{
-		requireAuth:       requireAuth,
-		requiredHTTPToken: requiredHTTPToken,
-		requiredGRPCToken: requiredGRPCToken,
+		requireBearerTokenAuth: requireAuth,
+		requiredHTTPToken:      requiredHTTPToken,
+		requiredGRPCToken:      requiredGRPCToken,
 	}
 	{
 		listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%s", httpTestEndpointPort))
@@ -234,13 +237,13 @@ func startTestEndpoints(g *run.Group, requireAuth bool, requiredHTTPToken string
 }
 
 type greetingsServer struct {
-	requireAuth       bool
-	requiredGRPCToken string
-	requiredHTTPToken string
+	requireBearerTokenAuth bool
+	requiredGRPCToken      string
+	requiredHTTPToken      string
 }
 
 func (s *greetingsServer) SayHello(ctx context.Context, r *e2e_helloworld.HelloRequest) (*e2e_helloworld.HelloReply, error) {
-	if s.requireAuth {
+	if s.requireBearerTokenAuth {
 		token, err := authFromMD(ctx)
 		if err != nil {
 			return nil, err
@@ -273,7 +276,7 @@ func authFromMD(ctx context.Context) (string, error) {
 }
 
 func (s *greetingsServer) sayHelloHandler(w http.ResponseWriter, r *http.Request) {
-	if s.requireAuth {
+	if s.requireBearerTokenAuth {
 		token := r.Header.Get("authorization")
 		if token == "" {
 			w.WriteHeader(http.StatusUnauthorized)

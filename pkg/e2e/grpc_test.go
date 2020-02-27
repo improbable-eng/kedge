@@ -15,7 +15,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TestGRPCEndpointCall invokes end backend SayHello RPC through winch and kedge using authentication in the backend.
+// TestGRPCEndpointCallWithBackendAuth invokes end backend SayHello RPC through winch and kedge using authentication
+// in the backend.
 func TestGRPCEndpointCallWithBackendAuth(t *testing.T) {
 	const name = "kedge"
 
@@ -82,7 +83,8 @@ func TestGRPCEndpointCallWithBackendAuth(t *testing.T) {
 	})
 }
 
-// TestGRPCEndpointCall invokes end backend SayHello RPC through winch and kedge using authentication in the proxy.
+// TestGRPCEndpointCallWithProxyAuth invokes end backend SayHello RPC through winch and kedge using authentication in
+// the proxy.
 func TestGRPCEndpointCallWithProxyAuth(t *testing.T) {
 	const name = "kedge"
 

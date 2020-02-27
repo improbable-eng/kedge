@@ -14,7 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestHTTPEndpointCall invokes end backend sayHello HTTP handler through winch and kedge.
+// TestHTTPEndpointCallWithBackendAuth invokes end backend sayHello HTTP handler through winch and kedge using
+// authentication in the backend.
 func TestHTTPEndpointCallWithBackendAuth(t *testing.T) {
 	const name = "kedge"
 
@@ -77,6 +78,8 @@ func TestHTTPEndpointCallWithBackendAuth(t *testing.T) {
 	})
 }
 
+// TestHTTPEndpointCallWithBearerTokenProxyAuth invokes end backend SayHello RPC through winch and kedge using
+// authentication in the proxy.
 func TestHTTPEndpointCallWithBearerTokenProxyAuth(t *testing.T) {
 	const name = "kedge"
 

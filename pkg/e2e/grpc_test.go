@@ -15,12 +15,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TestGRPCEndpointCall invokes end backend SayHello RPC through winch and kedge.
-func TestGRPCEndpointCall(t *testing.T) {
+// TestGRPCEndpointCallWithBackendAuth invokes end backend SayHello RPC through winch and kedge using authentication
+// in the backend.
+func TestGRPCEndpointCallWithBackendAuth(t *testing.T) {
 	const name = "kedge"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	exit, err := spinup(t, ctx, config{winch: true, kedge: true, testEndpoint: true})
+	exit, err := spinup(t, ctx, config{winch: true, kedge: true, testEndpoint: true, testEndpointAuthentication: true})
 	if err != nil {
 		t.Error(err)
 		cancel()
@@ -32,50 +33,122 @@ func TestGRPCEndpointCall(t *testing.T) {
 		<-exit
 	}()
 
-	err = Retry(time.Second, ctx.Done(), func() error {
-		if err = assertRunning(exit); err != nil {
-			t.Error(err)
-			return nil
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		reply, err := grpcHelloViaWinchAndKedge(ctx, endpointDNS, name)
-		if err != nil {
-			if st, ok := status.FromError(err); ok {
-				if st.Code() == codes.Unavailable {
-					return errors.New("not ready")
-				}
-				t.Errorf("Unexpected gRPC error: %v", st.Code())
+	t.Run("AuthenticatedBackendAuthRequest_ShouldSucceed", func(t *testing.T) {
+		err = Retry(time.Second, ctx.Done(), func() error {
+			if err = assertRunning(exit); err != nil {
+				t.Error(err)
 				return nil
 			}
 
-			return err
-		}
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
 
-		if reply.Message != expectedResponse(name) {
-			t.Errorf("Unexpected response: %v; Exp: %s", reply.Message, expectedResponse(name))
+			reply, err := grpcHelloViaWinchAndKedge(ctx, endpointDNS, name)
+			if err != nil {
+				if st, ok := status.FromError(err); ok {
+					if st.Code() == codes.Unavailable {
+						return errors.New("not ready")
+					}
+					t.Errorf("Unexpected gRPC error: %v", st.Code())
+					return nil
+				}
+
+				return err
+			}
+
+			if reply.Message != expectedResponse(name) {
+				t.Errorf("Unexpected response: %v; Exp: %s", reply.Message, expectedResponse(name))
+				return nil
+			}
+
 			return nil
-		}
-
-		return nil
+		})
+		require.NoError(t, err)
 	})
-	require.NoError(t, err)
 
-	// Try URL for which winch will not append backend auth and we expect it to fail.
-	_, err = grpcHelloViaWinchAndKedge(ctx, noAuthEndpointDNS, name)
-	require.Error(t, err)
+	t.Run("UnauthenticatedBackendAuthRequest_ShouldReturnUnauthenticated", func(t *testing.T) {
+		// Try URL for which winch will not append backend auth and we expect it to fail.
+		_, err = grpcHelloViaWinchAndKedge(ctx, noAuthEndpointDNS, name)
+		require.Error(t, err)
 
-	if st, ok := status.FromError(err); ok {
-		if st.Code() != codes.Unauthenticated {
-			t.Errorf("Unexpected gRPC code: %v. Expected 401.", st.Code())
+		if st, ok := status.FromError(err); ok {
+			if st.Code() != codes.Unauthenticated {
+				t.Errorf("Unexpected gRPC code: %v. Expected 401.", st.Code())
+				return
+			}
+			// Ok.
 			return
 		}
-		// Ok.
+		t.Errorf("Unexpected error: %v", err)
+	})
+}
+
+// TestGRPCEndpointCallWithProxyAuth invokes end backend SayHello RPC through winch and kedge using authentication in
+// the proxy.
+func TestGRPCEndpointCallWithProxyAuth(t *testing.T) {
+	const name = "kedge"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	exit, err := spinup(t, ctx, config{winch: true, kedge: true, kedgeBearerTokenAuth: true, testEndpoint: true, testEndpointAuthentication: false})
+	if err != nil {
+		t.Error(err)
+		cancel()
 		return
 	}
-	t.Errorf("Unexpected error: %v", err)
+
+	defer func() {
+		cancel()
+		<-exit
+	}()
+
+	t.Run("AuthenticatedProxyAuthRequest_ShouldSucceed", func(t *testing.T) {
+		err = Retry(time.Second, ctx.Done(), func() error {
+			if err = assertRunning(exit); err != nil {
+				t.Error(err)
+				return nil
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			reply, err := grpcHelloViaWinchAndKedge(ctx, bearerTokenProxyAuthEndpointDNS, name)
+			if err != nil {
+				if st, ok := status.FromError(err); ok {
+					if st.Code() == codes.Unavailable {
+						return errors.New("not ready")
+					}
+					t.Errorf("Unexpected gRPC error: %v", st.Code())
+					return nil
+				}
+
+				return err
+			}
+
+			if reply.Message != expectedResponse(name) {
+				t.Errorf("Unexpected response: %v; Exp: %s", reply.Message, expectedResponse(name))
+				return nil
+			}
+
+			return nil
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("UnauthenticatedBackendAuthRequest_ShouldReturnUnauthenticated", func(t *testing.T) {
+		// Try URL for which winch will not append backend auth and we expect it to fail.
+		_, err = grpcHelloViaWinchAndKedge(ctx, wrongBearerTokenProxyAuthEndpointDNS, name)
+		require.Error(t, err)
+
+		if st, ok := status.FromError(err); ok {
+			if st.Code() != codes.Unauthenticated {
+				t.Errorf("Unexpected gRPC code: %v. Expected 401.", st.Code())
+				return
+			}
+			// Ok.
+			return
+		}
+		t.Errorf("Unexpected error: %v", err)
+	})
 }
 
 func grpcHelloViaWinchAndKedge(ctx context.Context, dnsName string, name string) (*e2e_helloworld.HelloReply, error) {

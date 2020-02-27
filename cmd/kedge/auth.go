@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/Bplotka/oidc/authorize"
+	"github.com/improbable-eng/kedge/pkg/bearertokenauth"
 	"github.com/improbable-eng/kedge/pkg/sharedflags"
 	"github.com/sirupsen/logrus"
 )
@@ -20,9 +21,26 @@ var (
 		"Permissions satisfy Kedge access auth.")
 	flagEnableOIDCAuthForDebugEnpoints = sharedflags.Set.Bool("server_enable_oidc_for_debug_endpoints", false,
 		"If true, debug endpoints will be hidden by OIDC Auth with the same configuration as proxy.")
+	flagUnsafeBearerToken = sharedflags.Set.String("unsafe_bearer_token_proxy_auth", "",
+		"If set, all requests via Kedge for routes proxy_auth set to token will be checked for the specified "+
+			"bearer token in the Proxy-Authorization header.")
 )
 
 func authorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {
+	if *flagUnsafeBearerToken != "" {
+		if *flagOIDCProvider != "" || *flagOIDCClientID != "" || *flagOIDCPermsClaim != "" || len(*flagOIDCWhiteListPerms) > 0 || *flagEnableOIDCAuthForDebugEnpoints {
+			return nil, errors.New("cannot enable both Basic and OIDC auth")
+		}
+		return basicAuthAuthorizerFromFlags(entry)
+	}
+	return oidcAuthorizerFromFlags(entry)
+}
+
+func basicAuthAuthorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {
+	return bearertokenauth.NewAuthorizer(*flagUnsafeBearerToken), nil
+}
+
+func oidcAuthorizerFromFlags(entry *logrus.Entry) (authorize.Authorizer, error) {
 	if *flagOIDCProvider == "" {
 		entry.Warn("No OIDC authorization is configured.")
 		return nil, nil

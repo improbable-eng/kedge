@@ -14,12 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestHTTPEndpointCall invokes end backend sayHello HTTP handler through winch and kedge.
-func TestHTTPEndpointCall(t *testing.T) {
+// TestHTTPEndpointCallWithBackendAuth invokes end backend sayHello HTTP handler through winch and kedge using
+// authentication in the backend.
+func TestHTTPEndpointCallWithBackendAuth(t *testing.T) {
 	const name = "kedge"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	exit, err := spinup(t, ctx, config{winch: true, kedge: true, testEndpoint: true})
+	exit, err := spinup(t, ctx, config{winch: true, kedge: true, testEndpoint: true, testEndpointAuthentication: true})
 	if err != nil {
 		t.Error(err)
 		cancel()
@@ -31,46 +32,115 @@ func TestHTTPEndpointCall(t *testing.T) {
 		<-exit
 	}()
 
-	err = Retry(time.Second, ctx.Done(), func() error {
-		if err = assertRunning(exit); err != nil {
-			t.Error(err)
-			return nil
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		status, body, err := httpHelloViaWinchAndKedge(ctx, endpointDNS, name)
-		if err != nil {
-			return err
-		}
-
-		if status != http.StatusOK {
-			if status == http.StatusBadGateway {
-				return errors.New("not ready")
+	t.Run("AuthenticatedBackendAuthRequest_ShouldSucceed", func(t *testing.T) {
+		err = Retry(time.Second, ctx.Done(), func() error {
+			if err = assertRunning(exit); err != nil {
+				t.Error(err)
+				return nil
 			}
 
-			t.Errorf("Unexpected status code: %v. Resp: %v", status, body)
-			return nil
-		}
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
 
-		if body != expectedResponse(name) {
-			t.Errorf("Unexpected response: %v; Exp: %s", body, expectedResponse(name))
-			return nil
-		}
+			status, body, err := httpHelloViaWinchAndKedge(ctx, endpointDNS, name)
+			if err != nil {
+				return err
+			}
 
-		return nil
+			if status != http.StatusOK {
+				if status == http.StatusBadGateway {
+					return errors.New("not ready")
+				}
+
+				t.Errorf("Unexpected status code: %v. Resp: %v", status, body)
+				return nil
+			}
+
+			if body != expectedResponse(name) {
+				t.Errorf("Unexpected response: %v; Exp: %s", body, expectedResponse(name))
+				return nil
+			}
+
+			return nil
+		})
+		require.NoError(t, err)
 	})
-	require.NoError(t, err)
 
-	// Try URL for which winch will not append backend auth and we expect it to fail.
-	status, body, err := httpHelloViaWinchAndKedge(ctx, noAuthEndpointDNS, name)
-	require.NoError(t, err)
+	t.Run("UnauthenticatedBackendAuthRequest_ShouldReturn401", func(t *testing.T) {
+		// Try URL for which winch will not append backend auth and we expect it to fail.
+		status, body, err := httpHelloViaWinchAndKedge(ctx, noAuthEndpointDNS, name)
+		require.NoError(t, err)
 
-	if status != http.StatusUnauthorized {
-		t.Errorf("Unexpected status code: %v. Expected 401. Resp: %v", status, body)
+		if status != http.StatusUnauthorized {
+			t.Errorf("Unexpected status code: %v. Expected 401. Resp: %v", status, body)
+			return
+		}
+	})
+}
+
+// TestHTTPEndpointCallWithBearerTokenProxyAuth invokes end backend SayHello RPC through winch and kedge using
+// authentication in the proxy.
+func TestHTTPEndpointCallWithBearerTokenProxyAuth(t *testing.T) {
+	const name = "kedge"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	// Do not require auth in the endpoint only in the proxy.
+	exit, err := spinup(t, ctx, config{winch: true, kedge: true, kedgeBearerTokenAuth: true, testEndpoint: true, testEndpointAuthentication: false})
+	if err != nil {
+		t.Error(err)
+		cancel()
 		return
 	}
+
+	defer func() {
+		cancel()
+		<-exit
+	}()
+
+	t.Run("AuthenticatedProxyAuthRequest_ShouldSucceed", func(t *testing.T) {
+		err = Retry(time.Second, ctx.Done(), func() error {
+			if err = assertRunning(exit); err != nil {
+				t.Error(err)
+				return nil
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			status, body, err := httpHelloViaWinchAndKedge(ctx, bearerTokenProxyAuthEndpointDNS, name)
+			if err != nil {
+				return err
+			}
+
+			if status != http.StatusOK {
+				if status == http.StatusBadGateway {
+					return errors.New("not ready")
+				}
+
+				t.Errorf("Unexpected status code: %v. Resp: %v", status, body)
+				return nil
+			}
+
+			if body != expectedResponse(name) {
+				t.Errorf("Unexpected response: %v; Exp: %s", body, expectedResponse(name))
+				return nil
+			}
+
+			return nil
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("UnauthenticatedProxyAuthRequest_ShouldReturn401", func(t *testing.T) {
+		// Try URL for which winch will not append backend auth and we expect it to fail.
+		status, body, err := httpHelloViaWinchAndKedge(ctx, wrongBearerTokenProxyAuthEndpointDNS, name)
+		require.NoError(t, err)
+
+		if status != http.StatusUnauthorized {
+			t.Errorf("Unexpected status code: %v. Expected 401. Resp: %v", status, body)
+			return
+		}
+	})
 }
 
 func httpHelloViaWinchAndKedge(ctx context.Context, dnsName string, name string) (int, string, error) {

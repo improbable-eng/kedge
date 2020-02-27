@@ -11,6 +11,18 @@
         "token": {
           "token": "secret-token2"
         }
+      },
+      {
+        "name": "proxy-bearer-token-auth",
+        "token": {
+          "token": "secret-bearer-token"
+        }
+      },
+      {
+        "name": "wrong-proxy-bearer-token-auth",
+        "token": {
+          "token": "wrong-secret-bearer-token"
+        }
       }
     ]
 }

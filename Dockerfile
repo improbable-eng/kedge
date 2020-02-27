@@ -9,7 +9,7 @@ RUN echo "Installing Kedge with version ${BUILD_VERSION}"
 RUN go install -ldflags "-X main.BuildVersion=${BUILD_VERSION}" github.com/improbable-eng/kedge/cmd/kedge
 RUN go install -ldflags "-X main.BuildVersion=${BUILD_VERSION}" github.com/improbable-eng/kedge/cmd/winch
 
-FROM ubuntu:20.04
+FROM ubuntu:18.04
 
 RUN apt-get update && apt-get install -qq -y --no-install-recommends git wget curl ca-certificates openssh-client
 

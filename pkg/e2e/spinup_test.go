@@ -34,14 +34,20 @@ const (
 
 	miscDir = "../../misc/"
 
-	endpointDNS       = "test_endpoint.localhost.internal.example.com"
-	noAuthEndpointDNS = "no_auth.test_endpoint.localhost.internal.example.com"
+	endpointDNS                          = "test_endpoint.localhost.internal.example.com"
+	noAuthEndpointDNS                    = "no_auth.localhost.internal.example.com"
+	bearerTokenProxyAuthEndpointDNS      = "bearer_token_auth.localhost.internal.example.com"
+	wrongBearerTokenProxyAuthEndpointDNS = "wrong_bearer_token_auth.localhost.internal.example.com"
+
+	proxyBearerToken = "secret-bearer-token"
 )
 
 type config struct {
-	winch        bool
-	kedge        bool
-	testEndpoint bool
+	winch                      bool
+	kedge                      bool
+	kedgeBearerTokenAuth       bool
+	testEndpoint               bool
+	testEndpointAuthentication bool
 }
 
 // NOTE: It is important to `make build` before using this function to compile latest changes.
@@ -74,6 +80,12 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 			"--server_tls_client_cert_required", "true",
 			"--kedge_config_director_config_path", miscDir+"director.json",
 			"--kedge_config_backendpool_config_path", miscDir+"backendpool.json",
+			"--unsafe_bearer_token_proxy_auth", func() string {
+				if cfg.kedgeBearerTokenAuth {
+					return proxyBearerToken
+				}
+				return ""
+			}(),
 			"--log_level", "debug",
 		))
 	}
@@ -82,7 +94,7 @@ func spinup(t testing.TB, ctx context.Context, cfg config) (chan error, error) {
 
 	if cfg.testEndpoint {
 		// Tokens are specified in misc/winch_auth.json
-		err := startTestEndpoints(&g, "secret-token2", "secret-token")
+		err := startTestEndpoints(&g, cfg.testEndpointAuthentication, "secret-token2", "secret-token")
 		if err != nil {
 			return nil, err
 		}
@@ -160,10 +172,11 @@ func expectedResponse(name string) string {
 	return fmt.Sprintf("Hello %v!", name)
 }
 
-func startTestEndpoints(g *run.Group, requiredHTTPToken string, requiredGRPCToken string) error {
+func startTestEndpoints(g *run.Group, requireAuth bool, requiredHTTPToken string, requiredGRPCToken string) error {
 	log := logrus.New().WithField("bin", "testEndpoints")
 
 	s := &greetingsServer{
+		requireAuth:       requireAuth,
 		requiredHTTPToken: requiredHTTPToken,
 		requiredGRPCToken: requiredGRPCToken,
 	}
@@ -221,18 +234,21 @@ func startTestEndpoints(g *run.Group, requiredHTTPToken string, requiredGRPCToke
 }
 
 type greetingsServer struct {
+	requireAuth       bool
 	requiredGRPCToken string
 	requiredHTTPToken string
 }
 
 func (s *greetingsServer) SayHello(ctx context.Context, r *e2e_helloworld.HelloRequest) (*e2e_helloworld.HelloReply, error) {
-	token, err := authFromMD(ctx)
-	if err != nil {
-		return nil, err
-	}
+	if s.requireAuth {
+		token, err := authFromMD(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-	if token != s.requiredGRPCToken {
-		return nil, status.Error(codes.Unauthenticated, "wrong token")
+		if token != s.requiredGRPCToken {
+			return nil, status.Error(codes.Unauthenticated, "wrong token")
+		}
 	}
 
 	return &e2e_helloworld.HelloReply{
@@ -257,29 +273,31 @@ func authFromMD(ctx context.Context) (string, error) {
 }
 
 func (s *greetingsServer) sayHelloHandler(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("authorization")
-	if token == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("No authorization header"))
-		return
-	}
+	if s.requireAuth {
+		token := r.Header.Get("authorization")
+		if token == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("No authorization header"))
+			return
+		}
 
-	splits := strings.SplitN(token, " ", 2)
-	if len(splits) != 2 {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("Bad authorization string"))
-		return
-	}
-	if strings.ToLower(splits[0]) != "bearer" {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("Bad authorization string. No bearer"))
-		return
-	}
+		splits := strings.SplitN(token, " ", 2)
+		if len(splits) != 2 {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Bad authorization string"))
+			return
+		}
+		if strings.ToLower(splits[0]) != "bearer" {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Bad authorization string. No bearer"))
+			return
+		}
 
-	if splits[1] != s.requiredHTTPToken {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("wrong token"))
-		return
+		if splits[1] != s.requiredHTTPToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("wrong token"))
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)

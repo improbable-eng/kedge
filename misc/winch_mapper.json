@@ -2,14 +2,28 @@
   "routes": [
     {
       "regexp": {
-        "exp": "^no_auth[.]([a-z0-9-_].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "exp": "^no_auth[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "url": "https://${cluster}:18171"
+      }
+    },
+    {
+      "proxy_auth": "proxy-bearer-token-auth",
+      "regexp": {
+        "exp": "^bearer_token_auth[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "url": "https://${cluster}:18171"
+      }
+    },
+    {
+      "proxy_auth": "wrong-proxy-bearer-token-auth",
+      "regexp": {
+        "exp": "^wrong_bearer_token_auth[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
         "url": "https://${cluster}:18171"
       }
     },
     {
       "backend_auth": "test-endpoint-http",
       "regexp": {
-        "exp": "^([a-z0-9-_].*)[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
+        "exp": "^test_endpoint[.](?P<cluster>[a-z0-9-].*)[.]internal[.]example[.]com",
         "url": "https://${cluster}:18171"
       },
       "protocol": "HTTP"

@@ -10,7 +10,19 @@
       {
         "backend_name": "test_endpoint",
         "service_name_matcher": "*",
-        "authority_host_matcher": "no_auth.test_endpoint.localhost.internal.example.com",
+        "authority_host_matcher": "no_auth.localhost.internal.example.com",
+        "authority_port_matcher": 18271
+      },
+      {
+        "backend_name": "test_endpoint",
+        "service_name_matcher": "*",
+        "authority_host_matcher": "bearer_token_auth.localhost.internal.example.com",
+        "authority_port_matcher": 18271
+      },
+      {
+        "backend_name": "test_endpoint",
+        "service_name_matcher": "*",
+        "authority_host_matcher": "wrong_bearer_token_auth.localhost.internal.example.com",
         "authority_port_matcher": 18271
       }
     ]
@@ -24,7 +36,17 @@
       },
       {
         "backend_name": "test_endpoint",
-        "host_matcher": "no_auth.test_endpoint.localhost.internal.example.com",
+        "host_matcher": "no_auth.localhost.internal.example.com",
+        "port_matcher": 18270
+      },
+      {
+        "backend_name": "test_endpoint",
+        "host_matcher": "bearer_token_auth.localhost.internal.example.com",
+        "port_matcher": 18270
+      },
+      {
+        "backend_name": "test_endpoint",
+        "host_matcher": "wrong_bearer_token_auth.localhost.internal.example.com",
         "port_matcher": 18270
       }
     ]

@@ -24,6 +24,10 @@ func TestParseTarget(t *testing.T) {
 			expectedErr: errors.Errorf("Bad targetEntry name. It cannot contain any schema. Expected format: %s", ExpectedTargetFmt),
 		},
 		{
+			target:      "service1.ns1:123:123",
+			expectedErr: errors.Errorf("bad targetEntry - it contains multiple \":\" - expected format is %s", ExpectedTargetFmt),
+		},
+		{
 			target: "service1",
 			expectgedTarget: targetEntry{
 				service:   "service1",
@@ -63,7 +67,19 @@ func TestParseTarget(t *testing.T) {
 				service:   "service4",
 				namespace: "ns4",
 				port: targetPort{
-					value: "1010",
+					value:   "1010",
+					isNamed: false,
+				},
+			},
+		},
+		{
+			target: "service5.ns5:some-port",
+			expectgedTarget: targetEntry{
+				service:   "service5",
+				namespace: "ns5",
+				port: targetPort{
+					value:   "some-port",
+					isNamed: true,
 				},
 			},
 		},

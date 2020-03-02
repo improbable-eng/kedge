@@ -20,12 +20,15 @@ var (
 		Ports: []v1.EndpointPort{
 			{
 				Port: 8080,
+				Name: "someName",
 			},
 			{
 				Port: 8081,
+				Name: "someName1",
 			},
 			{
 				Port: 8082,
+				Name: "someName2",
 			},
 		},
 		Addresses: []v1.EndpointAddress{
@@ -38,6 +41,7 @@ var (
 		Ports: []v1.EndpointPort{
 			{
 				Port: 8080,
+				Name: "someName",
 			},
 		},
 		Addresses: []v1.EndpointAddress{
@@ -50,6 +54,7 @@ var (
 		Ports: []v1.EndpointPort{
 			{
 				Port: 8080,
+				Name: "someName",
 			},
 		},
 		Addresses: []v1.EndpointAddress{
@@ -68,6 +73,7 @@ var (
 		Ports: []v1.EndpointPort{
 			{
 				Port: 8080,
+				Name: "someName",
 			},
 		},
 		Addresses: []v1.EndpointAddress{
@@ -95,7 +101,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 			watchedTargetPort: targetPort{},
 			changes:           []change{newTestChange(watch.Added, testAddr1)},
 			expectedErrs: []error{errors.New("failed to convert k8s endpoint subset to update Addr: we got " +
-				"[{ 8080 } { 8081 } { 8082 }] ports and target port is not specified. Don't know what to choose")},
+				"[{someName 8080 } {someName1 8081 } {someName2 8082 }] ports and target port is not specified. Don't know what to choose")},
 		},
 		{
 			watchedTargetPort: targetPort{},
@@ -110,7 +116,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 			},
 		},
 		{
-			watchedTargetPort: targetPort{value: "8082"},
+			watchedTargetPort: targetPort{isNamed: true, value: "someName2"},
 			changes:           []change{newTestChange(watch.Added, testAddr1)},
 			expectedUpdates: [][]*naming.Update{
 				{
@@ -136,13 +142,20 @@ func TestWatcher_Next_OK(t *testing.T) {
 		{
 			// Non existing port just return no IPs. This makes configuration bit harder to debug, but we cannot assume
 			// port is always in any subset.
-			watchedTargetPort: targetPort{value: "9999"},
+			watchedTargetPort: targetPort{value: "no-such-number"},
+			changes:           []change{newTestChange(watch.Added, testAddr1)},
+			expectedUpdates:   [][]*naming.Update{nil},
+		},
+		{
+			// Non existing named port just return no IPs. This makes configuration bit harder to debug, but we cannot assume
+			// port is always in any subset.
+			watchedTargetPort: targetPort{isNamed: true, value: "non-existing-port-name"},
 			changes:           []change{newTestChange(watch.Added, testAddr1)},
 			expectedUpdates:   [][]*naming.Update{nil},
 		},
 		// Watcher next() tests:
 		{
-			watchedTargetPort: targetPort{value: "8080"},
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
 				newTestChange(watch.Modified, modifiedAddr1),
@@ -167,7 +180,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 			},
 		},
 		{
-			watchedTargetPort: targetPort{value: "8080"},
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, multipleAddrSubset),
 				newTestChange(watch.Modified, multipleAddrSubset),
@@ -218,7 +231,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 		},
 		{
 			// Test case that did not work previously because of bug.
-			watchedTargetPort: targetPort{value: "8080"},
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
 				newTestChange(watch.Deleted, testAddr1),
@@ -246,7 +259,7 @@ func TestWatcher_Next_OK(t *testing.T) {
 			},
 		},
 		{
-			watchedTargetPort: targetPort{value: "8080"},
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Modified, testAddr1),
 			},
@@ -262,17 +275,17 @@ func TestWatcher_Next_OK(t *testing.T) {
 		},
 		// Malformed state cases. We assume this order of events will never happen:
 		{
-			watchedTargetPort: targetPort{value: "8080"},
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Deleted, testAddr1),
 			},
 			expectedErrs: []error{errors.New("malformed internal state for addresses for target {  " +
-				"{8080}}. We got delete event type with state before deletion and it does not match with that " +
+				"{true someName}}. We got delete event type with state before deletion and it does not match with that " +
 				"we tracked map[]. State before deletion map[1.2.3.4:8080:{}]. Doing resync...")},
 		},
 		{
 			// This can happen (two adds) when we do resync.
-			watchedTargetPort: targetPort{value: "8080"},
+			watchedTargetPort: targetPort{isNamed: true, value: "someName"},
 			changes: []change{
 				newTestChange(watch.Added, testAddr1),
 				newTestChange(watch.Added, testAddr1),

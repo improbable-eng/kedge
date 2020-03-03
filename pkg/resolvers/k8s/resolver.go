@@ -17,7 +17,7 @@ import (
 const (
 	// ExpectedTargetFmt is an expected format of the targetEntry Name given to Resolver. This is complainant with
 	// the kubeDNS/CoreDNS entry format.
-	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<value number>)"
+	ExpectedTargetFmt = "<service>(|.<namespace>)(|.<whatever suffix>)(|:<port_name>|:<value number>)"
 )
 
 var (
@@ -72,7 +72,8 @@ func NewWithClient(logger logrus.FieldLogger, apiClient *k8s.APIClient) naming.R
 }
 
 type targetPort struct {
-	value string
+	isNamed bool
+	value   string
 }
 
 var noTargetPort = targetPort{}
@@ -93,23 +94,35 @@ func parseTarget(targetName string) (targetEntry, error) {
 		return targetEntry{}, errors.Errorf("Bad targetEntry name. It cannot contain any schema. Expected format: %s", ExpectedTargetFmt)
 	}
 
-	// To be parsed in expected manner we need to add some schema. We validated if there is not any scheme above.
-	u, err := url.Parse(fmt.Sprintf("no-matter://%s", targetName))
-	if err != nil {
-		return targetEntry{}, err
-	}
-
 	target := targetEntry{
 		namespace: "default",
 		port:      noTargetPort,
 	}
-	if p := u.Port(); p != "" {
-		target.port = targetPort{
-			value: p,
+
+	// Check if the port is named port. If it is, strip it before verifying this is a valid URL. We do this because the
+	// k8s resolver can work with named ports, but since go1.12 url.Parse does not support non-numeric ports.
+	targetNameParts := strings.Split(targetName, ":")
+	if len(targetNameParts) > 2 {
+		return targetEntry{}, errors.Errorf("bad targetEntry - it contains multiple \":\" - expected format is %s", ExpectedTargetFmt)
+	}
+	if len(targetNameParts) == 2 {
+		if p := targetNameParts[1]; p != "" {
+			target.port = targetPort{
+				value: p,
+			}
+			if _, err := strconv.Atoi(p); err != nil {
+				// NaN
+				target.port.isNamed = true
+				// Remove the named port from the targetName since it is unsupported in url.Parse.
+				targetName = targetNameParts[0]
+			}
 		}
-		if _, err := strconv.Atoi(p); err != nil {
-			return targetEntry{}, errors.Errorf("Named ports such as '%s' are not allowed", p)
-		}
+	}
+
+	// To be parsed in expected manner we need to add some schema. We validated if there is not any scheme above.
+	u, err := url.Parse(fmt.Sprintf("no-matter://%s", targetName))
+	if err != nil {
+		return targetEntry{}, err
 	}
 
 	serviceNamespace := strings.Split(u.Hostname(), ".")

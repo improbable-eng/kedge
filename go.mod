@@ -41,7 +41,7 @@ require (
 	github.com/prometheus/client_golang v1.2.0
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/common v0.7.0
-	github.com/rs/cors v0.0.0-20170801073201-eabcc6af4bbe
+	github.com/rs/cors v1.5.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.3.0
